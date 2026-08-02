@@ -23,6 +23,12 @@ export const PLAYER = {
   /**
    * Steps are ~0.2 m; autostep must clear them comfortably or the capsule
    * catches on every tread. Set above the tallest riser the stair can produce.
+   *
+   * Measured, autostep does NOT save a vertical face here: with this raised to
+   * 0.6 the walker still would not climb a 0.42 m ledge, or a 0.2 m one. So the
+   * collision geometry has to carry the walker on slopes alone — see
+   * stairRampBoxes() and stairApproaches(). This value is the fallback, not the
+   * mechanism.
    */
   autostepMaxHeight: 0.35,
   autostepMinWidth: 0.15,

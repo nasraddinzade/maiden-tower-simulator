@@ -1,7 +1,15 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
-import { planAllFlights, stairTreadVertices, type StepPlacement, type Winding } from '../../lib/staircase'
+import {
+  PASSAGE_SIDE_CLEARANCE,
+  planAllFlights,
+  stairApproaches,
+  stairTreadVertices,
+  treadDepth,
+  type StepPlacement,
+  type Winding,
+} from '../../lib/staircase'
 import { stairRampBoxes } from '../../lib/collision'
 import { FLOORS, innerRadiusAt } from '../../config/tower'
 
@@ -55,8 +63,8 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
         out.push({
           ...s,
           radialWidth: p.width,
-          // a tread as deep as its riser reads as solid masonry, not a plank
-          thickness: Math.max(0.12, riser),
+          // down to the floor of the passage cut — see treadDepth()
+          thickness: treadDepth(riser),
         })
       }
     })
@@ -93,7 +101,18 @@ function useRampBoxes(p: StaircaseProps) {
       FLOORS,
       innerRadiusAt,
     )
-    return stairRampBoxes(flights.flat(), p.width)
+    /*
+     * The ramp chain covers the treads and nothing else, so on its own it starts
+     * and ends in mid-air. The landings are the two ends — see stairLandings().
+     */
+    const approaches = stairApproaches(flights, p.width, innerRadiusAt, (i, end) =>
+      end === 'foot' ? FLOORS[i].floorY : FLOORS[i + 1].floorY,
+    )
+    return [
+      ...stairRampBoxes(flights.flat(), p.width),
+      // one box each — stepsPerBox is irrelevant on a two-point run
+      ...approaches.flatMap((pair) => stairRampBoxes(pair, p.width)),
+    ]
   }, [p.startAzimuthDeg, p.width, p.riserTarget, p.goingTarget, p.winding, p.wallClearance])
 }
 
@@ -114,10 +133,17 @@ export function Staircase(props: StaircaseProps) {
   const stoneMaterial = props.material ?? fallback
 
   const geometry = useMemo(() => {
-    const { positions, indices } = stairTreadVertices(steps, props.width, (s) => {
-      const placed = s as PlacedStep
-      return placed.thickness ?? 0.2
-    })
+    /*
+     * The tread fills the passage's FULL width, side clearance included. The
+     * clearance is there so the walking surface never fouls the passage wall,
+     * but leaving the stone short of it opened a 6 cm slot down each side of
+     * every step. A little of the block buried in the masonry costs nothing.
+     */
+    const { positions, indices } = stairTreadVertices(
+      steps,
+      props.width + 2 * PASSAGE_SIDE_CLEARANCE,
+      (s) => (s as PlacedStep).thickness ?? 0.2,
+    )
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     g.setIndex(indices)

@@ -18,7 +18,14 @@ import { describe, expect, it } from 'vitest'
 import { FLOORS, STAIR, TOWER, innerRadiusAt } from '../config/tower'
 import { PLAYER } from '../config/player'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from './cupola'
-import { planAllFlights, stairPassageSections, stairTreadVertices } from './staircase'
+import {
+  PASSAGE_SIDE_CLEARANCE,
+  planAllFlights,
+  stairApproaches,
+  stairPassageSections,
+  stairTreadVertices,
+  treadDepth,
+} from './staircase'
 
 /**
  * Must match WALL_EMBED in components/tower/FloorStructures.tsx.
@@ -217,31 +224,57 @@ describe('the stair leaves no slot that looks through', () => {
       positions[i * 3 + 1],
       positions[i * 3 + 2],
     ]
-    const yTop = Math.max(...positions.filter((_, i) => i % 3 === 1))
-    const yBottom = Math.min(...positions.filter((_, i) => i % 3 === 1))
 
-    let topFaces = 0
-    let bottomFaces = 0
+    /*
+     * EVERY face, not just the horizontal ones. An earlier version of this test
+     * checked only the top and bottom, and the two radial end faces — the riser
+     * itself — stayed inside-out through it: a quarter of each step's faces were
+     * culled, so from whichever side you were climbing you looked straight
+     * through the stone. Checking the whole prism costs nothing and cannot be
+     * fooled the same way.
+     *
+     * Each tread is one prism of VERTS_PER_STEP vertices, so a triangle's step
+     * is just its first index divided by that; the outward test is against that
+     * step's own centroid.
+     */
+    const VERTS_PER_STEP = positions.length / 3 / steps.length
+    expect(VERTS_PER_STEP, 'vertices do not divide evenly into steps').toBe(
+      Math.round(VERTS_PER_STEP),
+    )
+
+    const centroid = (step: number): [number, number, number] => {
+      let x = 0
+      let y = 0
+      let z = 0
+      for (let v = step * VERTS_PER_STEP; v < (step + 1) * VERTS_PER_STEP; v++) {
+        x += positions[v * 3]
+        y += positions[v * 3 + 1]
+        z += positions[v * 3 + 2]
+      }
+      return [x / VERTS_PER_STEP, y / VERTS_PER_STEP, z / VERTS_PER_STEP]
+    }
+
+    let inward = 0
     for (let t = 0; t < indices.length; t += 3) {
       const p = at(indices[t])
       const q = at(indices[t + 1])
       const r = at(indices[t + 2])
       const e1 = [q[0] - p[0], q[1] - p[1], q[2] - p[2]]
       const e2 = [r[0] - p[0], r[1] - p[1], r[2] - p[2]]
-      const ny = e1[2] * e2[0] - e1[0] * e2[2] // y component of e1 × e2
-      const meanY = (p[1] + q[1] + r[1]) / 3
-
-      if (Math.abs(meanY - yTop) < 1e-6) {
-        topFaces++
-        expect(ny, 'a tread top face pointing downward').toBeGreaterThan(0)
-      }
-      if (Math.abs(meanY - yBottom) < 1e-6) {
-        bottomFaces++
-        expect(ny, 'a tread bottom face pointing upward').toBeLessThan(0)
-      }
+      const n = [
+        e1[1] * e2[2] - e1[2] * e2[1],
+        e1[2] * e2[0] - e1[0] * e2[2],
+        e1[0] * e2[1] - e1[1] * e2[0],
+      ]
+      const c = centroid(Math.floor(indices[t] / VERTS_PER_STEP))
+      const d = [
+        (p[0] + q[0] + r[0]) / 3 - c[0],
+        (p[1] + q[1] + r[1]) / 3 - c[1],
+        (p[2] + q[2] + r[2]) / 3 - c[2],
+      ]
+      if (n[0] * d[0] + n[1] * d[1] + n[2] * d[2] <= 0) inward++
     }
-    expect(topFaces, 'no top faces found to check').toBeGreaterThan(0)
-    expect(bottomFaces, 'no bottom faces found to check').toBeGreaterThan(0)
+    expect(inward, `${inward} tread faces are wound inside-out`).toBe(0)
   })
 
   it('makes consecutive treads share an edge, so no wedge sticks out', () => {
@@ -274,21 +307,148 @@ describe('the stair leaves no slot that looks through', () => {
         const section = byAzimuth.get(s.azimuthDeg.toFixed(4))
         expect(section, `no passage section at az ${s.azimuthDeg.toFixed(1)}`).toBeDefined()
         if (!section) continue
-        const treadInner = s.midRadius - STAIR.width / 2
-        const treadOuter = s.midRadius + STAIR.width / 2
-        // Inward the tread ABUTS the passage wall — both sit on the room face,
-        // which is what the source describes, so they are equal by design and
-        // only a tread poking PAST it is a fault.
+        /*
+         * The tread fills the passage's full width. Anything narrower leaves a
+         * slot down each side that looks through to the bed, which is what the
+         * flight looked like when the tread was only STAIR.width across.
+         */
+        const treadWidth = STAIR.width + 2 * PASSAGE_SIDE_CLEARANCE
+        const treadInner = s.midRadius - treadWidth / 2
+        const treadOuter = s.midRadius + treadWidth / 2
         expect(
           treadInner,
-          `tread at az ${s.azimuthDeg.toFixed(1)} pokes through the inner wall`,
-        ).toBeGreaterThanOrEqual(section.innerRadius - 1e-9)
+          `slot inside the tread at az ${s.azimuthDeg.toFixed(1)}`,
+        ).toBeLessThanOrEqual(section.innerRadius + 1e-9)
         expect(
           treadOuter,
-          `tread at az ${s.azimuthDeg.toFixed(1)} pokes through the outer wall`,
-        ).toBeLessThan(section.outerRadius)
+          `slot outside the tread at az ${s.azimuthDeg.toFixed(1)}`,
+        ).toBeGreaterThanOrEqual(section.outerRadius - 1e-9)
       }
     }
+  })
+
+  it('carries every tread down to the passage floor, leaving no void under the nosing', () => {
+    /*
+     * A tread one riser thick is a plank on nothing: under each nosing sat a
+     * half-riser void down to the bed, and the flight read as floating slabs
+     * with black gaps between them. Cut stone steps are monolithic with their
+     * risers, so the block runs down to the floor of the cut — which also makes
+     * consecutive treads overlap and the stair become one solid mass.
+     */
+    const byAzimuth = new Map(sections.map((s) => [s.azimuthDeg.toFixed(4), s]))
+    for (const flight of flights) {
+      if (flight.length < 2) continue
+      const riser = Math.abs(flight[1].treadY - flight[0].treadY)
+      for (const s of flight) {
+        const section = byAzimuth.get(s.azimuthDeg.toFixed(4))
+        if (!section) continue
+        const treadBottom = s.treadY - treadDepth(riser)
+        expect(
+          treadBottom,
+          `az ${s.azimuthDeg.toFixed(1)}: tread bottom ${treadBottom.toFixed(3)} vs passage floor ${section.bottomY.toFixed(3)}`,
+        ).toBeCloseTo(section.bottomY, 6)
+      }
+    }
+  })
+
+  it('overlaps consecutive treads vertically, so the flight is one mass', () => {
+    for (const flight of flights) {
+      if (flight.length < 2) continue
+      const riser = Math.abs(flight[1].treadY - flight[0].treadY)
+      const depth = treadDepth(riser)
+      for (let i = 0; i < flight.length - 1; i++) {
+        const overlap = flight[i].treadY - (flight[i + 1].treadY - depth)
+        expect(overlap, `steps ${i}/${i + 1} overlap`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  /*
+   * The walking surface, as opposed to the drawn stone.
+   *
+   * The character controller will NOT climb a vertical face — measured: with
+   * autostep raised to 0.6 m it still refused a 0.42 m ledge, and a 0.2 m one.
+   * So the collision geometry has to carry the walker on slopes alone. That is
+   * why the flight is a ramp chain rather than a box per tread, and it is why
+   * the way in from each room has to be a ramp too.
+   */
+  describe('the way onto the stair is walkable', () => {
+    const approaches = stairApproaches(flights, STAIR.width, innerRadiusAt, (i, end) =>
+      end === 'foot' ? FLOORS[i].floorY : FLOORS[i + 1].floorY,
+    )
+
+    it('gives every storey exactly one way onto the helix', () => {
+      /*
+       * One per flight head, plus one at the bottom flight's foot. Emitting a
+       * foot approach on the upper flights too laid a second surface across the
+       * landing, 0.42 m above the top treads of the flight below, and the climb
+       * stopped three steps short of the storey.
+       */
+      expect(approaches.length).toBe(flights.length + 1)
+      const feet = approaches.filter(
+        ([, out]) => !flights.some((f) => Math.abs(f[f.length - 1].treadY - out.treadY) < 1e-9),
+      )
+      expect(feet.length, 'more than one foot approach').toBe(1)
+    })
+
+    it('starts each approach inside the room, under its floor slab', () => {
+      for (const [inRoom] of approaches) {
+        const face = innerRadiusAt(inRoom.treadY)
+        expect(
+          inRoom.midRadius,
+          `approach at y ${inRoom.treadY.toFixed(2)} starts at r ${inRoom.midRadius.toFixed(2)}, wall face ${face.toFixed(2)}`,
+        ).toBeLessThan(face - 0.3)
+      }
+    })
+
+    it('keeps every approach a walkable slope, never a face', () => {
+      /*
+       * The whole point of the approach is that it has no vertical face, so its
+       * own pitch has to stay inside the controller's climb limit — otherwise it
+       * is a wall with a chamfer on it and nothing is gained.
+       */
+      const limit = Math.tan(PLAYER.maxSlopeClimbAngleDeg * (Math.PI / 180))
+      for (const [inRoom, onStair] of approaches) {
+        const ax = inRoom.azimuthDeg * (Math.PI / 180)
+        const bx = onStair.azimuthDeg * (Math.PI / 180)
+        const run = Math.hypot(
+          onStair.midRadius * Math.sin(bx) - inRoom.midRadius * Math.sin(ax),
+          onStair.midRadius * Math.cos(bx) - inRoom.midRadius * Math.cos(ax),
+        )
+        const rise = Math.abs(onStair.treadY - inRoom.treadY)
+        expect(run, 'an approach with no run is a vertical face').toBeGreaterThan(0.3)
+        expect(
+          rise / run,
+          `approach at y ${inRoom.treadY.toFixed(2)}: ${rise.toFixed(2)} m over ${run.toFixed(2)} m`,
+        ).toBeLessThan(limit)
+      }
+    })
+
+    it('never lays a head landing over the treads below it', () => {
+      /*
+       * The landing is level with the storey floor. Centred on the top tread it
+       * reaches back over the two treads below, which are one and two risers
+       * lower — a level slab over a descending flight is a wall across it. It is
+       * therefore pushed one half-width ALONG the climb, so its trailing edge
+       * falls on the top tread and everything it covers is higher, not lower.
+       */
+      flights.forEach((steps, i) => {
+        const last = steps[steps.length - 1]
+        const floorY = FLOORS[i + 1].floorY
+        const halfWidthDeg = ((STAIR.width / last.midRadius) * (180 / Math.PI)) / 2
+        const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
+        const landingAz = last.azimuthDeg + halfWidthDeg * climbDir
+
+        for (const s of flights.flat()) {
+          const inside = Math.abs(s.azimuthDeg - landingAz) <= halfWidthDeg + 1e-9
+          if (!inside) continue
+          expect(
+            s.treadY,
+            `storey ${i + 2} landing at az ${landingAz.toFixed(1)} covers a tread at az ${s.azimuthDeg.toFixed(1)}, y ${s.treadY.toFixed(2)} — ${(floorY - s.treadY).toFixed(2)} m below the landing`,
+          ).toBeGreaterThanOrEqual(floorY - 1e-9)
+        }
+      })
+    })
   })
 
   it('bottoms the gap under each tread out on the bed, so it cannot see through', () => {

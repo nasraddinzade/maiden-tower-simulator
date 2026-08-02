@@ -238,13 +238,13 @@ export function stairPassageSections(
    * flight is a passage off the room, not a shaft.
    */
   innerFaceRadiusAt: (y: number) => number,
-  sideClearance = 0.06,
+  sideClearance = PASSAGE_SIDE_CLEARANCE,
   /**
    * Tolerance between the underside of a tread block and the floor of the cut,
    * metres. Only a tolerance — the depth itself is the flight's own riser, so
    * the stone below the passage rises with the stair and meets each tread.
    */
-  footTolerance = 0.02,
+  footTolerance = PASSAGE_FOOT_TOLERANCE,
 ): PassageSection[][] {
   const half = width / 2 + sideClearance
 
@@ -334,6 +334,29 @@ export function stairPassageSections(
   ]
 }
 
+/** Clearance kept either side of the flight inside the passage, metres. */
+export const PASSAGE_SIDE_CLEARANCE = 0.06
+/** Tolerance between a tread's underside and the floor of the cut, metres. */
+export const PASSAGE_FOOT_TOLERANCE = 0.02
+
+/**
+ * How deep a tread block is: from its own surface all the way DOWN to the floor
+ * of the passage cut, not one riser.
+ *
+ * A tread one riser thick is a plank on nothing. Under each nosing there was a
+ * half-riser void down to the bed, and beside each end a 6 cm slot, so the
+ * flight read as a stack of floating slabs with black gaps — "дырявая
+ * лестница". Cut stone steps are monolithic with their risers: carrying every
+ * tread down to the passage floor makes consecutive treads overlap vertically
+ * and the flight becomes one solid stepped mass.
+ *
+ * Must track stairPassageSections()' own bottomY, or the tread either floats
+ * again or pushes through the floor beneath it.
+ */
+export function treadDepth(riser: number): number {
+  return 1.5 * Math.max(0.12, riser) + PASSAGE_FOOT_TOLERANCE
+}
+
 /**
  * The treads as annular sectors — the shape a winder tread actually has.
  *
@@ -393,10 +416,17 @@ export function stairTreadVertices(
         indices.push(a + f, a + g, b + g)
       }
     }
-    // the two radial end faces, wound to match
+    /*
+     * The two radial end faces — the riser you tread against, and the back of
+     * the step above it. These were wound the wrong way round: both came out
+     * inside-out, so from the side you happened to be climbing, the riser was a
+     * backface and the eye went straight through the stair to whatever lay
+     * beyond. That is the "hollow" look — the tread stone is there, but a
+     * quarter of its faces are not drawn.
+     */
     const last = base + arcSegments * 4
-    indices.push(base + 0, base + 1, base + 2, base + 0, base + 2, base + 3)
-    indices.push(last + 0, last + 2, last + 1, last + 0, last + 3, last + 2)
+    indices.push(base + 0, base + 2, base + 1, base + 0, base + 3, base + 2)
+    indices.push(last + 0, last + 1, last + 2, last + 0, last + 2, last + 3)
   }
 
   return { positions, indices }
@@ -465,6 +495,104 @@ export function stairDoorways(
     }
   })
   return out
+}
+
+/**
+ * The walking surface that gets you between a room and the end of a flight,
+ * expressed as a pair of points the ramp chain can be built from.
+ *
+ * Walking the model, the stair was unreachable: you crossed the doorway, hit
+ * something invisible and stopped, a metre short of the first tread. Nothing was
+ * in the way — a ray cast in ANY direction from the walker found no surface
+ * nearer than 0.48 m. Two things were wrong at once.
+ *
+ * First, the floor ran out: the room's slab colliders stop at the wall face and
+ * the flight's ramp chain begins under the first tread a quarter of a metre
+ * further out, with nothing between. The shell draws a floor there — the passage
+ * bed — but the bed is CSG geometry and carries no collider.
+ *
+ * Second, and this is why simply filling the gap was not enough, the ramp chain
+ * presents a VERTICAL SIDE FACE to anyone arriving across it. The chain replaces
+ * the treads with an inclined slab; approached from the flight it is a smooth
+ * slope, but approached from the room it is a 0.3 m wall standing at the tread
+ * line, and the character controller would not climb it.
+ *
+ * So the approach is a ramp too, on the same principle as the flight: one
+ * inclined box from the room's floor up to the first tread, and one level box
+ * from the last tread back into the room above. Nothing vertical anywhere along
+ * the way in. Once placed ON the stair the walker already climbed all seven
+ * flights without a stumble, which is what made this so hard to see.
+ */
+export function stairApproaches(
+  flights: StepPlacement[][],
+  width: number,
+  innerFaceRadiusAt: (y: number) => number,
+  floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
+): Array<[StepApproachPoint, StepApproachPoint]> {
+  const out: Array<[StepApproachPoint, StepApproachPoint]> = []
+  flights.forEach((steps, i) => {
+    if (steps.length < 2) return
+    /*
+     * Only the bottom flight needs a way IN at its foot. Every flight above
+     * starts a few degrees past where the one below arrives, so the storey's
+     * landing — the head of the flight below — already joins that room to the
+     * helix, and a second surface there does more harm than good: laid across
+     * the top treads of the flight below it stood 0.42 m proud of them, and the
+     * climb stopped dead three steps short of the storey.
+     */
+    const ends = i === 0 ? (['foot', 'head'] as const) : (['head'] as const)
+    for (const end of ends) {
+      const s = end === 'foot' ? steps[0] : steps[steps.length - 1]
+      const floorY = floorYOf(i, end)
+
+      /*
+       * The head landing is pushed one half-width along the climb, so it lies
+       * BEYOND the top tread instead of straddling it.
+       *
+       * Centred on the last tread it reached back over the two below, which are
+       * a riser and two risers lower — and a level slab over a descending flight
+       * is a wall across it. That is exactly where the climb stopped once the
+       * landing was added: three steps short of the storey, at the slab's edge.
+       * Pushed forward, its trailing edge lands on the top tread and the flight
+       * below stays clear.
+       *
+       * The foot needs no such shift: everything behind the bottom tread is
+       * room, and everything ahead of it is HIGHER, so a ramp up to it can
+       * overhang nothing.
+       */
+      const halfWidthDeg = ((width / Math.max(0.5, s.midRadius)) * (180 / Math.PI)) / 2
+      const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
+      const azimuthDeg = end === 'head' ? s.azimuthDeg + halfWidthDeg * climbDir : s.azimuthDeg
+
+      /*
+       * Far enough inside the room to overlap its floor slab, whose colliders
+       * stop at the wall face. Butting the two would leave a seam the character
+       * controller can catch on, and a seam is what this exists to remove.
+       */
+      const inRoom: StepApproachPoint = {
+        azimuthDeg,
+        treadY: floorY,
+        midRadius: Math.max(0.5, innerFaceRadiusAt(floorY) - 0.35),
+      }
+      const onStair: StepApproachPoint = {
+        azimuthDeg,
+        // planFlight lands the top tread flush with the floor above, so the head
+        // is level; only the foot has a rise to make up
+        treadY: end === 'head' ? floorY : s.treadY,
+        midRadius: s.midRadius,
+      }
+      // always room-end first, so the box's own slope runs the way it is walked
+      out.push([inRoom, onStair])
+    }
+  })
+  return out
+}
+
+/** A point on the walking line: what stairRampBoxes() needs, nothing more. */
+export interface StepApproachPoint {
+  azimuthDeg: number
+  treadY: number
+  midRadius: number
 }
 
 /**
