@@ -1,0 +1,473 @@
+/**
+ * Pure geometry for the stair that climbs inside the wall thickness (Phase 4).
+ * three.js-free so it can be unit-tested (CLAUDE.md rule 6).
+ *
+ * [ref]: "Лестница примыкает к внутренней окружности стены, проходит в теле
+ * кладки" / "connected by a staircase which abuts the circular wall".
+ *
+ * The flight is a helix: each step advances by a fixed angle about the tower
+ * axis and rises by a fixed riser. Its inner edge sits just outside the inner
+ * wall face, so the whole flight lies within the masonry.
+ */
+
+/**
+ * Which way the stair turns as you climb, seen from above.
+ *
+ * UNRESOLVED. The Phase-4 spec assumes 'clockwise' and asks for it to be checked
+ * against reference-photos/interior/. It cannot be: the two photographs of the
+ * HISTORIC stair-in-wall disagree — in `Qız qalası mərtəbələrarası pilləkən.JPG`
+ * the treads' narrow ends read as being on the right, while the Dreamstime frame
+ * reads as curving the other way. (The other spiral photographs in the set show
+ * the MODERN visitor stair, which winds about a central newel and tells us
+ * nothing about the original.) Left as a parameter until someone who has walked
+ * it confirms — see the note on STAIR.winding in config/tower.ts.
+ */
+export type Winding = 'clockwise' | 'counterclockwise'
+
+/** +1 for clockwise (increasing azimuth), −1 for counterclockwise. */
+export function windingSign(w: Winding): 1 | -1 {
+  return w === 'clockwise' ? 1 : -1
+}
+
+export interface FlightParams {
+  /** World Y of the floor the flight starts from. */
+  fromY: number
+  /** World Y of the floor the flight lands on. */
+  toY: number
+  /** Azimuth of the first step, degrees clockwise from north. */
+  startAzimuthDeg: number
+  /**
+   * Radius of the flight's inner edge at a height, wall clearance already
+   * included.
+   *
+   * A FUNCTION, not a number. The wall thins going up, so its room-side face
+   * moves outward as you climb — 0.044 m per metre. Pinning the whole flight to
+   * the face at the storey's FLOOR left its inner edge progressively inside the
+   * room: by the head of a flight the passage was cut 0.23 m past the wall, so
+   * the stair was still an open niche onto the chamber for its whole length,
+   * which is precisely what the walkthrough footage says it is not. The source
+   * says the stair ABUTS the inner face; the face is a cone, so the stair is a
+   * cone too.
+   */
+  innerRadiusAt: (y: number) => number
+  /** Radial width of the flight. */
+  width: number
+  /** Preferred riser height; the real one is rounded to fit the storey exactly. */
+  riserTarget: number
+  /** Preferred tread depth measured along the walking line. */
+  goingTarget: number
+  winding: Winding
+}
+
+export interface StepPlacement {
+  index: number
+  /** Azimuth of the step's centre, degrees clockwise from north. */
+  azimuthDeg: number
+  /** Angular width of the step wedge, degrees. */
+  angularWidthDeg: number
+  /** World Y of the tread surface (the surface you stand on). */
+  treadY: number
+  /** Mid-radius of the flight — the walking line. */
+  midRadius: number
+}
+
+/**
+ * Number of risers needed to climb `rise` at approximately `riserTarget`.
+ * Always at least one, so a flight never degenerates.
+ */
+export function stepCountFor(rise: number, riserTarget: number): number {
+  if (rise <= 0) return 0
+  return Math.max(1, Math.round(rise / riserTarget))
+}
+
+/** The riser you actually get once the count is rounded to fit the storey. */
+export function actualRiser(rise: number, count: number): number {
+  return count > 0 ? rise / count : 0
+}
+
+/**
+ * Angle each step advances, so that the tread depth along the walking line is
+ * about `goingTarget`. Wider flights higher up therefore turn through a smaller
+ * angle per step, which keeps the going constant rather than the arc.
+ */
+export function stepAngleDeg(goingTarget: number, midRadius: number): number {
+  if (midRadius <= 0) throw new Error('midRadius must be positive')
+  return (goingTarget / midRadius) * (180 / Math.PI)
+}
+
+/** Lay out one storey-to-storey flight. */
+export function planFlight(p: FlightParams): StepPlacement[] {
+  const rise = p.toY - p.fromY
+  const count = stepCountFor(rise, p.riserTarget)
+  if (count === 0) return []
+
+  const riser = actualRiser(rise, count)
+  const sign = windingSign(p.winding)
+
+  const steps: StepPlacement[] = []
+  let azimuth = p.startAzimuthDeg
+  for (let i = 0; i < count; i++) {
+    // tread i is the surface you arrive on after climbing i+1 risers
+    const treadY = p.fromY + riser * (i + 1)
+    const midRadius = p.innerRadiusAt(treadY) + p.width / 2
+    // the going is held constant along the walking line, so a wider course
+    // higher up turns through a smaller angle
+    const dAngle = stepAngleDeg(p.goingTarget, midRadius) * sign
+    steps.push({
+      index: i,
+      azimuthDeg: azimuth,
+      angularWidthDeg: Math.abs(dAngle),
+      treadY,
+      midRadius,
+    })
+    azimuth += dAngle
+  }
+  return steps
+}
+
+/** Total angle a flight sweeps, degrees (unsigned). */
+export function flightArcDeg(steps: StepPlacement[]): number {
+  if (steps.length < 2) return steps.length ? steps[0].angularWidthDeg : 0
+  return Math.abs(steps[steps.length - 1].azimuthDeg - steps[0].azimuthDeg) + steps[0].angularWidthDeg
+}
+
+/**
+ * How many steps below the landing the opening must already be open.
+ *
+ * You do not meet the slab when your FEET reach it — you meet it when your HEAD
+ * does, which is a whole body height plus the slab's own thickness earlier. With
+ * the old flat 4 steps, the walker's head was under the storey-6 slab from
+ * azimuth 168.6° while the opening only began at 150°: 18.6° of arc spent
+ * wedged under masonry, and every landing had the same trap.
+ */
+export function headroomStepsFor(riser: number, walkerHeight: number, slabThickness: number): number {
+  if (riser <= 0) return 4
+  return Math.max(4, Math.ceil((walkerHeight + slabThickness) / riser))
+}
+
+/**
+ * Angular span of the opening the flight needs where it breaks through the
+ * structure above — the last `headroomSteps` steps plus a landing margin.
+ */
+export function stairwellSpanDeg(
+  steps: StepPlacement[],
+  headroomSteps = 4,
+): { centreAzimuthDeg: number; widthDeg: number } | null {
+  if (steps.length === 0) return null
+  const tail = steps.slice(Math.max(0, steps.length - headroomSteps))
+  const first = tail[0].azimuthDeg
+  const last = tail[tail.length - 1].azimuthDeg
+  const widthDeg = Math.abs(last - first) + tail[0].angularWidthDeg * 2
+  return { centreAzimuthDeg: (first + last) / 2, widthDeg }
+}
+
+export interface StairSettings {
+  winding: Winding
+  riserTarget: number
+  goingTarget: number
+  width: number
+  wallClearance: number
+  startAzimuthDeg: number
+}
+
+/**
+ * Lay out every flight of the tower, one per storey gap.
+ *
+ * Flights are chained: each resumes one step past where the previous ended, so
+ * the whole stair reads as a single helix through the masonry rather than eight
+ * unrelated runs. `innerRadiusOf` is injected so this stays independent of the
+ * config module and can be exercised with synthetic towers in tests.
+ */
+export function planAllFlights(
+  cfg: StairSettings,
+  floors: Array<{ floorY: number }>,
+  innerRadiusOf: (y: number) => number,
+): StepPlacement[][] {
+  const flights: StepPlacement[][] = []
+  let cursor = cfg.startAzimuthDeg
+
+  for (let i = 0; i < floors.length - 1; i++) {
+    const steps = planFlight({
+      fromY: floors[i].floorY,
+      toY: floors[i + 1].floorY,
+      startAzimuthDeg: cursor,
+      innerRadiusAt: (y) => innerRadiusOf(y) + cfg.wallClearance,
+      width: cfg.width,
+      riserTarget: cfg.riserTarget,
+      goingTarget: cfg.goingTarget,
+      winding: cfg.winding,
+    })
+    flights.push(steps)
+    if (steps.length > 1) {
+      const stepAngle = steps[1].azimuthDeg - steps[0].azimuthDeg
+      cursor = steps[steps.length - 1].azimuthDeg + stepAngle
+    } else if (steps.length === 1) {
+      cursor = steps[0].azimuthDeg
+    }
+  }
+  return flights
+}
+
+/** One cross-section of the passage the stair needs cut through the masonry. */
+export interface PassageSection {
+  azimuthDeg: number
+  innerRadius: number
+  outerRadius: number
+  bottomY: number
+  topY: number
+}
+
+/**
+ * The void a stair in a wall actually requires.
+ *
+ * Modelling treads inside solid masonry is not enough: without a passage cut
+ * around them the steps are entombed, and the only reason a character seems to
+ * climb is that the collider tunnels through the wall surface. A real stair in
+ * a wall has a barrel-vaulted passage over it — this returns the sections of
+ * that passage, to be swept into a solid and subtracted from the shell.
+ */
+export function stairPassageSections(
+  flights: StepPlacement[][],
+  width: number,
+  headroom: number,
+  /**
+   * Radius of the room-side wall face at a height. The passage must be cut back
+   * PAST it, otherwise the tunnel is sealed: the void exists inside the masonry
+   * but no doorway connects it to any chamber, and a walker placed on the treads
+   * is entombed. Open along its length is also what the photographs show — the
+   * flight is a passage off the room, not a shaft.
+   */
+  innerFaceRadiusAt: (y: number) => number,
+  sideClearance = 0.06,
+  /**
+   * Tolerance between the underside of a tread block and the floor of the cut,
+   * metres. Only a tolerance — the depth itself is the flight's own riser, so
+   * the stone below the passage rises with the stair and meets each tread.
+   */
+  footTolerance = 0.02,
+): PassageSection[][] {
+  const half = width / 2 + sideClearance
+
+  /**
+   * Depth of the cut below a tread.
+   *
+   * The floor of the cut is NOT a staircase — it is lofted straight between one
+   * step's section and the next, so halfway along a step it sits half a riser
+   * higher than at the section itself. Drop it by only one riser and that loft
+   * rises into the tread blocks and fills the risers, and the stair renders as a
+   * smooth ramp with the steps swallowed. One and a half risers puts the loft
+   * exactly on the underside of the treads at the midpoints, which is as close
+   * as a linear sweep can sit without eating them.
+   */
+  const riserOf = (steps: StepPlacement[]): number =>
+    steps.length > 1 ? Math.abs(steps[1].treadY - steps[0].treadY) : 0.2
+
+  const sectionAt = (
+    s: StepPlacement,
+    riser: number,
+    azimuthDeg = s.azimuthDeg,
+  ): PassageSection => {
+    /**
+     * The passage stays INSIDE the masonry.
+     *
+     * It used to be cut back 0.35 m past the room face, which opened the flight
+     * to the room along its whole length and made the stair read as a shelf in
+     * an open niche. Walkthrough footage of the tower settles it: the stair is a
+     * closed, vaulted tunnel in the wall, entered through an arched doorway at
+     * each storey. Those doorways are cut separately — see stairDoorways().
+     */
+    /*
+     * Clamped to the room's face at THIS step's height. The side clearance is
+     * there to keep the tread off the passage wall, but taken on the inner side
+     * it cuts 0.06 m past the face and reopens the niche the whole point was to
+     * close. Inward the flight abuts the wall, as the source says; the clearance
+     * survives on the outer side, where there is 5 m of masonry to take it.
+     */
+    return {
+      azimuthDeg,
+      innerRadius: Math.max(0.05, s.midRadius - half, innerFaceRadiusAt(s.treadY)),
+      outerRadius: s.midRadius + half,
+      // one and a half risers down, so the lofted floor meets the treads' underside
+      bottomY: s.treadY - 1.5 * Math.max(0.12, riser) - footTolerance,
+      topY: s.treadY + headroom,
+    }
+  }
+
+  /**
+   * ONE continuous tube for the whole stair, not one per flight.
+   *
+   * Per-flight tools were the first attempt, out of a worry that a single sweep
+   * would wrap past itself and hand the CSG evaluator a self-intersecting solid.
+   * It does not: the helix turns about 1.4 times over the whole 23.6 m climb, so
+   * a full turn takes some 17 m of height while the tube is only 2.6 m tall — it
+   * never catches its own lower course. The per-flight version, meanwhile, put a
+   * flat end cap at every landing, and a cap is a wall of solid stone straight
+   * across the passage. Walking the model, that is exactly where the climb
+   * stopped: at the head of the first flight, facing masonry.
+   *
+   * Lead-in and lead-out carry the two remaining caps one step past the bottom
+   * and top treads, so neither stands where anyone walks. A real stair in a wall
+   * starts at a doorway off the room and ends at a landing, not flush with a
+   * tread.
+   */
+  // each step carries its own flight's riser, since storeys round to different ones
+  const steps: Array<{ step: StepPlacement; riser: number }> = []
+  for (const flight of flights) {
+    const riser = riserOf(flight)
+    for (const step of flight) steps.push({ step, riser })
+  }
+
+  const body = steps.map(({ step, riser }) => sectionAt(step, riser))
+  if (body.length < 2) return [body]
+
+  const first = steps[0]
+  const last = steps[steps.length - 1]
+  const leadIn = first.step.azimuthDeg - (steps[1].step.azimuthDeg - first.step.azimuthDeg)
+  const leadOut =
+    last.step.azimuthDeg + (last.step.azimuthDeg - steps[steps.length - 2].step.azimuthDeg)
+  return [
+    [
+      sectionAt(first.step, first.riser, leadIn),
+      ...body,
+      sectionAt(last.step, last.riser, leadOut),
+    ],
+  ]
+}
+
+/**
+ * The treads as annular sectors — the shape a winder tread actually has.
+ *
+ * They used to be straight boxes turned to each step's azimuth. A chord set on
+ * a circle cannot meet its neighbour: consecutive treads splay apart on the
+ * outer edge and interpenetrate on the inner one, and the wedge between them
+ * reads in-game as a thin shard sticking out of the stair. Cutting them as
+ * sectors of the angular width the step already carries makes each tread meet
+ * the next exactly, because step i+1's azimuth is step i's plus that width.
+ *
+ * Returned as flat arrays so this module stays three.js-free (CLAUDE.md rule 6).
+ */
+export function stairTreadVertices(
+  steps: StepPlacement[],
+  width: number,
+  thicknessOf: (s: StepPlacement) => number,
+  arcSegments = 3,
+): { positions: number[]; indices: number[] } {
+  const positions: number[] = []
+  const indices: number[] = []
+  const DEG = Math.PI / 180
+
+  for (const s of steps) {
+    const base = positions.length / 3
+    const inner = s.midRadius - width / 2
+    const outer = s.midRadius + width / 2
+    const top = s.treadY
+    const bottom = s.treadY - thicknessOf(s)
+    const half = s.angularWidthDeg / 2
+
+    for (let k = 0; k <= arcSegments; k++) {
+      const az = (s.azimuthDeg - half + (s.angularWidthDeg * k) / arcSegments) * DEG
+      const dx = Math.sin(az)
+      const dz = -Math.cos(az)
+      // four per station: inner-bottom, outer-bottom, outer-top, inner-top
+      positions.push(dx * inner, bottom, dz * inner)
+      positions.push(dx * outer, bottom, dz * outer)
+      positions.push(dx * outer, top, dz * outer)
+      positions.push(dx * inner, top, dz * inner)
+    }
+
+    // side walls along the sector
+    for (let k = 0; k < arcSegments; k++) {
+      const a = base + k * 4
+      const b = base + (k + 1) * 4
+      for (let f = 0; f < 4; f++) {
+        const g = (f + 1) % 4
+        indices.push(a + f, b + f, b + g)
+        indices.push(a + f, b + g, a + g)
+      }
+    }
+    // the two radial end faces
+    const last = base + arcSegments * 4
+    indices.push(base + 0, base + 2, base + 1, base + 0, base + 3, base + 2)
+    indices.push(last + 0, last + 1, last + 2, last + 0, last + 2, last + 3)
+  }
+
+  return { positions, indices }
+}
+
+/** An arched doorway between a room and the stair passage. */
+export interface StairDoorway {
+  azimuthDeg: number
+  /** Angular width of the opening, degrees. */
+  widthDeg: number
+  bottomY: number
+  topY: number
+  /** Reaches into the room. */
+  innerRadius: number
+  /** Reaches into the passage. */
+  outerRadius: number
+}
+
+/**
+ * The doorways that let you onto the stair.
+ *
+ * With the passage sealed inside the masonry, each flight needs a way in at its
+ * foot and a way out at its head — which is what the tower actually has: an
+ * arched opening at floor level, the width of the flight, with the steps
+ * starting immediately behind it.
+ *
+ * The head of one flight and the foot of the next sit at the same storey but at
+ * different azimuths (the helix moves on), so both are emitted; they are a few
+ * degrees apart and simply read as one landing.
+ */
+export function stairDoorways(
+  flights: StepPlacement[][],
+  width: number,
+  height: number,
+  innerFaceRadiusAt: (y: number) => number,
+  floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
+  /** Floor slab thickness, so the threshold can be dropped clear of it. */
+  slabThickness = 0.3,
+): StairDoorway[] {
+  const out: StairDoorway[] = []
+  flights.forEach((steps, i) => {
+    if (steps.length === 0) return
+    for (const end of ['foot', 'head'] as const) {
+      const s = end === 'foot' ? steps[0] : steps[steps.length - 1]
+      const floorY = floorYOf(i, end)
+      // reach past the room face so the opening is a hole, not a blind recess
+      const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - width / 2)
+      const outer = s.midRadius + width / 2 + 0.06
+      out.push({
+        azimuthDeg: s.azimuthDeg,
+        widthDeg: (width / Math.max(0.5, s.midRadius)) * (180 / Math.PI),
+        /**
+         * The threshold sits BELOW the floor, not at it.
+         *
+         * A doorway is an arc a couple of steps wide, so a sill cut at floor
+         * level hangs over the tread just short of the landing: measured, that
+         * left 0.16 m of headroom on the second-to-last step of a flight — you
+         * could not get from the stair onto the floor. Dropping it clear of the
+         * slab removes the lip; the room's own floor slab covers the notch.
+         */
+        bottomY: floorY - slabThickness - 0.15,
+        topY: floorY + height,
+        innerRadius: Math.max(0.05, inner),
+        outerRadius: outer,
+      })
+    }
+  })
+  return out
+}
+
+/**
+ * True when the whole flight stays inside the masonry: its outer edge must not
+ * break through the outer face, and its inner edge must not overhang the room.
+ */
+export function flightFitsInWall(
+  innerRadius: number,
+  width: number,
+  innerFaceRadius: number,
+  outerFaceRadius: number,
+): boolean {
+  return innerRadius >= innerFaceRadius && innerRadius + width <= outerFaceRadius
+}

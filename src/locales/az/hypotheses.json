@@ -1,0 +1,60 @@
+{
+  "_note": "Qısa terminlər yazılıb; uzun mətnlər TODO_AZ olaraq saxlanılıb — CLAUDE.md: kəkə tərcümədən boş yer yaxşıdır. Ana dili daşıyıcısı yoxlamalıdır.",
+
+  "layerTitle": "Təyinat versiyası",
+  "disclaimer": "TODO_AZ",
+  "proponent": "Müəllif",
+  "period": "Dövr",
+  "source": "Mənbə",
+  "for": "Lehinə",
+  "against": "Əleyhinə",
+
+  "citadel": {
+    "title": "Müdafiə qalası",
+    "summary": "TODO_AZ",
+    "for": ["TODO_AZ"],
+    "against": ["TODO_AZ"]
+  },
+
+  "fire-temple": {
+    "title": "Zərdüşti atəşgahı",
+    "summary": "TODO_AZ",
+    "for": ["TODO_AZ"],
+    "against": ["TODO_AZ"]
+  },
+
+  "dakhma": {
+    "title": "Daxma",
+    "summary": "TODO_AZ",
+    "for": ["TODO_AZ"],
+    "against": ["TODO_AZ"]
+  },
+
+  "astronomical": {
+    "title": "Astronomik qüllə",
+    "summary": "TODO_AZ",
+    "for": ["TODO_AZ"],
+    "against": ["TODO_AZ"]
+  },
+
+  "solar-temple": {
+    "title": "Günəş məbədi",
+    "summary": "TODO_AZ",
+    "for": ["TODO_AZ"],
+    "against": ["TODO_AZ"]
+  },
+
+  "oil-column": {
+    "title": "TODO_AZ",
+    "summary": "TODO_AZ",
+    "for": ["TODO_AZ"],
+    "against": ["TODO_AZ"]
+  },
+
+  "lighthouse": {
+    "title": "Mayak",
+    "summary": "TODO_AZ",
+    "for": ["TODO_AZ"],
+    "against": ["TODO_AZ"]
+  }
+}

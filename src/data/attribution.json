@@ -1,0 +1,68 @@
+{
+  "photos": [
+    {
+      "hotspotId": "cupola-oculus",
+      "file": "photos/cupola-oculus.jpg",
+      "author": "Photo by MrArifnajafov (Photography from the original).",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Baku_Maiden_Tower_floor.JPG"
+    },
+    {
+      "hotspotId": "well",
+      "file": "photos/well.jpg",
+      "author": "Toghrul Rahimli",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Q%C4%B1z_qalas%C4%B1.3_c%C3%BC_m%C9%99rt%C9%99b%C9%99.jpg"
+    },
+    {
+      "hotspotId": "staircase",
+      "file": "photos/staircase.jpg",
+      "author": "Urmen19",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Q%C4%B1z_qalas%C4%B1_m%C9%99rt%C9%99b%C9%99l%C9%99raras%C4%B1_pill%C9%99k%C9%99n.JPG"
+    },
+    {
+      "hotspotId": "window-niche",
+      "file": "photos/window-niche.jpg",
+      "author": "Xoncha",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Inside_of_Maiden_Tower_in_Baku.JPG"
+    },
+    {
+      "hotspotId": "slits",
+      "file": "photos/slits.jpg",
+      "author": "lumoplank",
+      "license": "CC0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Old_City,_Baku-_Part_I_-_OldCityBaku8362.jpg"
+    },
+    {
+      "hotspotId": "entrance",
+      "file": "photos/entrance.jpg",
+      "author": "Diego Delso",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Torre_de_la_Doncella,_Baku,_Azerbaiy%C3%A1n,_2016-09-26,_DD_06.jpg"
+    },
+    {
+      "hotspotId": "buttress",
+      "file": "photos/buttress.jpg",
+      "author": "Ludvig14",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Baku_Maiden_Tower_004_7736.jpg"
+    },
+    {
+      "hotspotId": "section",
+      "file": "photos/section.jpg",
+      "author": "Don-kun",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Jungfrauenbastei.png"
+    }
+  ]
+}

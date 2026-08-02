@@ -1,0 +1,109 @@
+{
+  "layerTitle": "Proposed purpose",
+  "disclaimer": "None of these is marked correct. The tower is genuinely disputed: dating ranges from the 1st century CE (mortar analysis) to the 12th century (the Masud ibn Daud inscription — a slab set into the wall later, and not above the entrance).",
+  "proponent": "Proposed by",
+  "period": "Period",
+  "source": "Source",
+  "for": "For",
+  "against": "Against",
+
+  "citadel": {
+    "title": "Defensive citadel",
+    "summary": "The official UNESCO reading: the tower is part of the defensive system of the walled city.",
+    "for": [
+      "For the 12th century this is not in dispute — the tower is built into the Old City's fortifications.",
+      "Walls 5 m thick at the base and narrow slit openings suit a defensive purpose.",
+      "The single entrance is raised above ground, as is usual in a fortified tower."
+    ],
+    "against": [
+      "It does not account for the lower storeys, which some researchers date to the 7th–6th centuries BCE.",
+      "A defensive tower has no need of a 21 m well and an elaborate water-collection system.",
+      "The beak-shaped buttress serves no obvious defensive function."
+    ]
+  },
+
+  "fire-temple": {
+    "title": "Zoroastrian fire temple",
+    "summary": "D. Akhundov dates the tower to the 7th–6th centuries BCE and reads seven fire outlets at its crown.",
+    "for": [
+      "It accounts for the very early dating of the lower masonry.",
+      "Fire worship is well documented on the Absheron peninsula — Ateshgah is the obvious parallel.",
+      "It gives the roof platform a purpose that otherwise goes unexplained."
+    ],
+    "against": [
+      "The seven fire outlets are not confirmed by excavation.",
+      "No soot or burnt layer of the kind a permanent fire would leave is described.",
+      "The 7th–6th century BCE dating is itself contested."
+    ]
+  },
+
+  "dakhma": {
+    "title": "Dakhma — tower of silence",
+    "summary": "A funerary reading: a structure for the Zoroastrian rite of exposing the dead.",
+    "for": [
+      "A tower with an open upper platform matches the dakhma type.",
+      "It is consistent with the region's Zoroastrian context."
+    ],
+    "against": [
+      "Dakhmas are traditionally placed outside a settlement; this tower stands at its centre.",
+      "Eight roofed storeys are redundant for a rite that needs only a platform.",
+      "No funerary finds of the kind such a use implies are described."
+    ]
+  },
+
+  "astronomical": {
+    "title": "Astronomical tower",
+    "summary": "Ahmadov links the 30 lower and 31 upper stone corbels to the days of the month, and the buttress to sunrise at the equinox.",
+    "for": [
+      "The counts of 30 and 31 do match the lengths of months.",
+      "The stacked storeys would allow observation from several heights."
+    ],
+    "against": [
+      "Tested in this model: measured from the OSM footprint the buttress points at 106.7°, while equinox sunrise is at 90.1° — a discrepancy of 16.6°.",
+      "The match at 90° only appears if you take the rounded 'due east' of the prose rather than the measured bearing.",
+      "Slits that are narrow outside and flare inward are an aperture for admitting a beam, not a sector for viewing the sky.",
+      "No source describes observation of stars."
+    ]
+  },
+
+  "solar-temple": {
+    "title": "Solar temple",
+    "summary": "Abbas Islamov claims that at sunrise on the winter solstice the beam enters the central window exactly.",
+    "for": [
+      "The openings really are narrow outside and flare inward, which is how an aperture works.",
+      "The observation was recorded photographically by its author in 2004."
+    ],
+    "against": [
+      "No source identifies which window is meant, which makes the claim hard to test.",
+      "Tested in this model: at sunrise on 21 December the closest match is the arched window, about 1° off — but that window is a documented later insertion. The nearest original slit misses by roughly 8°.",
+      "The window azimuths here were recovered from photographs and carry about ±20° of systematic error, so the result settles the question neither way."
+    ]
+  },
+
+  "oil-column": {
+    "title": "Oil distillation column",
+    "summary": "V. Ibragimov proposes an industrial purpose: distilling oil.",
+    "for": [
+      "Absheron has produced oil for centuries; it was gathered here long before the industrial era.",
+      "The elaborate system of pipes and channels inside the tower needs explaining."
+    ],
+    "against": [
+      "The pipework as described collects water downward rather than drawing off a distillate.",
+      "No thermal damage of the kind distillation would leave is described.",
+      "The reading has no support in the archaeological literature."
+    ]
+  },
+
+  "lighthouse": {
+    "title": "Lighthouse",
+    "summary": "Use of the tower as a lighthouse is documented for the 18th–19th centuries.",
+    "for": [
+      "This is not a hypothesis but a documented fact for that period.",
+      "The height and the position by the shoreline suit a lighthouse."
+    ],
+    "against": [
+      "It explains a late use only, not the purpose it was built for.",
+      "By the time the tower served as a lighthouse it was already many centuries old."
+    ]
+  }
+}

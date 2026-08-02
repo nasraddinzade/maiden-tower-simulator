@@ -1,0 +1,47 @@
+{
+  "title": "Points of interest",
+  "comparePhoto": "Photograph",
+  "compareModel": "Model",
+  "close": "Close",
+  "confidence": "Basis",
+  "confidenceMeasured": "measured",
+  "confidenceInferred": "inferred",
+  "confidenceAssumed": "assumed",
+  "photoBy": "By",
+  "license": "Licence",
+  "attributionTitle": "Credits and licences",
+  "attributionIntro": "Every photograph here is freely licensed. Crediting the author is a condition of CC BY and CC BY-SA, not a courtesy. Material without a free licence is not included in the app.",
+
+  "cupola-oculus": {
+    "title": "Cupola and oculus",
+    "text": "A shallow stone cupola with a central circular opening. All eight oculi are coaxial, so the sky is visible from the bottom. No source gives the opening's diameter: estimates range from 1.3 to 3 m, and the model shows the chosen value as a placeholder rather than a measurement."
+  },
+  "well": {
+    "title": "The well",
+    "text": "A 0.7 m bore, 21 m deep to the aquifer. The mouth is wider than the bore — a funnel clearly visible in the photograph — which is why 0.7 m is taken as the bore and not as the opening in the floor. Sources disagree on the storey: the project reference says the second, while the photographer's caption and İçərişəhər say the third."
+  },
+  "staircase": {
+    "title": "Stair in the wall thickness",
+    "text": "The flight runs inside the masonry, abutting the inner circle. The winding was read from photographs — counterclockwise when ascending, though the work plan had assumed the opposite. No source gives step dimensions, so riser and going are chosen so that each flight lands exactly on the next floor."
+  },
+  "window-niche": {
+    "title": "Window niche",
+    "text": "Narrow outside, flaring inward. This is an aperture for admitting a beam, not a sector for viewing: a slit in a 4 m wall accepts light only within a few degrees of its own axis. The inner dimensions are not measured — the single interior photograph gives proportion, not metres."
+  },
+  "slits": {
+    "title": "Slit windows from outside",
+    "text": "Eight slits are countable on the photographed face, in two columns of four. The lower column is a true vertical; the upper one drifts sideways by about 11°. The azimuths were recovered from photographs and carry roughly ±20° of error, pinned to the buttress measured from the footprint."
+  },
+  "entrance": {
+    "title": "The entrance",
+    "text": "The entrance faces west. The project reference said south-east, but the photographs disprove it: in the frame where the door faces the camera the 10.7 m buttress is absent entirely, which is only possible from the opposite bearing. The south-east door of the literature is a different opening, higher up the tower."
+  },
+  "buttress": {
+    "title": "The buttress",
+    "text": "The beak-shaped projection was measured from the OpenStreetMap footprint: a 3.0 m nose, 10.7 m of projection, an axis at 106.7°, skewed 13.6° off the middle of its own root — hence the asymmetric flanks. The texts call the direction east, but the measurement gives 106.7°, which is 16.6° away from equinox sunrise."
+  },
+  "section": {
+    "title": "The section drawing",
+    "text": "A redraw of a 1980 book plate. It confirms the topology — eight domed chambers, coaxial oculi, a stair in the wall, the well shaft — but it carries no scale bar, so not one number in the model comes from it. It also shows the inner chamber offset from the axis, which the model does not yet reproduce."
+  }
+}

@@ -1,0 +1,460 @@
+/**
+ * Collision geometry, built from primitives — deliberately NOT the CSG mesh.
+ *
+ * docs/optimization-addendum.md, Phases 4 and 6: "визуальная геометрия и
+ * коллизионная — РАЗНЫЕ меши... Trimesh-коллайдер по CSG-мешу башни убьёт
+ * физику". There is a second, measured reason: the CSG result is not watertight
+ * (14 183 boundary edges out of 26 876 at the time of writing), and a trimesh
+ * collider off a non-watertight mesh gives unreliable contacts — which is
+ * exactly the wall-tunnelling seen while walking the model.
+ *
+ * three.js-free so it can be unit-tested (CLAUDE.md rule 6). Returns plain
+ * specs; the React layer turns them into rapier colliders.
+ *
+ * Conventions (CLAUDE.md rule 3): metres, Y up, north = -Z, east = +X, azimuth
+ * clockwise from north.
+ */
+
+const DEG = Math.PI / 180
+
+/** One cuboid collider. Local +X is radial (outward), +Z tangential, +Y up. */
+export interface BoxSpec {
+  /** Half-extents along the box's own X, Y, Z. */
+  halfExtents: [number, number, number]
+  position: [number, number, number]
+  /** Orientation as a quaternion (x, y, z, w). */
+  quaternion: [number, number, number, number]
+  /** What this box is, for the F4 debug view and for tests. */
+  kind: 'wall' | 'passageOuter' | 'floor' | 'ramp'
+}
+
+/**
+ * The yaw that points a box's local +X radially OUTWARD at an azimuth.
+ *
+ * rotateY(π/2 − az) sends +X to (sin az, 0, −cos az). The first version of this
+ * module used −az, which sends +X TANGENTIALLY — every box was turned 90°, so
+ * walls presented their thin side to the room (the face sat 8–13 cm off) and
+ * the floor annuli ran their radial extent sideways, leaving ring-shaped holes
+ * a walker fell straight through. The orientation is now pinned by tests that
+ * transform the actual corners.
+ */
+export function radialYaw(azimuthRad: number): number {
+  return Math.PI / 2 - azimuthRad
+}
+
+/** Quaternion for: yaw about world Y, then tilt about the box's local Z axis. */
+export function yawThenTilt(yaw: number, tilt: number): [number, number, number, number] {
+  // q = qYaw * qTilt, with qYaw about (0,1,0) and qTilt about (0,0,1)
+  const cy = Math.cos(yaw / 2)
+  const sy = Math.sin(yaw / 2)
+  const ct = Math.cos(tilt / 2)
+  const st = Math.sin(tilt / 2)
+  // (0, sy, 0, cy) * (0, 0, st, ct)
+  return [sy * st, sy * ct, cy * st, cy * ct]
+}
+
+/** Quaternion for: yaw about world Y, then pitch about the box's local X axis. */
+export function yawThenPitch(yaw: number, pitch: number): [number, number, number, number] {
+  const cy = Math.cos(yaw / 2)
+  const sy = Math.sin(yaw / 2)
+  const cp = Math.cos(pitch / 2)
+  const sp = Math.sin(pitch / 2)
+  // (0, sy, 0, cy) * (sp, 0, 0, cp)
+  return [cy * sp, sy * cp, -sy * sp, cy * cp]
+}
+
+/** Apply a quaternion to a vector. */
+export function rotate(
+  q: [number, number, number, number],
+  v: [number, number, number],
+): [number, number, number] {
+  const [qx, qy, qz, qw] = q
+  const [vx, vy, vz] = v
+  // t = 2 q × v; v' = v + qw t + q × t
+  const tx = 2 * (qy * vz - qz * vy)
+  const ty = 2 * (qz * vx - qx * vz)
+  const tz = 2 * (qx * vy - qy * vx)
+  return [
+    vx + qw * tx + qy * tz - qz * ty,
+    vy + qw * ty + qz * tx - qx * tz,
+    vz + qw * tz + qx * ty - qy * tx,
+  ]
+}
+
+/** Where the stair passage sits at one azimuth: a vertical band and a radial span. */
+export interface PassageWindow {
+  bottomY: number
+  topY: number
+  /** Room-side boundary of the void — the back of the jamb. */
+  innerRadius: number
+  outerRadius: number
+}
+
+export interface WallColliderParams {
+  /** Number of boxes around the circumference. The addendum asks for 24–32. */
+  sectors: number
+  outerRadius: number
+  /** Inner (room-side) face radius at a height. */
+  innerRadiusAt: (y: number) => number
+  /** Bottom and top of the wall. */
+  baseY: number
+  topY: number
+  /** One band per storey keeps each box short enough for the taper to matter little. */
+  bandBoundaries: number[]
+  /** Openings that must not be walled over, as azimuth ranges and height ranges. */
+  entrance: { azimuthDeg: number; widthDeg: number; sillY: number; headY: number }
+  /**
+   * Further holes right through the wall — the arched doorways onto the stair.
+   * Treated exactly like the entrance: no collider across the opening, wall
+   * above and below it intact.
+   */
+  openings?: Array<{ azimuthDeg: number; widthDeg: number; sillY: number; headY: number }>
+  /**
+   * For an azimuth, the parts of the passage that cross it. Where the passage
+   * crosses, the wall box starts at the passage's OUTER face instead of the
+   * room face, so the passage stays open but its outer side is still solid.
+   */
+  passageAt: (azimuthDeg: number) => PassageWindow[]
+}
+
+/** Shortest signed difference a − b, in (−180, 180]. */
+function angleDelta(a: number, b: number): number {
+  return ((((a - b) % 360) + 540) % 360) - 180
+}
+
+/**
+ * `span` with every range in `holes` removed, as the pieces that survive.
+ * Used to stop a collider being emitted across an opening.
+ */
+export function subtractRanges(
+  span: [number, number],
+  holes: Array<[number, number]>,
+): Array<[number, number]> {
+  let pieces: Array<[number, number]> = [span]
+  for (const [hb, ht] of holes) {
+    const next: Array<[number, number]> = []
+    for (const [pb, pt] of pieces) {
+      if (ht <= pb || hb >= pt) {
+        next.push([pb, pt]) // no overlap
+        continue
+      }
+      if (hb > pb) next.push([pb, Math.min(hb, pt)])
+      if (ht < pt) next.push([Math.max(ht, pb), pt])
+    }
+    pieces = next
+  }
+  return pieces.filter(([b, t]) => t - b > 1e-9)
+}
+
+/**
+ * A ring of boxes per band, following the wall's inner face.
+ *
+ * Each box is tilted by the taper angle so its inner face lies ON the cone
+ * rather than chording it — otherwise a 3.6 m band would stop the walker up to
+ * 0.16 m short of the wall they can see.
+ */
+export function wallColliders(p: WallColliderParams): BoxSpec[] {
+  const out: BoxSpec[] = []
+  const sectorDeg = 360 / p.sectors
+  // half-width of the chord, plus a little so neighbours overlap and leave no seam
+  const halfChord = p.outerRadius * Math.tan((sectorDeg / 2) * DEG) * 1.06
+
+  for (let b = 0; b < p.bandBoundaries.length - 1; b++) {
+    const y0 = p.bandBoundaries[b]
+    const y1 = p.bandBoundaries[b + 1]
+    if (y1 <= y0) continue
+    const midY = (y0 + y1) / 2
+    const halfHeight = (y1 - y0) / 2
+
+    // taper of the inner face across this band: positive as the radius grows upward
+    const slope = (p.innerRadiusAt(y1) - p.innerRadiusAt(y0)) / (y1 - y0)
+    const tilt = Math.atan(slope)
+    const innerMid = p.innerRadiusAt(midY)
+
+    for (let s = 0; s < p.sectors; s++) {
+      const azimuthDeg = s * sectorDeg + sectorDeg / 2
+
+      /**
+       * Everything that interrupts the wall at this azimuth, as height ranges.
+       *
+       * Two kinds, and they must be handled the same way — as interruptions
+       * within a band, never by dropping the whole band. The entrance is a
+       * 2 m doorway; dropping its band opened a 7 m gash you could walk out of.
+       */
+      const cuts: Array<{
+        bottomY: number
+        topY: number
+        startRadius: number | null
+        jambTo?: number
+      }> = []
+
+      for (const o of [p.entrance, ...(p.openings ?? [])]) {
+        const d = Math.abs(angleDelta(azimuthDeg, o.azimuthDeg))
+        if (d <= o.widthDeg / 2 + sectorDeg / 2) {
+          // right through the wall: no box at all across the opening
+          cuts.push({ bottomY: o.sillY, topY: o.headY, startRadius: null })
+        }
+      }
+      for (const w of p.passageAt(azimuthDeg)) {
+        /*
+         * The passage is solid on BOTH sides: the jamb between it and the room,
+         * and the mass beyond it. Emitting only the outer side left the jamb
+         * without a collider, so a walker crossed 0.25 m of drawn masonry and
+         * stepped straight onto the stair anywhere along its length.
+         */
+        cuts.push({
+          bottomY: w.bottomY,
+          topY: w.topY,
+          startRadius: w.outerRadius,
+          jambTo: w.innerRadius,
+        })
+      }
+
+      const inBand = cuts
+        .filter((c) => c.topY > y0 && c.bottomY < y1)
+        .sort((a, c) => a.bottomY - c.bottomY)
+
+      /** Heights at this azimuth where the wall is open right through. */
+      const openRanges: Array<[number, number]> = inBand
+        .filter((c) => c.startRadius === null)
+        .map((c) => [Math.max(c.bottomY, y0), Math.min(c.topY, y1)])
+
+      if (inBand.length === 0) {
+        out.push(boxAt(azimuthDeg, innerMid, p.outerRadius, midY, halfHeight, halfChord, tilt, 'wall', sectorDeg))
+        continue
+      }
+
+      let cursor = y0
+      for (const c of inBand) {
+        const cTop = Math.min(c.topY, y1)
+        const cBottom = Math.max(c.bottomY, y0)
+        if (cBottom > cursor) {
+          const mid = (cursor + cBottom) / 2
+          out.push(
+            boxAt(azimuthDeg, p.innerRadiusAt(mid), p.outerRadius, mid, (cBottom - cursor) / 2, halfChord, tilt, 'wall', sectorDeg),
+          )
+        }
+        if (cTop > cBottom && c.startRadius !== null) {
+          const mid = (cBottom + cTop) / 2
+          const halfH = (cTop - cBottom) / 2
+          // the mass beyond the passage
+          out.push(
+            boxAt(azimuthDeg, c.startRadius, p.outerRadius, mid, halfH, halfChord, tilt, 'passageOuter', sectorDeg),
+          )
+
+          /*
+           * The jamb — but NOT across a doorway.
+           *
+           * The doorway and the passage occupy the same azimuth and overlapping
+           * heights, so emitting the jamb blindly walls the doorway up: cut in
+           * the drawn stone, solid in the physics. You could see the stair and
+           * not walk into it. The jamb is therefore emitted only over the parts
+           * of its band that no opening covers.
+           */
+          if (c.jambTo !== undefined) {
+            for (const [jb, jt] of subtractRanges([cBottom, cTop], openRanges)) {
+              const jMid = (jb + jt) / 2
+              const face = p.innerRadiusAt(jMid)
+              if (jt - jb > 0.02 && c.jambTo - face > 0.02) {
+                out.push(
+                  boxAt(azimuthDeg, face, c.jambTo, jMid, (jt - jb) / 2, halfChord, tilt, 'wall', sectorDeg),
+                )
+              }
+            }
+          }
+        }
+        cursor = Math.max(cursor, cTop)
+      }
+      if (cursor < y1) {
+        const mid = (cursor + y1) / 2
+        out.push(
+          boxAt(azimuthDeg, p.innerRadiusAt(mid), p.outerRadius, mid, (y1 - cursor) / 2, halfChord, tilt, 'wall', sectorDeg),
+        )
+      }
+    }
+  }
+
+  return out
+}
+
+/**
+ * Thickness of a wall box, metres.
+ *
+ * The wall is up to 5 m thick, but a collider spanning all of it gives every box
+ * a huge axis-aligned bounding box overlapping half a dozen neighbours, and a
+ * ring of those drops the frame to about a second. Only the inner face is ever
+ * touched, so the boxes hug it. 0.8 m cannot be tunnelled: the controller sweeps
+ * the capsule, and even unswept, 1.4 m/s at 30 fps moves 0.05 m per step.
+ */
+const WALL_BOX_THICKNESS = 0.8
+
+function boxAt(
+  azimuthDeg: number,
+  innerRadius: number,
+  outerRadius: number,
+  midY: number,
+  halfHeight: number,
+  _halfChordAtOuter: number,
+  tilt: number,
+  kind: BoxSpec['kind'],
+  sectorDeg: number,
+): BoxSpec {
+  const thickness = Math.max(0.05, Math.min(outerRadius - innerRadius, WALL_BOX_THICKNESS))
+  const midRadius = innerRadius + thickness / 2
+  // chord at this box's own radius, with enough overlap that neighbours meet
+  const halfChord = (midRadius + thickness) * Math.tan((sectorDeg / 2) * DEG) * 1.2
+  const rad = azimuthDeg * DEG
+  // Tilt sign: rotating +X (radial) about local Z carries the upper half of the
+  // face INWARD for a positive angle, and the room widens upward, so the tilt
+  // that lays the face on the cone is the NEGATIVE of the taper angle.
+  return {
+    halfExtents: [thickness / 2, halfHeight, halfChord],
+    position: [Math.sin(rad) * midRadius, midY, -Math.cos(rad) * midRadius],
+    quaternion: yawThenTilt(radialYaw(rad), -tilt),
+    kind,
+  }
+}
+
+export interface FloorColliderParams {
+  /** Segments around the ring. */
+  sectors: number
+  floorY: number
+  thickness: number
+  /** Central opening; the slab is an annulus between this and outerRadius. */
+  oculusRadius: number
+  outerRadius: number
+  /**
+   * Where the stair pierces the slab. `innerRadius` matters as much as the arc:
+   * the flight runs inside the WALL, so only the outer lip of the slab has to
+   * go. Dropping the whole wedge instead took the floor out from the oculus to
+   * the wall over 50° of arc, and since the visible slab kept its inner part,
+   * you walked onto floor that was drawn but had no collider under it and fell
+   * a storey.
+   */
+  stairwell?: { centreAzimuthDeg: number; widthDeg: number; innerRadius: number }
+}
+
+/**
+ * An annular slab as a ring of boxes, with the oculus and the stairwell left out.
+ *
+ * The addendum: "пол яруса — cylinder-коллайдер с вырезом под окулюс,
+ * собранный из кольцевых сегментов". Rapier has no annulus, so the ring is
+ * segments; the stairwell is simply a run of segments that are not emitted.
+ */
+export function floorColliders(p: FloorColliderParams): BoxSpec[] {
+  if (p.outerRadius <= p.oculusRadius) return []
+  const out: BoxSpec[] = []
+  const sectorDeg = 360 / p.sectors
+  const halfChord = p.outerRadius * Math.tan((sectorDeg / 2) * DEG) * 1.06
+
+  for (let s = 0; s < p.sectors; s++) {
+    const azimuthDeg = s * sectorDeg + sectorDeg / 2
+
+    // default: the full ring segment, oculus out to the wall
+    let inner = p.oculusRadius
+    let outer = p.outerRadius
+
+    if (p.stairwell) {
+      const d = Math.abs(angleDelta(azimuthDeg, p.stairwell.centreAzimuthDeg))
+      if (d <= p.stairwell.widthDeg / 2) {
+        /*
+         * Inside the well the segment is SHORTENED, not dropped.
+         *
+         * The flight runs in the wall, so only the slab's outer lip has to go.
+         * Dropping the whole wedge cut the floor from the oculus to the wall
+         * over some 50° of arc while the drawn slab kept its inner part — so
+         * you walked onto floor that was visibly there, with nothing under it,
+         * and fell a storey. Reproduced at azimuth 132° on storey 2.
+         */
+        outer = p.stairwell.innerRadius
+        if (outer - inner < 0.15) continue // nothing worth keeping
+      }
+    }
+
+    const rad = azimuthDeg * DEG
+    const half = (outer - inner) / 2
+    const mid = (outer + inner) / 2
+    out.push({
+      halfExtents: [half, p.thickness / 2, halfChord],
+      position: [Math.sin(rad) * mid, p.floorY - p.thickness / 2, -Math.cos(rad) * mid],
+      quaternion: yawThenTilt(radialYaw(rad), 0),
+      kind: 'floor',
+    })
+  }
+  return out
+}
+
+export interface RampStep {
+  azimuthDeg: number
+  treadY: number
+  midRadius: number
+}
+
+/**
+ * The stair's walking surface as a chain of inclined boxes.
+ *
+ * docs/optimization-addendum.md: "лестница — НЕ отдельный коллайдер на каждую
+ * ступень. Один наклонный box-коллайдер вдоль марша (пандус) + autostep." One
+ * box cannot follow a helix, so it is one inclined box per couple of steps —
+ * still an order of magnitude fewer shapes than treads, and every one convex.
+ *
+ * Each box's top face passes through the two nosings it spans, so the walker's
+ * feet track the visible treads to within half a riser. The pitch (~34° for a
+ * 0.2 rise on a 0.3 going) stays well inside the controller's 60° climb limit.
+ */
+export function stairRampBoxes(
+  steps: RampStep[],
+  width: number,
+  stepsPerBox = 2,
+  thickness = 0.3,
+): BoxSpec[] {
+  const out: BoxSpec[] = []
+  if (steps.length < 2) return out
+
+  for (let i = 0; i < steps.length - 1; i += stepsPerBox) {
+    const a = steps[i]
+    const b = steps[Math.min(i + stepsPerBox, steps.length - 1)]
+
+    const ra = a.azimuthDeg * DEG
+    const rb = b.azimuthDeg * DEG
+    const pa: [number, number, number] = [Math.sin(ra) * a.midRadius, a.treadY, -Math.cos(ra) * a.midRadius]
+    const pb: [number, number, number] = [Math.sin(rb) * b.midRadius, b.treadY, -Math.cos(rb) * b.midRadius]
+
+    const run = Math.hypot(pb[0] - pa[0], pb[2] - pa[2])
+    const rise = pb[1] - pa[1]
+    if (run < 1e-6) continue
+
+    // heading of the chord: the yaw that points local +Z along the travel
+    const heading = Math.atan2(pb[0] - pa[0], pb[2] - pa[2])
+    // that same yaw expressed in radialYaw terms: local +Z of radialYaw(θ) is
+    // tangential; easiest is to build the yaw directly so +Z = travel direction
+    const yaw = heading
+    // pitch about local X: positive lifts +Z, sign fixed by the corner test
+    const pitch = -Math.atan2(rise, run)
+
+    const length = Math.hypot(run, rise)
+    const mid: [number, number, number] = [
+      (pa[0] + pb[0]) / 2,
+      (pa[1] + pb[1]) / 2,
+      (pa[2] + pb[2]) / 2,
+    ]
+    const q = yawThenPitch(yaw, pitch)
+    // sink the centre half a thickness along the box's own down-normal, so the
+    // TOP face carries the nosings
+    const down = rotate(q, [0, -thickness / 2, 0])
+
+    out.push({
+      // slight length overlap so consecutive boxes leave no seam at the joint
+      halfExtents: [width / 2, thickness / 2, length / 2 + 0.05],
+      position: [mid[0] + down[0], mid[1] + down[1], mid[2] + down[2]],
+      quaternion: q,
+      kind: 'ramp',
+    })
+  }
+  return out
+}
+
+/** Total collider count, for the budget readout. */
+export function colliderCount(...groups: BoxSpec[][]): number {
+  return groups.reduce((n, g) => n + g.length, 0)
+}
