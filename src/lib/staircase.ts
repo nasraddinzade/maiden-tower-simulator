@@ -375,20 +375,28 @@ export function stairTreadVertices(
       positions.push(dx * inner, top, dz * inner)
     }
 
-    // side walls along the sector
+    /*
+     * Winding, and it matters more than it looks.
+     *
+     * The station loop runs inner-bottom → outer-bottom → outer-top → inner-top
+     * while the sweep advances with increasing azimuth. Taken in that order the
+     * faces come out INSIDE-OUT — the bottom face's normal points up, the top
+     * face's points down — so with backface culling the treads render as hollow
+     * shells and the flight reads as full of holes. Reversed, they are solid.
+     */
     for (let k = 0; k < arcSegments; k++) {
       const a = base + k * 4
       const b = base + (k + 1) * 4
       for (let f = 0; f < 4; f++) {
         const g = (f + 1) % 4
-        indices.push(a + f, b + f, b + g)
-        indices.push(a + f, b + g, a + g)
+        indices.push(a + f, b + g, b + f)
+        indices.push(a + f, a + g, b + g)
       }
     }
-    // the two radial end faces
+    // the two radial end faces, wound to match
     const last = base + arcSegments * 4
-    indices.push(base + 0, base + 2, base + 1, base + 0, base + 3, base + 2)
-    indices.push(last + 0, last + 1, last + 2, last + 0, last + 2, last + 3)
+    indices.push(base + 0, base + 1, base + 2, base + 0, base + 2, base + 3)
+    indices.push(last + 0, last + 2, last + 1, last + 0, last + 3, last + 2)
   }
 
   return { positions, indices }

@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest'
 import { FLOORS, STAIR, TOWER, innerRadiusAt } from '../config/tower'
 import { PLAYER } from '../config/player'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from './cupola'
-import { planAllFlights, stairPassageSections } from './staircase'
+import { planAllFlights, stairPassageSections, stairTreadVertices } from './staircase'
 
 /**
  * Must match WALL_EMBED in components/tower/FloorStructures.tsx.
@@ -199,6 +199,49 @@ describe('the stair leaves no slot that looks through', () => {
         ).toBeGreaterThan(0.1)
       }
     }
+  })
+
+  it('builds treads solid side out, not inside out', () => {
+    /*
+     * Wound the wrong way the prism's normals all point inwards: the top face
+     * faces down, the bottom faces up. Nothing errors — the geometry is built,
+     * the tests on positions pass — but backface culling makes every tread a
+     * hollow shell and the flight reads as full of holes. Only the indices say
+     * so, which is why this checks them rather than the corner coordinates.
+     */
+    const steps = flights[0]
+    const { positions, indices } = stairTreadVertices(steps, STAIR.width, () => 0.2)
+
+    const at = (i: number): [number, number, number] => [
+      positions[i * 3],
+      positions[i * 3 + 1],
+      positions[i * 3 + 2],
+    ]
+    const yTop = Math.max(...positions.filter((_, i) => i % 3 === 1))
+    const yBottom = Math.min(...positions.filter((_, i) => i % 3 === 1))
+
+    let topFaces = 0
+    let bottomFaces = 0
+    for (let t = 0; t < indices.length; t += 3) {
+      const p = at(indices[t])
+      const q = at(indices[t + 1])
+      const r = at(indices[t + 2])
+      const e1 = [q[0] - p[0], q[1] - p[1], q[2] - p[2]]
+      const e2 = [r[0] - p[0], r[1] - p[1], r[2] - p[2]]
+      const ny = e1[2] * e2[0] - e1[0] * e2[2] // y component of e1 × e2
+      const meanY = (p[1] + q[1] + r[1]) / 3
+
+      if (Math.abs(meanY - yTop) < 1e-6) {
+        topFaces++
+        expect(ny, 'a tread top face pointing downward').toBeGreaterThan(0)
+      }
+      if (Math.abs(meanY - yBottom) < 1e-6) {
+        bottomFaces++
+        expect(ny, 'a tread bottom face pointing upward').toBeLessThan(0)
+      }
+    }
+    expect(topFaces, 'no top faces found to check').toBeGreaterThan(0)
+    expect(bottomFaces, 'no bottom faces found to check').toBeGreaterThan(0)
   })
 
   it('makes consecutive treads share an edge, so no wedge sticks out', () => {
