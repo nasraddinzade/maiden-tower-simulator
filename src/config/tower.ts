@@ -292,7 +292,31 @@ export const ENTRANCE = {
   azimuthDeg: 270, // west — [İçərişəhər]/az.Wikipedia, corroborated photographically; NOT [ref]'s 135°
   width: 1.1, // m — [İçərişəhər] doorway width (sourced)
   height: 2.0, // m — [PLACEHOLDER] opening height not in sources
-  sillY: 2.0, // m above base — [İçərişəhər] "2 m above former ground surface" (datum ≈ storey-1 level)
+  /**
+   * m — how far the sill stands above the FORMER GROUND SURFACE, which is
+   * outside the tower. [İçərişəhər], "2 m above former ground surface".
+   *
+   * This used to be read as a world Y, on a note that the datum was "≈ storey-1
+   * level". That conflated the street outside with the floor inside, and it put
+   * the threshold two metres ABOVE the chamber it opens onto: you climbed the
+   * stair, went through the door and stood on a lip with a two-metre drop in
+   * front of you, unable to reach the floor or anything on it.
+   *
+   * The footage says the opposite. Coming in through the door the route is level
+   * and then rises — two or three broad steps within the passage, and more up
+   * around the drum inside. So the threshold is at the chamber floor and the
+   * former ground surface is 2 m BELOW it, out in the street. That is also the
+   * plain meaning of a raised entrance.
+   */
+  sillY: 2.0,
+  /** World Y of the threshold: the floor of storey 1, which it opens onto. */
+  get thresholdY() {
+    return FLOORS[0].floorY
+  },
+  /** World Y of the ground outside, one sill height below the threshold. */
+  get groundY() {
+    return FLOORS[0].floorY - this.sillY
+  },
   get direction() {
     return azimuthToVector(this.azimuthDeg)
   },

@@ -350,7 +350,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
     entranceAzimuthDeg: { value: ENTRANCE.azimuthDeg, min: 0, max: 360, step: 1, label: 'azimuth°' },
     entranceWidth: { value: ENTRANCE.width, min: 0.6, max: 3, step: 0.05, label: 'width m' },
     entranceHeight: { value: ENTRANCE.height, min: 1.2, max: 4, step: 0.05, label: 'height m' },
-    entranceSillY: { value: ENTRANCE.sillY, min: 0, max: 8, step: 0.1, label: 'sill Y m' },
+    entranceSillY: { value: ENTRANCE.thresholdY, min: -4, max: 8, step: 0.1, label: 'threshold Y m' },
   })
 
   return (

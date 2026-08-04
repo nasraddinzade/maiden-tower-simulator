@@ -61,8 +61,8 @@ function FeatureMarkers() {
     const t = { x: -d.z, z: d.x }
     const w = ENTRANCE.width / 2
     const wp = { x: d.x * R, z: d.z * R }
-    const y0 = ENTRANCE.sillY
-    const y1 = ENTRANCE.sillY + ENTRANCE.height
+    const y0 = ENTRANCE.thresholdY
+    const y1 = ENTRANCE.thresholdY + ENTRANCE.height
     const rect: Pt[] = [
       [wp.x + t.x * w, y0, wp.z + t.z * w],
       [wp.x - t.x * w, y0, wp.z - t.z * w],

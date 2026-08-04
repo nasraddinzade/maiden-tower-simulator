@@ -98,8 +98,8 @@ export function TowerColliders({
         azimuthDeg: ENTRANCE.azimuthDeg,
         // arc the opening subtends at the outer face
         widthDeg: (ENTRANCE.width / TOWER.outerRadius) * (180 / Math.PI),
-        sillY: ENTRANCE.sillY,
-        headY: ENTRANCE.sillY + ENTRANCE.height,
+        sillY: ENTRANCE.thresholdY,
+        headY: ENTRANCE.thresholdY + ENTRANCE.height,
       },
       openings: (doorways ?? []).map((d) => ({
         azimuthDeg: d.azimuthDeg,

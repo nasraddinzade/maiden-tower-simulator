@@ -43,7 +43,7 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     return stairRampBoxes(
       [
         { azimuthDeg: ENTRANCE.azimuthDeg, treadY: GROUND_Y, midRadius: FOOT_RADIUS },
-        { azimuthDeg: ENTRANCE.azimuthDeg, treadY: ENTRANCE.sillY, midRadius: TOWER.outerRadius },
+        { azimuthDeg: ENTRANCE.azimuthDeg, treadY: ENTRANCE.thresholdY, midRadius: TOWER.outerRadius },
       ],
       EXTERNAL_STAIR.width,
       1,
@@ -75,12 +75,12 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
    * sill to walk on.
    */
   const passage = useMemo(() => {
-    const inner = innerRadiusAt(ENTRANCE.sillY)
+    const inner = innerRadiusAt(ENTRANCE.thresholdY)
     const depth = TOWER.outerRadius - inner
     return {
       position: [
         Math.sin(az) * (inner + depth / 2),
-        ENTRANCE.sillY - 0.15,
+        ENTRANCE.thresholdY - 0.15,
         -Math.cos(az) * (inner + depth / 2),
       ] as [number, number, number],
       halfExtents: [depth / 2, 0.15, ENTRANCE.width / 2] as [number, number, number],

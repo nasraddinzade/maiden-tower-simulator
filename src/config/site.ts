@@ -56,12 +56,17 @@ export const EXTERNAL_STAIR_RISE = EXTERNAL_STAIR.risers * EXTERNAL_STAIR.riser
 /**
  * World Y of the paved ground outside.
  *
- * Derived, so the measured flight lands exactly on the sourced sill instead of
- * one of them being fudged to meet the other. It comes out at +0.02, i.e. the
- * model's y = 0 datum is the pavement to within two centimetres — which is what
- * [İçərişəhər] means by "the former ground surface".
+ * Derived from the THRESHOLD, which is the floor of storey 1, less the measured
+ * rise of the flight. It comes out at −1.98, and the reserve's sourced sill
+ * height puts the former ground surface at −2.00. Two figures from completely
+ * different places, 0.02 m apart, so neither is nudged to meet the other.
+ *
+ * It used to be derived from ENTRANCE.sillY read as a world Y, which put the
+ * pavement at +0.02 and the threshold two metres above the chamber floor. You
+ * could climb the stair and walk through the door, and then you were stuck on a
+ * lip with a two-metre drop, unable to reach the floor or the stair up from it.
  */
-export const GROUND_Y = ENTRANCE.sillY - EXTERNAL_STAIR_RISE
+export const GROUND_Y = ENTRANCE.thresholdY - EXTERNAL_STAIR_RISE
 
 /**
  * The paved area around the tower.
