@@ -115,20 +115,34 @@ describe('cupolas against the tower config', () => {
     }
   })
 
-  it('pierces every floor above the ground storey, and only those', () => {
-    expect(FLOORS[0].hasFloorOpening).toBe(false)
-    for (let i = 1; i < FLOORS.length; i++) expect(FLOORS[i].hasFloorOpening).toBe(true)
+  it('pierces the three storeys the survey found, and no others', () => {
+    /*
+     * This used to assert that every storey above the ground one was pierced, so
+     * that the openings lined up and the sky showed from the bottom. The building
+     * is not built that way — "на этажах не везде есть дыра по середине пола".
+     * Surveyed off the 2026 footage there are three openings, at storeys 2, 5 and
+     * 8, and the vaults of 3, 6 and 7 are closed. Storey 3's round floor feature
+     * is the WELL head, a shaft going down, and is no part of this.
+     */
+    const pierced = FLOORS.filter((f) => f.hasFloorOpening).map((f) => f.floorNumber)
+    expect(pierced).toEqual([2, 5, 8])
+    // and a vault is open exactly where the floor above it is
+    for (const f of FLOORS) {
+      const above = FLOORS[f.index + 1]
+      expect(f.oculusRadius > 0, `storey ${f.floorNumber} vault`).toBe(
+        above ? above.hasFloorOpening : false,
+      )
+    }
   })
 
-  it('leaves the sky visible up the axis from storey 1 (Phase-3 acceptance)', () => {
-    expect(oculiAreClear(FLOORS)).toBe(true)
+  it('does NOT leave the sky visible up the axis — the openings do not line up', () => {
     /*
-     * A sight line fits, and so does a good part of the opening's width. The
-     * 1.0 m this used to ask for was calibrated to the old 1.2 m placeholder;
-     * the oculus is now photo-measured at 0.75 ± 0.15, so 1.0 m of clear column
-     * is wider than the hole itself and asking for it tests nothing real.
+     * The Phase-3 acceptance criterion was a clear sight line from storey 1 to the
+     * sky. It was written from the reference's "ярусы связаны вертикально" and it
+     * is wrong about this tower: with closed vaults over storeys 2, 3, 6 and 7 the
+     * axis is blocked several times over. Kept as a test rather than deleted,
+     * because the old behaviour is exactly what someone would restore by accident.
      */
-    expect(oculiAreClear(FLOORS, 0.5)).toBe(true)
-    expect(oculiAreClear(FLOORS, TOWER.oculusRadius + 0.05)).toBe(false)
+    expect(oculiAreClear(FLOORS)).toBe(false)
   })
 })

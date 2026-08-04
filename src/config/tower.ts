@@ -131,12 +131,38 @@ export interface FloorSpec {
   cupolaSpringY: number
   /** Inner radius at the springing level — the cupola's span. */
   cupolaSpanRadius: number
-  /**
-   * Whether this storey's floor slab carries the oculus opening. Storey 1 rests
-   * on the rock and has no opening beneath it; every storey above is pierced so
-   * the openings line up and the sky is visible from the bottom.
-   */
+  /** Whether this storey's floor slab is pierced by the opening below it. */
   hasFloorOpening: boolean
+}
+
+/**
+ * The central openings, surveyed storey by storey off the owner's 2026 footage.
+ *
+ * The model used to pierce EVERY storey above the first, so that the openings
+ * lined up and you could see the sky from the bottom. The building does not do
+ * that — "на этажах не везде есть дыра по середине пола". There are three, and
+ * they do not line up at all:
+ *
+ *   storey 1 vault → storey 2 floor   the well the modern steel spiral rises
+ *                                     through, not an oculus
+ *   storey 4 vault → storey 5 floor
+ *   storey 7 vault → storey 8 floor
+ *
+ * Storeys 3 and 6 have unbroken paving and a closed vault; the round thing in
+ * storey 3's floor is the WELL head, a shaft going down, not a link upward.
+ *
+ * Diameters are [VIDEO] — read off a frame by taking the frameless glass guard
+ * round each opening as 1.00–1.10 m, the ratio being nearly independent of where
+ * the camera stood. The method is written out in each entry's tolerance. The
+ * storey-8 opening measures ~0.5 m smaller than storey 5's; that difference is
+ * visible in the footage but sits only just outside the method's own tolerance,
+ * so treat it as likely rather than settled.
+ */
+const OPENINGS: Record<number, { radius: number; note: string }> = {
+  // keyed by the index of the storey whose VAULT is pierced
+  0: { radius: 0.9, note: '[VIDEO] Ø ~1.8 m ±0.3 — modern stair well, glass-guard ratio' },
+  3: { radius: 1.2, note: '[VIDEO] Ø ~2.4 m ±0.5 — glass-guard ratio, bench cross-check' },
+  6: { radius: 0.7, note: '[VIDEO] Ø ~1.4 m ±0.35 — glass-guard ratio' },
 }
 
 function buildFloors(): FloorSpec[] {
@@ -153,12 +179,14 @@ function buildFloors(): FloorSpec[] {
       floorY,
       ceilingY,
       clearHeight,
-      oculusRadius: OCULUS_RADIUS_DEFAULT,
+      // 0 where the vault is closed — most of them are
+      oculusRadius: OPENINGS[i]?.radius ?? 0,
       wallThicknessAtLevel: wallThicknessAt(floorY),
       innerRadiusAtLevel: innerRadiusAt(floorY),
       cupolaSpringY,
       cupolaSpanRadius: innerRadiusAt(cupolaSpringY),
-      hasFloorOpening: i > 0,
+      // this storey's floor is pierced iff the vault BELOW it is
+      hasFloorOpening: OPENINGS[i - 1] !== undefined,
     })
     y = ceilingY + CEILING_STRUCTURE // next floor sits above this cupola
   }
