@@ -506,6 +506,17 @@ export const WATER = {
   /** Below ground the pipes turn rectangular and leave through the wall [ref]. */
   buriedPipeWidth: 0.22, // m — [ref]
   buriedPipeHeight: 0.18, // m — [ref]
+  /**
+   * m — how far below the paving the buried pipes run. [ASSUMPTION]; [ref] says
+   * only that they are "ниже уровня земли".
+   *
+   * It matters that this is measured DOWN FROM THE GROUND rather than given as a
+   * world Y. It used to be a hard-coded −1.2 in the component, which was under
+   * the paving while the paving was near y = 0. Once the ground was put where
+   * the raised entrance says it is, two metres lower, the pipes were left
+   * standing 0.8 m in open air, sticking out of the tower's base like planks.
+   */
+  buriedPipeDepth: 0.6,
 }
 
 // ———————————————————————————————— site ————————————————————————————————

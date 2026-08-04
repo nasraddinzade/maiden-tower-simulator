@@ -9,7 +9,7 @@ import {
   pipeOuterDiameter,
   wellProfile,
 } from '../../lib/waterSystem'
-import { FLOORS, TOWER, WATER, WELL, innerRadiusAt } from '../../config/tower'
+import { ENTRANCE, FLOORS, TOWER, WATER, WELL, innerRadiusAt } from '../../config/tower'
 import { isStoreyVisible } from '../../lib/visibility'
 
 export interface WaterSystemProps {
@@ -276,7 +276,7 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
         return (
           <mesh
             key={az}
-            position={[d.x * mid, -1.2, d.z * mid]}
+            position={[d.x * mid, ENTRANCE.groundY - WATER.buriedPipeDepth, d.z * mid]}
             rotation={[0, -(az * Math.PI) / 180 + Math.PI / 2, 0]}
           >
             <boxGeometry args={[len, WATER.buriedPipeHeight, WATER.buriedPipeWidth]} />

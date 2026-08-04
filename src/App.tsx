@@ -73,7 +73,13 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   const { showShell, showWireframe, showScaleRef, cutaway } = useControls('View', {
     showShell: true,
     showWireframe: false,
-    showScaleRef: true,
+    /*
+     * The 1.75 m scale rod. Off by default now: the model's target is the tower
+     * AS IT STANDS, and a debug marker standing on the paving beside it is the
+     * clearest possible example of something that is not there. Still one click
+     * away in the panel when a size needs checking.
+     */
+    showScaleRef: false,
     cutaway: { value: false, label: 'cutaway (hide shell)' },
   })
 
