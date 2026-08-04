@@ -208,7 +208,29 @@ export const TOWER = {
   wallThicknessTop: WALL_TOP,
   floorCount: FLOOR_COUNT,
   foundationDepth: FOUNDATION_DEPTH,
-  /** Residual height above the top storey — the crenellated roof/parapet [ASSUMPTION]. */
+  /**
+   * Residual height above the top storey — the roof parapet [ASSUMPTION].
+   *
+   * CONTRADICTED BY MEASUREMENT, and left standing so the contradiction stays
+   * visible rather than being tuned away.
+   *
+   * This is not measured at all: it is whatever is left of the sourced 29.5 m
+   * [ICOMOS 958] once eight storeys of ASSUMED heights are stacked under it, and
+   * it comes to 2.6 m. Measured off the roof footage it is about 0.53 m.
+   *
+   * The measurement does not depend on knowing any absolute size. Taken against
+   * the sea horizon, the parapet stands at 0.556 of the phone's own height above
+   * the deck — two independent columns of the frame agreeing to 0.4%. For the
+   * parapet to be 2.6 m the phone would have had to be held 4.7 m above the roof.
+   * So the residual is wrong whatever scale is assumed, which means the fault is
+   * in the STACK below it: GROUND_CLEAR, UPPER_CLEAR, CEILING_STRUCTURE and
+   * CUPOLA_RISE are all assumptions and together they run some 2 m short.
+   *
+   * Not corrected by spreading the 2 m across the storeys — that is fitting
+   * geometry so a total comes out, which is the one thing this model must not do.
+   * The storeys are being measured against the visitors standing in them; when
+   * those land, the stack changes and this becomes a real residual.
+   */
   parapetHeight: HEIGHT - TOP_OF_FLOORS,
   /** Rise of each shallow cupola, crown down to its springing [ASSUMPTION]. */
   cupolaRise: CUPOLA_RISE,
