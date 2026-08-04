@@ -26,6 +26,7 @@ import {
 } from './lib/staircase'
 import { Staircase } from './components/tower/Staircase'
 import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
+import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
 import type { WindowSpec } from './lib/windows'
@@ -471,6 +472,13 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
       */}
       <ModernSpiralStair visible={stair.showStair} withColliders={stair.withColliders} />
 
+      {/*
+        The ground outside and the stair up to the doorway. Without them the
+        walker has to start inside a sealed tower, which is the one route into
+        the building that does not exist.
+      */}
+      <SiteAndEntranceStair visible withColliders={stair.withColliders} />
+
       {showScaleRef && (
         <mesh position={[TOWER.outerRadius + 2.5, 1.75 / 2, 0]}>
           <boxGeometry args={[0.4, 1.75, 0.4]} />
@@ -489,6 +497,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         <FirstPersonPlayer
           touchInput={touchInput}
           touchLook={touchLook}
+          startAt={OUTDOOR_START}
           lamp={lampCtl.lamp}
           lampIntensity={lampCtl.lampIntensity}
         />

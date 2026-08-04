@@ -18,6 +18,12 @@ export interface FirstPersonPlayerProps {
   /** Storey the player starts on. */
   startFloorIndex?: number
   /**
+   * Drop the walker here instead, facing `yaw`. Used to start them OUTSIDE, on
+   * the paved ground, so the way in is the way the building's way in — up the
+   * stair to the raised doorway — rather than materialising in a sealed room.
+   */
+  startAt?: { x: number; y: number; z: number; yaw: number }
+  /**
    * A hand lamp. The interior really is almost dark — 5 m of wall and slit
    * windows let in very little — which is historically right but leaves nothing
    * to see. A carried light is also what the 2007 reference photographs show.
@@ -38,6 +44,7 @@ export function FirstPersonPlayer({
   touchInput,
   touchLook,
   startFloorIndex = 0,
+  startAt,
   lamp = true,
   lampIntensity = 26,
 }: FirstPersonPlayerProps) {
@@ -46,7 +53,7 @@ export function FirstPersonPlayer({
   const body = useRef<RapierRigidBody>(null)
   const keyboard = useKeyboard()
 
-  const yaw = useRef(0)
+  const yaw = useRef(startAt?.yaw ?? 0)
   const pitch = useRef(0)
   const vertical = useRef(0)
   const locked = useRef(false)
@@ -58,9 +65,10 @@ export function FirstPersonPlayer({
   const pendingPlacement = useRef<{ x: number; y: number; z: number } | null>(null)
 
   const start = useMemo(() => {
+    if (startAt) return startAt
     const f = FLOORS[startFloorIndex]
     return teleportTarget(f.floorY, f.innerRadiusAtLevel, f.oculusRadius, PLAYER.radius)
-  }, [startFloorIndex])
+  }, [startFloorIndex, startAt])
 
   /**
    * Rapier's character controller — the piece that makes the stair walkable.
