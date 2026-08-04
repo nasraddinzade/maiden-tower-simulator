@@ -25,6 +25,7 @@ import {
   type Winding,
 } from './lib/staircase'
 import { Staircase } from './components/tower/Staircase'
+import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
 import type { WindowSpec } from './lib/windows'
@@ -462,6 +463,13 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         withColliders={stair.withColliders}
         material={innerMat}
       />
+
+      {/*
+        The inserted steel spiral, entry chamber to storey 2. It is the ONLY way
+        between those two floors in the tower as it stands, so without it the
+        model has a hole where the visitor route begins.
+      */}
+      <ModernSpiralStair visible={stair.showStair} withColliders={stair.withColliders} />
 
       {showScaleRef && (
         <mesh position={[TOWER.outerRadius + 2.5, 1.75 / 2, 0]}>
