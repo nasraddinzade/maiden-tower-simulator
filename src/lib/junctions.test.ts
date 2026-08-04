@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { FLOORS, STAIR, TOWER, innerRadiusAt } from '../config/tower'
+import { FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt } from '../config/tower'
 import { PLAYER } from '../config/player'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from './cupola'
 import {
@@ -170,7 +170,7 @@ describe('the stair leaves no slot that looks through', () => {
       wallClearance: STAIR.wallClearance,
       startAzimuthDeg: STAIR.startAzimuthDeg,
     },
-    FLOORS,
+    WALL_LIFTS,
     innerRadiusAt,
   )
   const sections = stairPassageSections(
@@ -373,22 +373,25 @@ describe('the stair leaves no slot that looks through', () => {
    * the way in from each room has to be a ramp too.
    */
   describe('the way onto the stair is walkable', () => {
-    const approaches = stairApproaches(flights, STAIR.width, innerRadiusAt, (i, end) =>
-      end === 'foot' ? FLOORS[i].floorY : FLOORS[i + 1].floorY,
+    const approaches = stairApproaches(
+      flights,
+      STAIR.width,
+      innerRadiusAt,
+      (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+      WALL_LIFTS.map((l) => l.opensAtY),
     )
 
-    it('gives every storey exactly one way onto the helix', () => {
+    it('gives both ends of every flight a way on, plus the storey 4→6 passes', () => {
       /*
-       * One per flight head, plus one at the bottom flight's foot. Emitting a
-       * foot approach on the upper flights too laid a second surface across the
-       * landing, 0.42 m above the top treads of the flight below, and the climb
-       * stopped three steps short of the storey.
+       * Two per flight, since the flights are separate runs off separate
+       * chambers, plus one more wherever a flight merely PASSES a storey and is
+       * left from partway along it. Anything less and some bottom tread stands
+       * proud of a chamber floor with nothing leading up to it — and this
+       * character controller will not climb a step of any height.
        */
-      expect(approaches.length).toBe(flights.length + 1)
-      const feet = approaches.filter(
-        ([, out]) => !flights.some((f) => Math.abs(f[f.length - 1].treadY - out.treadY) < 1e-9),
-      )
-      expect(feet.length, 'more than one foot approach').toBe(1)
+      const passes = WALL_LIFTS.reduce((n, l) => n + l.opensAtY.length, 0)
+      expect(passes, 'the 4→6 flight should pass exactly one storey').toBe(1)
+      expect(approaches.length).toBe(flights.length * 2 + passes)
     })
 
     it('starts each approach inside the room, under its floor slab', () => {

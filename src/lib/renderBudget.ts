@@ -12,7 +12,7 @@ import { cupolaProfile, effectiveOpeningRadius } from './cupola'
 import { planAllFlights } from './staircase'
 import { channelRings } from './waterSystem'
 import { isStoreyVisible, lodSegments } from './visibility'
-import { FLOORS, STAIR, TOWER, WATER, innerRadiusAt } from '../config/tower'
+import { FLOORS, STAIR, TOWER, WALL_LIFTS, WATER, innerRadiusAt } from '../config/tower'
 
 export interface BudgetOptions {
   /** Storey the viewer is on. */
@@ -108,7 +108,7 @@ export function interiorRenderBudget(options: BudgetOptions = {}): RenderBudget 
       wallClearance: STAIR.wallClearance,
       startAzimuthDeg: STAIR.startAzimuthDeg,
     },
-    FLOORS,
+    WALL_LIFTS,
     innerRadiusAt,
   )
   const stepCount = flights.reduce((n, f) => n + f.length, 0)

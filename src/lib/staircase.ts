@@ -170,26 +170,39 @@ export interface StairSettings {
   startAzimuthDeg: number
 }
 
+/** The part of a lift this function needs: two heights and nothing else. */
+export interface FlightRun {
+  fromY: number
+  toY: number
+}
+
 /**
- * Lay out every flight of the tower, one per storey gap.
+ * Lay out the flights cut in the masonry, ONE PER LIFT.
  *
- * Flights are chained: each resumes one step past where the previous ended, so
- * the whole stair reads as a single helix through the masonry rather than eight
- * unrelated runs. `innerRadiusOf` is injected so this stays independent of the
- * config module and can be exercised with synthetic towers in tests.
+ * Not one per storey gap. The tower does not have a flight between every pair of
+ * storeys: the bottom lift is a modern steel spiral standing in the middle of the
+ * chamber and is no part of this, and one flight — 4 to 6 — spans two storey
+ * heights, opening onto the storey between it partway along. Driving this off a
+ * list of RUNS rather than off the floor table is what lets both be true.
+ *
+ * Flights are still chained: each resumes one step past where the previous ended,
+ * so the masonry stair keeps turning the same way up the tower instead of
+ * restarting at an arbitrary azimuth every storey. `innerRadiusOf` is injected so
+ * this stays independent of the config module and can be exercised with synthetic
+ * towers in tests.
  */
 export function planAllFlights(
   cfg: StairSettings,
-  floors: Array<{ floorY: number }>,
+  runs: FlightRun[],
   innerRadiusOf: (y: number) => number,
 ): StepPlacement[][] {
   const flights: StepPlacement[][] = []
   let cursor = cfg.startAzimuthDeg
 
-  for (let i = 0; i < floors.length - 1; i++) {
+  for (const run of runs) {
     const steps = planFlight({
-      fromY: floors[i].floorY,
-      toY: floors[i + 1].floorY,
+      fromY: run.fromY,
+      toY: run.toY,
       startAzimuthDeg: cursor,
       innerRadiusAt: (y) => innerRadiusOf(y) + cfg.wallClearance,
       width: cfg.width,
@@ -432,6 +445,26 @@ export function stairTreadVertices(
   return { positions, indices }
 }
 
+/**
+ * Where a flight is entered or left at one of its ends — the ONE rule the
+ * doorway and the ramp up to it must both obey.
+ *
+ * Half a flight-width along the climb from the end tread. Both the opening in
+ * the masonry and the walking surface leading to it are placed by this, because
+ * when they were placed separately they drifted apart by exactly that half width
+ * and the walker met a jamb where the ramp said there was a way through.
+ */
+export function approachAzimuthDeg(
+  steps: StepPlacement[],
+  endTread: StepPlacement,
+  width: number,
+): number {
+  if (steps.length < 2) return endTread.azimuthDeg
+  const halfWidthDeg = ((width / Math.max(0.5, endTread.midRadius)) * (180 / Math.PI)) / 2
+  const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
+  return endTread.azimuthDeg + halfWidthDeg * climbDir
+}
+
 /** An arched doorway between a room and the stair passage. */
 export interface StairDoorway {
   azimuthDeg: number
@@ -465,33 +498,68 @@ export function stairDoorways(
   floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
   /** Floor slab thickness, so the threshold can be dropped clear of it. */
   slabThickness = 0.3,
+  /**
+   * Per flight, the floor levels it runs PAST and opens onto partway along.
+   *
+   * Only 4→6 has any: it is one flight spanning two storey heights, and storey 5
+   * is reached from the middle of it rather than from its head. Without this the
+   * middle storey has no way onto the stair at all.
+   */
+  opensAtYPerFlight: number[][] = [],
 ): StairDoorway[] {
   const out: StairDoorway[] = []
+
+  const doorwayAt = (all: StepPlacement[], s: StepPlacement, floorY: number): StairDoorway => {
+    // reach past the room face so the opening is a hole, not a blind recess
+    const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - width / 2)
+    // the same azimuth the ramp up to it uses — see approachAzimuthDeg()
+    const azimuthDeg = approachAzimuthDeg(all, s, width)
+    /*
+     * The head is measured from whatever the walker is standing on IN the
+     * opening, not from the floor of the room.
+     *
+     * The ramp onto the flight climbs inside the doorway — half a flight-width
+     * along, the treads are already two or three risers up. A head fixed at
+     * floor level therefore came down on the walker halfway through the opening:
+     * measured, feet at 4.05 m under a lintel at 5.90 m with 1.75 m of walker
+     * between them, and the climb stopped in the doorway itself.
+     */
+    const underfoot = all.reduce((best, cur) =>
+      Math.abs(cur.azimuthDeg - azimuthDeg) < Math.abs(best.azimuthDeg - azimuthDeg) ? cur : best,
+    )
+    return {
+      azimuthDeg,
+      widthDeg: (width / Math.max(0.5, s.midRadius)) * (180 / Math.PI),
+      /**
+       * The threshold sits BELOW the floor, not at it.
+       *
+       * A doorway is an arc a couple of steps wide, so a sill cut at floor
+       * level hangs over the tread just short of the landing: measured, that
+       * left 0.16 m of headroom on the second-to-last step of a flight — you
+       * could not get from the stair onto the floor. Dropping it clear of the
+       * slab removes the lip; the room's own floor slab covers the notch.
+       */
+      bottomY: floorY - slabThickness - 0.15,
+      topY: Math.max(floorY, underfoot.treadY) + height,
+      innerRadius: Math.max(0.05, inner),
+      outerRadius: s.midRadius + width / 2 + 0.06,
+    }
+  }
+
   flights.forEach((steps, i) => {
     if (steps.length === 0) return
     for (const end of ['foot', 'head'] as const) {
       const s = end === 'foot' ? steps[0] : steps[steps.length - 1]
-      const floorY = floorYOf(i, end)
-      // reach past the room face so the opening is a hole, not a blind recess
-      const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - width / 2)
-      const outer = s.midRadius + width / 2 + 0.06
-      out.push({
-        azimuthDeg: s.azimuthDeg,
-        widthDeg: (width / Math.max(0.5, s.midRadius)) * (180 / Math.PI),
-        /**
-         * The threshold sits BELOW the floor, not at it.
-         *
-         * A doorway is an arc a couple of steps wide, so a sill cut at floor
-         * level hangs over the tread just short of the landing: measured, that
-         * left 0.16 m of headroom on the second-to-last step of a flight — you
-         * could not get from the stair onto the floor. Dropping it clear of the
-         * slab removes the lip; the room's own floor slab covers the notch.
-         */
-        bottomY: floorY - slabThickness - 0.15,
-        topY: floorY + height,
-        innerRadius: Math.max(0.05, inner),
-        outerRadius: outer,
-      })
+      out.push(doorwayAt(steps, s, floorYOf(i, end)))
+    }
+    // and the openings partway along, for a flight that passes a storey
+    for (const floorY of opensAtYPerFlight[i] ?? []) {
+      // the tread nearest that level IS the landing there — the flight does not
+      // pause for it, you simply step off sideways where it goes by
+      const s = steps.reduce((best, cur) =>
+        Math.abs(cur.treadY - floorY) < Math.abs(best.treadY - floorY) ? cur : best,
+      )
+      out.push(doorwayAt(steps, s, floorY))
     }
   })
   return out
@@ -528,61 +596,88 @@ export function stairApproaches(
   width: number,
   innerFaceRadiusAt: (y: number) => number,
   floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
+  /** Per flight, floor levels it runs PAST and opens onto — see stairDoorways(). */
+  opensAtYPerFlight: number[][] = [],
 ): Array<[StepApproachPoint, StepApproachPoint]> {
   const out: Array<[StepApproachPoint, StepApproachPoint]> = []
   flights.forEach((steps, i) => {
     if (steps.length < 2) return
     /*
-     * Only the bottom flight needs a way IN at its foot. Every flight above
-     * starts a few degrees past where the one below arrives, so the storey's
-     * landing — the head of the flight below — already joins that room to the
-     * helix, and a second surface there does more harm than good: laid across
-     * the top treads of the flight below it stood 0.42 m proud of them, and the
-     * climb stopped dead three steps short of the storey.
+     * BOTH ends of every flight, now that the flights are genuinely separate.
+     *
+     * While the model had one helix running the full height, a flight above the
+     * bottom needed no way in at its foot: it began a few degrees past where the
+     * one below arrived and the two were one continuous ramp. The tower is not
+     * built that way. Each flight starts at its own doorway off a chamber, so
+     * each needs its own ramp up off that chamber's floor, or its bottom tread
+     * stands 0.2 m proud of the floor with nothing leading to it — and this
+     * character controller will not climb a step of any height.
      */
-    const ends = i === 0 ? (['foot', 'head'] as const) : (['head'] as const)
-    for (const end of ends) {
-      const s = end === 'foot' ? steps[0] : steps[steps.length - 1]
-      const floorY = floorYOf(i, end)
+    const nearestTo = (azimuthDeg: number) =>
+      steps.reduce((best, cur) =>
+        Math.abs(cur.azimuthDeg - azimuthDeg) < Math.abs(best.azimuthDeg - azimuthDeg) ? cur : best,
+      )
 
-      /*
-       * The head landing is pushed one half-width along the climb, so it lies
-       * BEYOND the top tread instead of straddling it.
-       *
-       * Centred on the last tread it reached back over the two below, which are
-       * a riser and two risers lower — and a level slab over a descending flight
-       * is a wall across it. That is exactly where the climb stopped once the
-       * landing was added: three steps short of the storey, at the slab's edge.
-       * Pushed forward, its trailing edge lands on the top tread and the flight
-       * below stays clear.
-       *
-       * The foot needs no such shift: everything behind the bottom tread is
-       * room, and everything ahead of it is HIGHER, so a ramp up to it can
-       * overhang nothing.
-       */
-      const halfWidthDeg = ((width / Math.max(0.5, s.midRadius)) * (180 / Math.PI)) / 2
-      const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
-      const azimuthDeg = end === 'head' ? s.azimuthDeg + halfWidthDeg * climbDir : s.azimuthDeg
-
-      /*
-       * Far enough inside the room to overlap its floor slab, whose colliders
-       * stop at the wall face. Butting the two would leave a seam the character
-       * controller can catch on, and a seam is what this exists to remove.
-       */
-      const inRoom: StepApproachPoint = {
-        azimuthDeg,
-        treadY: floorY,
-        midRadius: Math.max(0.5, innerFaceRadiusAt(floorY) - 0.35),
-      }
-      const onStair: StepApproachPoint = {
-        azimuthDeg,
-        // planFlight lands the top tread flush with the floor above, so the head
-        // is level; only the foot has a rise to make up
-        treadY: end === 'head' ? floorY : s.treadY,
-        midRadius: s.midRadius,
-      }
+    /*
+     * EVERY approach is pushed one half-width ALONG the climb, and then anchored
+     * on whatever tread it actually lands next to.
+     *
+     * Both halves of that matter, and both were learnt the hard way.
+     *
+     * The shift: an approach centred on the end tread straddles it, reaching back
+     * over the treads below, which are a riser and two risers lower. A slab laid
+     * over a descending flight is a wall across it. Unshifted at the foot, this
+     * put the next flight's ramp 0.19 m proud of the top treads of the flight
+     * below, and the climb stopped two steps short of storey 3 at az 145.
+     *
+     * The anchor: having moved along the flight, the approach must meet it at the
+     * height the flight HAS THERE, not at the height of the end tread it was
+     * named after. Otherwise the shift simply trades a wall at one end for a lip
+     * at the other, and this character controller will not climb a lip either.
+     */
+    const approach = (endTread: StepPlacement, floorY: number, level: boolean) => {
+      const azimuthDeg = approachAzimuthDeg(steps, endTread, width)
+      const anchor = level ? endTread : nearestTo(azimuthDeg)
+      out.push([
+        /*
+         * Far enough inside the room to overlap its floor slab, whose colliders
+         * stop at the wall face. Butting the two would leave a seam the character
+         * controller can catch on, and a seam is what this exists to remove.
+         */
+        {
+          azimuthDeg,
+          treadY: floorY,
+          midRadius: Math.max(0.5, innerFaceRadiusAt(floorY) - 0.35),
+        },
+        {
+          azimuthDeg,
+          // the head is level: planFlight lands its top tread flush with the
+          // floor above, and past that tread the flight has no more treads to
+          // follow, so there is nothing to anchor to but the floor itself
+          treadY: level ? floorY : anchor.treadY,
+          midRadius: anchor.midRadius,
+        },
+      ])
       // always room-end first, so the box's own slope runs the way it is walked
-      out.push([inRoom, onStair])
+    }
+
+    approach(steps[0], floorYOf(i, 'foot'), false)
+    approach(steps[steps.length - 1], floorYOf(i, 'head'), true)
+
+    /*
+     * And a landing where the flight merely PASSES a storey — 4→6 opening onto
+     * storey 5. The flight does not stop there, so the tread nearest that level
+     * is where you step off, and the landing is a ramp from it down to the
+     * chamber floor, exactly like a foot approach taken the other way.
+     */
+    for (const floorY of opensAtYPerFlight[i] ?? []) {
+      approach(
+        steps.reduce((best, cur) =>
+          Math.abs(cur.treadY - floorY) < Math.abs(best.treadY - floorY) ? cur : best,
+        ),
+        floorY,
+        false,
+      )
     }
   })
   return out

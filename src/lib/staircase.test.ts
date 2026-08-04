@@ -11,7 +11,7 @@ import {
   windingSign,
   type FlightParams,
 } from './staircase'
-import { FLOORS, STAIR, TOWER, innerRadiusAt } from '../config/tower'
+import { FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt } from '../config/tower'
 
 const base: FlightParams = {
   fromY: 0,
@@ -156,7 +156,7 @@ describe('fitting inside the masonry', () => {
   })
 })
 
-describe('planAllFlights — one continuous helix', () => {
+describe('planAllFlights — one flight per lift', () => {
   const settings = {
     winding: STAIR.winding,
     riserTarget: STAIR.riserTarget,
@@ -165,10 +165,19 @@ describe('planAllFlights — one continuous helix', () => {
     wallClearance: STAIR.wallClearance,
     startAzimuthDeg: STAIR.startAzimuthDeg,
   }
-  const flights = planAllFlights(settings, FLOORS, innerRadiusAt)
+  const flights = planAllFlights(settings, WALL_LIFTS, innerRadiusAt)
 
-  it('produces a flight for every storey gap', () => {
-    expect(flights).toHaveLength(FLOORS.length - 1)
+  it('produces a flight per masonry lift, not per storey gap', () => {
+    /*
+     * The tower does not have a stair between every pair of storeys. The bottom
+     * lift is a modern steel spiral standing in the middle of the chamber and is
+     * no part of the masonry stair, and 4→6 is ONE flight spanning two storey
+     * heights. Counting flights off the floor table gave eight storeys minus one
+     * = seven, which is the wrong number for two independent reasons.
+     */
+    expect(flights).toHaveLength(WALL_LIFTS.length)
+    expect(WALL_LIFTS.length, 'a lift table that matches the floor table is a smell')
+      .not.toBe(FLOORS.length - 1)
   })
 
   it('starts the first flight where the config says', () => {
@@ -193,9 +202,20 @@ describe('planAllFlights — one continuous helix', () => {
     }
   })
 
-  it('reaches the top storey', () => {
+  it('reaches the head of the last lift — the roof deck, not the top floor', () => {
     const all = flights.flat()
-    expect(all[all.length - 1].treadY).toBeCloseTo(FLOORS[FLOORS.length - 1].floorY, 10)
+    expect(all[all.length - 1].treadY).toBeCloseTo(WALL_LIFTS[WALL_LIFTS.length - 1].toY, 10)
+  })
+
+  it('spans two storey heights on the one lift that passes a storey', () => {
+    // "с 4 на 5 и 6 всего одна лестница где на 5 выходишь с середины пути"
+    const passing = WALL_LIFTS.filter((l) => l.opensAtY.length > 0)
+    expect(passing, 'exactly one flight runs past a storey').toHaveLength(1)
+    const l = passing[0]
+    for (const y of l.opensAtY) {
+      expect(y, 'the level it opens onto must lie inside the run').toBeGreaterThan(l.fromY)
+      expect(y).toBeLessThan(l.toY)
+    }
   })
 
   it('turns consistently in one direction throughout', () => {
@@ -210,7 +230,7 @@ describe('planAllFlights — one continuous helix', () => {
     // derive the opposite from the config, so this keeps testing a real flip
     // whichever way STAIR.winding is set
     const opposite = STAIR.winding === 'clockwise' ? 'counterclockwise' : 'clockwise'
-    const other = planAllFlights({ ...settings, winding: opposite }, FLOORS, innerRadiusAt)
+    const other = planAllFlights({ ...settings, winding: opposite }, WALL_LIFTS, innerRadiusAt)
     const a = flights.flat()
     const b = other.flat()
     expect(a).toHaveLength(b.length)

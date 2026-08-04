@@ -4,7 +4,17 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
-import { BUTTRESS, ENTRANCE, FLOORS, STAIR, TOWER, WATER, WELL, innerRadiusAt } from './config/tower'
+import {
+  BUTTRESS,
+  ENTRANCE,
+  FLOORS,
+  STAIR,
+  TOWER,
+  WALL_LIFTS,
+  WATER,
+  WELL,
+  innerRadiusAt,
+} from './config/tower'
 import { PLAYER } from './config/player'
 import {
   headroomStepsFor,
@@ -111,28 +121,46 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         wallClearance: stair.wallClearance,
         startAzimuthDeg: stair.startAzimuthDeg,
       },
-      FLOORS,
+      WALL_LIFTS,
       innerRadiusAt,
     )
     const cuts: Array<StairwellCut | undefined> = []
     flights.forEach((steps, i) => {
+      const lift = WALL_LIFTS[i]
+      if (!lift) return
       // the opening has to be open from where the walker's HEAD meets the slab,
       // not from where their feet do — see headroomStepsFor()
       const riser = steps.length > 1 ? Math.abs(steps[1].treadY - steps[0].treadY) : STAIR.riserTarget
-      const span = stairwellSpanDeg(steps, headroomStepsFor(riser, PLAYER.height, TOWER.floorSlab))
-      if (!span) return
-      // The flight lands on storey i+1, so THAT storey's floor is pierced — and
-      // the opening is measured at ITS level, not the one below. Taking the
-      // radius from the storey beneath put the cut 0.27 m inside the room face,
-      // which is a hole in the floor at the wall rather than a lip over the
-      // passage. No inward margin either, for the same reason.
-      const pierced = FLOORS[i + 1]
-      const inner = innerRadiusAt(pierced.floorY) + stair.wallClearance
-      cuts[i + 1] = {
-        centreAzimuthDeg: span.centreAzimuthDeg,
-        widthDeg: span.widthDeg,
-        innerRadius: inner,
-        outerRadius: inner + stair.stairWidth + 0.1,
+      const headroomSteps = headroomStepsFor(riser, PLAYER.height, TOWER.floorSlab)
+      /*
+       * A flight pierces the slab it LANDS on — and, for 4→6, also the slab it
+       * runs PAST. The cut is measured at the pierced storey's own level, not at
+       * the one below: taking the radius from beneath put it 0.27 m inside the
+       * room face, which is a hole in the floor at the wall rather than a lip
+       * over the passage. No inward margin either, for the same reason.
+       *
+       * The roof lift lands on the deck, which is not a floor slab and carries
+       * no cut here.
+       */
+      const pierces = [...lift.opensAtFloorNumbers, lift.toFloorNumber].filter(
+        (n) => n >= 1 && n <= FLOORS.length,
+      )
+      for (const floorNumber of pierces) {
+        const pierced = FLOORS[floorNumber - 1]
+        // for a storey the flight only passes, the opening sits where the flight
+        // crosses THAT level, not at the head of the run
+        const span = stairwellSpanDeg(
+          steps.filter((s) => s.treadY <= pierced.floorY + 1e-9),
+          headroomSteps,
+        )
+        if (!span) continue
+        const inner = innerRadiusAt(pierced.floorY) + stair.wallClearance
+        cuts[floorNumber - 1] = {
+          centreAzimuthDeg: span.centreAzimuthDeg,
+          widthDeg: span.widthDeg,
+          innerRadius: inner,
+          outerRadius: inner + stair.stairWidth + 0.1,
+        }
       }
     })
     return cuts
@@ -161,7 +189,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         wallClearance: stair.wallClearance,
         startAzimuthDeg: stair.startAzimuthDeg,
       },
-      FLOORS,
+      WALL_LIFTS,
       innerRadiusAt,
     )
     // Vault height above each tread. [ASSUMPTION] — no source gives it. 2.0 m
@@ -195,7 +223,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         wallClearance: stair.wallClearance,
         startAzimuthDeg: stair.startAzimuthDeg,
       },
-      FLOORS,
+      WALL_LIFTS,
       innerRadiusAt,
     )
     return stairDoorways(
@@ -203,8 +231,9 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
       stair.stairWidth,
       PLAYER.height + 0.35,
       innerRadiusAt,
-      (i, end) => (end === 'foot' ? FLOORS[i].floorY : FLOORS[i + 1].floorY),
+      (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
       TOWER.floorSlab,
+      WALL_LIFTS.map((l) => l.opensAtY),
     )
   }, [
     stair.cutStairwells,

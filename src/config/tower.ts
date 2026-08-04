@@ -296,6 +296,102 @@ export const STAIR: {
   startAzimuthDeg: 200, // ° — [PLACEHOLDER] where the first flight begins; no source fixes it
 }
 
+// ———————————————————— vertical circulation, 2026 ————————————————————
+//
+// How you actually get from storey to storey in the tower AS IT STANDS.
+//
+// This replaces the model's earlier assumption — one continuous helix in the
+// wall running the full 23.6 m, a flight per storey gap — which was mine, not
+// the sources'. docs/maiden-tower-reference.md says only that the stair "примыкает
+// к внутренней окружности стены, проходит в теле кладки"; it fixes neither the
+// extent nor the number of flights. It does say the storeys are linked vertically
+// through the oculi, which is a different arrangement altogether.
+//
+// The table below is the owner's own account of the building, walked in 2026 and
+// corroborated frame by frame against their two walkthrough videos (ascent
+// "снизу вверх", descent "сверху вниз"). Timings cited are seconds into the ascent.
+//
+// The one that breaks the pattern is 4→6: a SINGLE flight spanning two storey
+// heights, with a doorway onto storey 5 partway along. Everywhere else you leave
+// the passage at each storey, cross the chamber and enter the next doorway — no
+// flight runs past a storey. That is the whole of "сплошная только для двух ярусов".
+export type LiftKind =
+  /** Free-standing modern steel spiral, in the middle of the chamber. */
+  | 'modernSpiral'
+  /** Original stone flight inside the wall thickness. */
+  | 'wallStair'
+
+export interface StairLift {
+  kind: LiftKind
+  /** World Y the flight leaves from. */
+  fromY: number
+  /** World Y it arrives at. */
+  toY: number
+  /**
+   * Floor levels this flight runs PAST without ending, opening onto them partway
+   * along. Empty for every lift but 4→6.
+   */
+  opensAtY: number[]
+  /** The same storeys as 1-based numbers, for the slab cuts and for labels. */
+  opensAtFloorNumbers: number[]
+  /** For labels and for provenance in the UI. */
+  fromFloorNumber: number
+  toFloorNumber: number
+  /** Where this came from, so nobody has to guess later. */
+  source: string
+}
+
+function buildLifts(): StairLift[] {
+  // TOP_OF_FLOORS is the base of the parapet, i.e. the deck you walk out onto
+  const y = (floorNumber: number) =>
+    floorNumber > FLOOR_COUNT ? TOP_OF_FLOORS : FLOORS[floorNumber - 1].floorY
+
+  const lift = (
+    kind: LiftKind,
+    from: number,
+    to: number,
+    source: string,
+    opensOnto: number[] = [],
+  ): StairLift => ({
+    kind,
+    fromY: y(from),
+    toY: y(to),
+    opensAtY: opensOnto.map(y),
+    opensAtFloorNumbers: opensOnto,
+    fromFloorNumber: from,
+    toFloorNumber: to,
+    source,
+  })
+
+  return [
+    // "с первого яруса на второй по середине есть винтовая лестница" — and the
+    // footage shows it plainly: a free-standing dark-steel spiral with chequer
+    // treads and a part-glazed balustrade, climbed 48–72 s, no landing on the way.
+    lift('modernSpiral', 1, 2, '[OWNER] + [VIDEO] ascent 48–72 s'),
+    lift('wallStair', 2, 3, '[OWNER] + [VIDEO] ascent 100–126 s'),
+    lift('wallStair', 3, 4, '[OWNER] + [VIDEO] ascent 169–196 s'),
+    // The exception. One flight, two storey heights, storey 5 entered from
+    // partway along it: "с 4 на 5 и 6 всего одна лестница где на 5 выходишь
+    // с середины пути по лестнице".
+    lift('wallStair', 4, 6, '[OWNER] + [VIDEO] ascent 220–310 s', [5]),
+    lift('wallStair', 6, 7, '[OWNER] + [VIDEO] ascent 337–345 s'),
+    /*
+     * The last two are [VIDEO] only — the owner's account stopped at 6→7. Both
+     * walkthroughs show worn stone treads in a close ashlar passage with a bolted
+     * tubular handrail at these levels, and no modern stair anywhere above the
+     * entry chamber, so stone is what the footage supports. Still worth the
+     * owner's word before it is treated as settled.
+     */
+    lift('wallStair', 7, 8, '[VIDEO] ascent 395–404 s — awaiting the owner'),
+    lift('wallStair', 8, FLOOR_COUNT + 1, '[VIDEO] ascent 429–449 s — awaiting the owner'),
+  ]
+}
+
+export const LIFTS: StairLift[] = buildLifts()
+
+/** Just the flights cut in the masonry — the modern spiral is not one of them. */
+export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair')
+
 // ———————————————————————————————— well ————————————————————————————————
 
 // The best-sourced part of the whole model: [ref] gives almost every dimension

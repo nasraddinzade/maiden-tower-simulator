@@ -11,7 +11,7 @@ import {
   type Winding,
 } from '../../lib/staircase'
 import { stairRampBoxes } from '../../lib/collision'
-import { FLOORS, innerRadiusAt } from '../../config/tower'
+import { WALL_LIFTS, innerRadiusAt } from '../../config/tower'
 
 export interface StaircaseProps {
   winding: Winding
@@ -51,14 +51,14 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
         wallClearance: p.wallClearance,
         startAzimuthDeg: p.startAzimuthDeg,
       },
-      FLOORS,
+      WALL_LIFTS,
       innerRadiusAt,
     )
 
     const out: PlacedStep[] = []
     flights.forEach((steps, i) => {
       if (steps.length === 0) return
-      const riser = (FLOORS[i + 1].floorY - FLOORS[i].floorY) / steps.length
+      const riser = (WALL_LIFTS[i].toY - WALL_LIFTS[i].fromY) / steps.length
       for (const s of steps) {
         out.push({
           ...s,
@@ -84,8 +84,14 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
  * that trimesh was replaced with primitive boxes, the stair stopped holding
  * anyone. Explicit CuboidColliders cannot vanish that way.
  *
- * ONE chain for the whole stair, not one per flight: the helix is continuous,
- * and per-flight chains would leave a hole at every landing.
+ * ONE CHAIN PER FLIGHT, and no longer one for the whole stair.
+ *
+ * It used to be one, on the reasoning that the helix is continuous and per-flight
+ * chains would leave a hole at every landing. The tower is not built that way:
+ * except for 4→6, no flight runs past a storey — you leave the passage, cross the
+ * chamber and enter the next doorway. Flattening the flights into one chain
+ * fabricated a ramp straight from the head of one flight to the foot of the next,
+ * letting the walker skip the room the building makes you walk through.
  */
 function useRampBoxes(p: StaircaseProps) {
   return useMemo(() => {
@@ -98,18 +104,22 @@ function useRampBoxes(p: StaircaseProps) {
         wallClearance: p.wallClearance,
         startAzimuthDeg: p.startAzimuthDeg,
       },
-      FLOORS,
+      WALL_LIFTS,
       innerRadiusAt,
     )
     /*
      * The ramp chain covers the treads and nothing else, so on its own it starts
-     * and ends in mid-air. The landings are the two ends — see stairLandings().
+     * and ends in mid-air. The approaches are the ends — see stairApproaches().
      */
-    const approaches = stairApproaches(flights, p.width, innerRadiusAt, (i, end) =>
-      end === 'foot' ? FLOORS[i].floorY : FLOORS[i + 1].floorY,
+    const approaches = stairApproaches(
+      flights,
+      p.width,
+      innerRadiusAt,
+      (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+      WALL_LIFTS.map((l) => l.opensAtY),
     )
     return [
-      ...stairRampBoxes(flights.flat(), p.width),
+      ...flights.flatMap((steps) => stairRampBoxes(steps, p.width)),
       // one box each — stepsPerBox is irrelevant on a two-point run
       ...approaches.flatMap((pair) => stairRampBoxes(pair, p.width)),
     ]
