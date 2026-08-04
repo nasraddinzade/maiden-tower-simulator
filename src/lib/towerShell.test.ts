@@ -43,8 +43,16 @@ describe('shell mesh quality', () => {
 describe('shell bounding box', () => {
   const bb = built.geometry.boundingBox!
 
-  it('spans the full tower height from the ground up', () => {
-    expect(bb.min.y).toBeCloseTo(0, 5)
+  it('spans from below the street up to the full tower height', () => {
+    /*
+     * The drum used to start at y = 0, the floor of storey 1 and the level the
+     * doorway opens onto. That is not the ground: the entrance is RAISED, and
+     * once the paving was put where the sourced sill height says it is, the
+     * tower stood on a two-metre gap with daylight under the wall. It now
+     * carries on down past the street, which [ICOMOS 958] supports — the
+     * foundation goes some 15 m below ground.
+     */
+    expect(bb.min.y).toBeLessThan(ENTRANCE.groundY + 1e-6)
     expect(bb.max.y).toBeCloseTo(TOWER.height, 5)
   })
 

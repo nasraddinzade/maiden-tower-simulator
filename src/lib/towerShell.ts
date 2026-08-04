@@ -16,7 +16,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import { azimuthToVector } from './geometry'
 import type { PassageSection, StairDoorway } from './staircase'
 import { countDegenerateTriangles, filterDegenerateTriangles } from './mesh'
-import { TOWER, innerRadiusAt } from '../config/tower'
+import { ENTRANCE, TOWER, innerRadiusAt } from '../config/tower'
 
 export interface ShellParams {
   buttressAzimuthDeg: number
@@ -395,25 +395,44 @@ export function buildShellGeometry(p: ShellParams): {
   const R = TOWER.outerRadius
   const H = TOWER.height
 
-  // Outer drum — near-vertical, base at y = 0.
-  const drum = new THREE.CylinderGeometry(R, R, H, RADIAL_SEGMENTS, 1, false)
-  drum.translate(0, H / 2, 0)
+  /*
+   * Outer drum. It reaches BELOW the threshold, down past the street.
+   *
+   * It used to start at y = 0, which is the floor of storey 1 and the level the
+   * doorway opens onto. Once the ground outside was put where the raised
+   * entrance says it is — a sill height lower — the tower stood on nothing: a
+   * two-metre gap right round the base, daylight under the wall.
+   *
+   * [ICOMOS 958] has the foundation going some 15 m below ground, so the drum
+   * carrying on down is not an invention; what is arbitrary is only how far
+   * below the paving to stop, and that is buried and invisible.
+   */
+  const BASE_Y = ENTRANCE.groundY - 0.5
+  const drumHeight = H - BASE_Y
+  const drum = new THREE.CylinderGeometry(R, R, drumHeight, RADIAL_SEGMENTS, 1, false)
+  drum.translate(0, BASE_Y + drumHeight / 2, 0)
 
   // Inner cavity — cone following innerRadiusAt(); extended past both ends so
   // the subtraction cuts cleanly instead of leaving coplanar faces.
   const iB = innerRadiusAt(0)
   const iT = innerRadiusAt(H)
   const slope = (iT - iB) / H
+  /*
+   * The cavity stops at the floor of storey 1. Below that is the plinth the
+   * tower stands on, and it is solid — extending the hollow down into it would
+   * open the new base up again from the inside.
+   */
   const ext = 1.0
+  const cavityHeight = H + ext
   const cavity = new THREE.CylinderGeometry(
     iT + slope * ext,
-    iB - slope * ext,
-    H + 2 * ext,
+    iB,
+    cavityHeight,
     RADIAL_SEGMENTS,
     1,
     false,
   )
-  cavity.translate(0, H / 2, 0)
+  cavity.translate(0, cavityHeight / 2, 0)
 
   // Buttress — extrude the beak plan upward, then aim it at its azimuth.
   const beak = new THREE.ExtrudeGeometry(

@@ -80,6 +80,7 @@ export function TowerColliders({
 
     // one band per storey, plus the parapet above the top floor
     const bands = [
+      ENTRANCE.groundY - 0.5,
       ...FLOORS.map((f) => f.floorY),
       TOWER.height - TOWER.parapetHeight,
       TOWER.height,
@@ -91,7 +92,9 @@ export function TowerColliders({
       sectors,
       outerRadius: TOWER.outerRadius,
       innerRadiusAt,
-      baseY: 0,
+      // down to the plinth, so the wall is solid where it meets the street and a
+      // walker outside cannot step into the tower's base
+      baseY: ENTRANCE.groundY - 0.5,
       topY: TOWER.height,
       bandBoundaries: bands,
       entrance: {

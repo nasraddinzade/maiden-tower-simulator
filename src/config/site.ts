@@ -77,8 +77,15 @@ export const GROUND_Y = ENTRANCE.thresholdY - EXTERNAL_STAIR_RISE
  * one cannot be mistaken for evidence.
  */
 export const SITE = {
-  /** m — radius of the walkable ground disc, measured from the tower axis. */
-  radius: TOWER.outerRadius + 26,
+  /**
+   * m — radius of the ground disc, from the tower axis.
+   *
+   * Big enough that its rim is not in shot. At 26 m out the disc simply ended,
+   * and from the spawn you saw its cut edge standing against the sky on both
+   * sides — the tower on a saucer. The ground is one cylinder either way, so the
+   * only cost of pushing the edge out is that it is further away.
+   */
+  radius: TOWER.outerRadius + 110,
   /** m — how far the player starts from the tower's outer face. */
   spawnDistance: 14,
   /** m — thickness of the ground slab, so it is a solid to stand on. */

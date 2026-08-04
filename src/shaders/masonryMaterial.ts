@@ -9,6 +9,8 @@ export interface MasonryOptions {
   coursePeriod?: number
   /** How strongly the banding shows in the base colour. 1 = as measured. */
   bandContrast?: number
+  /** Thickness of the bed joint, metres. */
+  jointThickness?: number
   /** Strength of the diamond tooling at the top of the tower. */
   diamondStrength?: number
   /** Size of the lozenges, repeats per metre. */
@@ -21,6 +23,7 @@ export interface MasonryMaterial extends THREE.MeshStandardMaterial {
   masonryUniforms: {
     uCoursePeriod: { value: number }
     uBandContrast: { value: number }
+    uJointThickness: { value: number }
     uDiamondStrength: { value: number }
     uDiamondScale: { value: number }
     uColourNoise: { value: number }
@@ -55,6 +58,17 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
 
   const uniforms = {
     uCoursePeriod: { value: opts.coursePeriod ?? COURSE_HEIGHT },
+    /*
+     * m — thickness of the bed joint itself, NOT a fraction of the course.
+     *
+     * It used to be a fraction, and the fraction was 0.28: on a 0.35 m course
+     * that is a 10 cm band of mortar between every pair of stones. The tower is
+     * dressed ashlar laid on thin gypsum beds — the courses read as LINES in
+     * every photograph of it, and at 10 cm they came out as broad dark stripes,
+     * which is most of why the walls looked painted rather than built.
+     * [ASSUMPTION], but a joint of a couple of centimetres is what ashlar means.
+     */
+    uJointThickness: { value: opts.jointThickness ?? 0.022 },
     uBandContrast: { value: opts.bandContrast ?? 1 },
     uDiamondStrength: { value: opts.diamondStrength ?? (interior ? 0.25 : 0.6) },
     uDiamondScale: { value: opts.diamondScale ?? 2.2 },
@@ -90,6 +104,7 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
          varying vec3 vMasonryWorld;
          varying vec3 vMasonryNormalW;
          uniform float uCoursePeriod;
+         uniform float uJointThickness;
          uniform float uBandContrast;
          uniform float uDiamondStrength;
          uniform float uDiamondScale;
@@ -117,8 +132,10 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
          {
            float period = max(uCoursePeriod, 0.02);
            float t = fract(vMasonryWorld.y / period);
-           // joint occupies the lowest part of each course; smooth so it does not alias
-           float band = smoothstep(0.0, 0.28, t);
+           // the joint is a real thickness, not a share of the course; smoothed
+           // over about a millimetre so it does not alias at a grazing angle
+           float joint = clamp(uJointThickness / period, 0.004, 0.5);
+           float band = smoothstep(0.0, joint, t);
 
            /*
             * Courses belong on a WALL FACE, not on a soffit or a floor.
