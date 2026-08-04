@@ -318,9 +318,18 @@ function FloorSlab({
 /**
  * Phase 3 — the eight storeys' ceilings and floors.
  *
- * Each storey is roofed by a shallow stone cupola with a central oculus [ref];
- * the floor above repeats the opening so all eight line up on the axis and the
- * sky is visible from the floor of storey 1.
+ * Each storey's opening comes from ITS OWN surveyed radius, not from one figure
+ * applied to all eight. The tower has three openings and they differ in size —
+ * see the OPENINGS table in config/tower.ts. A single global radius was drawing
+ * all three the same, and worse, drawing the SLAB's hole from the storey's own
+ * vault radius instead of the vault BELOW it, which is the one that actually
+ * pierces that floor. Measured consequence: the walker climbing the steel spiral
+ * met the underside of storey 2's slab at 3.50 m while standing well inside the
+ * opening's radius, and the climb stopped there.
+ *
+ * The leva control stays useful as a MULTIPLIER on the surveyed values, so the
+ * openings can still be tuned together without any one of them losing its
+ * provenance.
  */
 export function FloorStructures({
   oculusRadius,
@@ -337,6 +346,16 @@ export function FloorStructures({
   return (
     <group>
       {FLOORS.map((f) => {
+        /*
+         * Scale factor, not a value: `oculusRadius` from leva is compared against
+         * the config default so a untouched control leaves the survey alone.
+         */
+        const openingScale =
+          TOWER.oculusRadius > 0 ? oculusRadius / TOWER.oculusRadius : 1
+        /** This storey's own vault opening — 0 where the vault is closed. */
+        const vaultOpening = f.oculusRadius * openingScale
+        /** The hole in THIS storey's floor is cut by the vault BELOW it. */
+        const slabOpening = (FLOORS[f.index - 1]?.oculusRadius ?? 0) * openingScale
         // Phase 11: a closed storey three floors away is never visible, so it is
         // not drawn; the ones just above and below drop to a coarser lathe.
         if (!isStoreyVisible(f.index, viewerStorey, { showAll: showAllStoreys })) return null
@@ -354,7 +373,7 @@ export function FloorStructures({
               <Solid on={withColliders}>
               <Cupola
                 spanRadius={springRadius}
-                oculusRadius={oculusRadius}
+                oculusRadius={vaultOpening}
                 rise={cupolaRise}
                 springY={f.ceilingY - cupolaRise}
                 cut={throughCupola}
@@ -367,7 +386,7 @@ export function FloorStructures({
             )}
             {showCupolas && (
               <CeilingFill
-                holeR={effectiveOpeningRadius(oculusRadius, springRadius)}
+                holeR={effectiveOpeningRadius(vaultOpening, springRadius)}
                 /*
                  * Start where the DOME ends, not at the crown. The crown is the
                  * height the dome would reach on the axis; it never gets there,
@@ -383,7 +402,7 @@ export function FloorStructures({
                   f.ceilingY -
                   cupolaRise +
                   domeHeightAt(
-                    effectiveOpeningRadius(oculusRadius, springRadius),
+                    effectiveOpeningRadius(vaultOpening, springRadius),
                     springRadius,
                     cupolaRise,
                   )
@@ -403,7 +422,7 @@ export function FloorStructures({
               <Solid on={withColliders}>
               <FloorSlab
                 innerR={f.innerRadiusAtLevel}
-                holeR={oculusRadius}
+                holeR={slabOpening}
                 thickness={TOWER.floorSlab}
                 y={f.floorY}
                 solid={!f.hasFloorOpening}

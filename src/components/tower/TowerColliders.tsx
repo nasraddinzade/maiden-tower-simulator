@@ -118,8 +118,15 @@ export function TowerColliders({
           sectors: Math.min(sectors, 24),
           floorY: f.floorY,
           thickness: TOWER.floorSlab,
-          // storey 1 rests on the rock: solid, no oculus to fall through
-          oculusRadius: i === 0 ? 0 : f.oculusRadius,
+          /*
+           * The hole in THIS floor is cut by the vault BELOW it, not by this
+           * storey's own vault — which is usually closed. Reading f.oculusRadius
+           * made storey 2's slab solid in the physics world while the model drew
+           * an opening in it, and the walker climbing the steel spiral hit the
+           * underside at 3.50 m standing well inside the opening's radius.
+           * Storey 1 rests on the rock and has nothing beneath it to pierce it.
+           */
+          oculusRadius: FLOORS[i - 1]?.oculusRadius ?? 0,
           outerRadius: f.innerRadiusAtLevel,
           stairwell: cut
             ? {
