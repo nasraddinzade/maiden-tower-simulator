@@ -72,12 +72,15 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
       .replace(
         '#include <common>',
         `#include <common>
-         varying vec3 vMasonryWorld;`,
+         varying vec3 vMasonryWorld;
+         varying vec3 vMasonryNormalW;`,
       )
       .replace(
         '#include <worldpos_vertex>',
         `#include <worldpos_vertex>
-         vMasonryWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+         vMasonryWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+         // world normal, so the fragment stage can tell a wall face from a soffit
+         vMasonryNormalW = normalize(mat3(modelMatrix) * objectNormal);`,
       )
 
     shader.fragmentShader = shader.fragmentShader
@@ -85,6 +88,7 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
         '#include <common>',
         `#include <common>
          varying vec3 vMasonryWorld;
+         varying vec3 vMasonryNormalW;
          uniform float uCoursePeriod;
          uniform float uBandContrast;
          uniform float uDiamondStrength;
@@ -115,18 +119,37 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
            float t = fract(vMasonryWorld.y / period);
            // joint occupies the lowest part of each course; smooth so it does not alias
            float band = smoothstep(0.0, 0.28, t);
-           band = mix(1.0, band, clamp(uBandContrast, 0.0, 2.0));
+
+           /*
+            * Courses belong on a WALL FACE, not on a soffit or a floor.
+            *
+            * The banding is a function of world Y alone, which is right on a
+            * vertical face: each bed joint is a horizontal line. On a horizontal
+            * or near-horizontal surface it is badly wrong — Y barely changes
+            * across the whole face, so a single course smears over the lot, and
+            * on the curved soffit of the entrance tunnel each band stretched
+            * into a metres-long streak. Walking in from the street you met a
+            * starburst instead of a passage.
+            *
+            * Real masonry shows its beds where the stone is FACED and not where
+            * you are looking at the underside of it, so fading the banding out
+            * as the surface turns horizontal is what the material does anyway.
+            */
+           float faceUp = abs(normalize(vMasonryNormalW).y);
+           float faceness = 1.0 - smoothstep(0.55, 0.92, faceUp);
+           band = mix(1.0, band, clamp(uBandContrast, 0.0, 2.0) * faceness);
 
            // position around the wall, so the lozenges wrap without a UV seam
            float around = atan(vMasonryWorld.z, vMasonryWorld.x) * 3.0;
            float up = vMasonryWorld.y;
+           // the lozenge dressing is a face treatment too, and smears the same way
            float d1 = abs(fract((around + up) * uDiamondScale) - 0.5) * 2.0;
            float d2 = abs(fract((around - up) * uDiamondScale) - 0.5) * 2.0;
            float diamond = min(d1, d2);
 
            // [ref]: the diamond dressing is decorative high up, plain lower down
            float heightT = clamp(vMasonryWorld.y / max(uTowerHeight, 1.0), 0.0, 1.0);
-           float diamondAmount = uDiamondStrength * heightT * heightT;
+           float diamondAmount = uDiamondStrength * heightT * heightT * faceness;
 
            float drift = masonryNoise(vec2(around * 2.0, up * 1.7)) - 0.5;
 
