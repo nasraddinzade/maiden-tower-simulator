@@ -12,6 +12,24 @@ import {
 /** m — chequer plate is thin; this is a plate, not a stone block. */
 const TREAD_PLATE = 0.012
 
+/**
+ * m — width of the walkable band the collider covers, about the walking line.
+ * Narrower than the treads on purpose; see the note in useRampBoxes below.
+ */
+const COLLIDER_BAND = 0.55
+
+/**
+ * m — how far the walking-surface boxes hang below the treads.
+ *
+ * The masonry flights use 0.3 m, which is nothing there: a wall flight rises
+ * about 0.9 m in the arc a walker occupies. This spiral climbs 2.25 m in a full
+ * turn, so the flight passes right over your head, and a 0.3 m box under each
+ * tread cuts the clear height to 1.95 m for a 1.75 m walker. Measured, the
+ * capsule was clipping the underside of the run above with 0.29 m of itself and
+ * the controller stopped moving. A plate-thin collider under a plate-thin tread.
+ */
+const COLLIDER_THICKNESS = 0.08
+
 export interface ModernSpiralStairProps {
   visible: boolean
   withColliders: boolean
@@ -66,13 +84,50 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
 
   useEffect(() => () => treadGeometry?.dispose(), [treadGeometry])
 
-  const ramp = useMemo(
-    () =>
-      steps.length > 1
-        ? stairRampBoxes(steps, MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius)
-        : [],
-    [steps],
-  )
+  const ramp = useMemo(() => {
+    if (steps.length < 2) return []
+    const width = MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius
+    const first = steps[0]
+    /*
+     * A ramp up to the bottom tread, exactly as the masonry flights get.
+     *
+     * Free-standing or not, the first tread is a riser above the chamber floor
+     * and this character controller will not climb a vertical face of any
+     * height — measured, it refused a 0.20 m one with autostep set to 0.60 m. So
+     * without this the stair is decoration: you can walk round it and never get
+     * on it. The ramp runs radially OUTWARD from the flight into the room, since
+     * for a free-standing stair the room is outside it, not inside.
+     */
+    const approach = [
+      {
+        azimuthDeg: first.azimuthDeg,
+        treadY: MODERN_SPIRAL_LIFT ? MODERN_SPIRAL_LIFT.fromY : 0,
+        midRadius: MODERN_SPIRAL.outerRadius + 0.5,
+      },
+      { azimuthDeg: first.azimuthDeg, treadY: first.treadY, midRadius: first.midRadius },
+    ]
+    /*
+     * ONE box per step, and the collider NARROWER than the treads.
+     *
+     * A chain of yawed boxes cannot represent a tight helix without leaving
+     * lips. Each box's top is the plane through two nosings; the next box's
+     * plane is yawed from it, so away from the walking line the two diverge, and
+     * the step between them grows with distance from that line. On the masonry
+     * flights the yaw is 4° a step at 4.3 m radius and the lip is ~15 mm — below
+     * notice. This newel spiral turns 27.7° a step at 0.58 m, and across the full
+     * 1.04 m tread the lip works out at ~0.11 m. This controller will not climb a
+     * lip of any height: measured, the walker took three treads and stopped dead.
+     *
+     * So the walking surface is a band about the walking line rather than the
+     * whole tread. The lip shrinks in proportion — ~0.06 m at this width — and
+     * the treads are still drawn full width, which is what anyone actually sees.
+     * Halving the span from two steps to one halves the chord error as well.
+     */
+    return [
+      ...stairRampBoxes(steps, COLLIDER_BAND, 1, COLLIDER_THICKNESS),
+      ...stairRampBoxes(approach, width, 1, COLLIDER_THICKNESS),
+    ]
+  }, [steps])
 
   /** One post per tread on the outer arc, plus the rail linking their heads. */
   const balustrade = useMemo(() => {
