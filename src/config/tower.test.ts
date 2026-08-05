@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { BUTTRESS, ENTRANCE, FLOORS, SITE, TOWER, WELL, innerRadiusAt, wallThicknessAt } from './tower'
+import {
+  BUTTRESS,
+  ENTRANCE,
+  FLOORS,
+  LIFTS,
+  SITE,
+  STAIR,
+  TOWER,
+  WELL,
+  innerRadiusAt,
+  wallThicknessAt,
+} from './tower'
 
 describe('wall thickness', () => {
   it('is 5.0 m at the GROUND, not at the storey-1 floor [ICOMOS 958]', () => {
@@ -168,5 +179,77 @@ describe('the vertical budget stays closed', () => {
     const slitY = TOWER.groundY + 0.94 * TOWER.height
     expect(slitY).toBeGreaterThan(FLOORS[FLOORS.length - 1].floorY)
     expect(slitY).toBeLessThan(TOWER.topY - TOWER.parapetHeight)
+  })
+})
+
+/**
+ * Guards on the ONE tread count the corpus yielded.
+ *
+ * The 8→roof lift was counted frame by frame in both walkthroughs: 16–17 risers,
+ * in two flights about a landing. Nothing else in the tower was counted at all —
+ * every flight below begins straight and breaks into winders inside the wall, so
+ * no single frame holds both its first tread and its last.
+ *
+ * These do not prove the riser. The rise they divide comes from the model, so
+ * they can only show that count and assumption are mutually consistent. What
+ * they DO catch is a storey height or a lift-table edit that quietly pushes the
+ * implied riser somewhere a stone stair cannot go.
+ */
+describe('the counted flight stays physically possible', () => {
+  const roofLift = LIFTS[LIFTS.length - 1]
+
+  it('is the lift from the top storey to the roof deck', () => {
+    expect(roofLift.kind).toBe('wallStair')
+    expect(roofLift.fromFloorNumber).toBe(FLOORS.length)
+    expect(roofLift.toY).toBeCloseTo(TOWER.topY - TOWER.parapetHeight, 9)
+  })
+
+  it('divides into 16–17 risers at a riser a person can climb', () => {
+    const rise = roofLift.toY - roofLift.fromY
+    for (const treads of [16, 17]) {
+      const riser = rise / treads
+      expect(riser, `${treads} treads gives ${riser.toFixed(3)} m`).toBeGreaterThan(0.15)
+      expect(riser).toBeLessThan(0.25)
+    }
+  })
+
+  it('brackets the assumed riser, which is the whole of what the count shows', () => {
+    const rise = roofLift.toY - roofLift.fromY
+    expect(rise / 17).toBeLessThanOrEqual(STAIR.riserTarget)
+    expect(rise / 16).toBeGreaterThanOrEqual(STAIR.riserTarget)
+  })
+})
+
+/**
+ * The masonry stair must never again be given the storey the steel spiral serves.
+ * The owner's account is explicit — "с первого яруса на второй по середине есть
+ * винтовая лестница" — and the model spent a long time with a stone flight there
+ * instead, which is a route the building does not have.
+ */
+describe('the lift table matches the building', () => {
+  it('serves storey 1 to 2 by the modern spiral and nothing else', () => {
+    const first = LIFTS.filter((l) => l.fromFloorNumber === 1)
+    expect(first).toHaveLength(1)
+    expect(first[0].kind).toBe('modernSpiral')
+    expect(first[0].toFloorNumber).toBe(2)
+  })
+
+  it('runs exactly one flight past a storey, and it is 4→6', () => {
+    // "с 4 на 5 и 6 всего одна лестница где на 5 выходишь с середины пути"
+    const passing = LIFTS.filter((l) => l.opensAtFloorNumbers.length > 0)
+    expect(passing).toHaveLength(1)
+    expect(passing[0].fromFloorNumber).toBe(4)
+    expect(passing[0].toFloorNumber).toBe(6)
+    expect(passing[0].opensAtFloorNumbers).toEqual([5])
+  })
+
+  it('leaves no storey unreachable', () => {
+    const reached = new Set([1])
+    for (const l of LIFTS) {
+      expect(reached.has(l.fromFloorNumber), `nothing reaches storey ${l.fromFloorNumber}`).toBe(true)
+      reached.add(l.toFloorNumber)
+      for (const n of l.opensAtFloorNumbers) reached.add(n)
+    }
+    for (const f of FLOORS) expect(reached.has(f.floorNumber), `storey ${f.floorNumber}`).toBe(true)
   })
 })
