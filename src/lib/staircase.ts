@@ -684,7 +684,44 @@ export function stairApproaches(
       // always room-end first, so the box's own slope runs the way it is walked
     }
 
-    approach(steps[0], floorYOf(i, 'foot'), false)
+    /*
+     * THE FOOT RAMP RUNS TANGENTIALLY, along the way the walker is travelling.
+     *
+     * This is what defeated three attempts. The approaches climbed RADIALLY —
+     * inward end to outward end at one azimuth — while a walker arriving off the
+     * flight below is moving TANGENTIALLY, around the helix. So they always met
+     * it broadside, and a ramp met broadside is a ledge however gentle its slope.
+     * Measured at storey 3: standing at 7.255 m facing a surface at 7.39, free to
+     * move in the four downhill directions and stuck in all four uphill ones,
+     * with no ray from the capsule centre able to see the thing at all.
+     *
+     * Running it along the travel direction instead — from the storey floor at
+     * the previous flight's head, round to this flight's first tread — makes it a
+     * continuation of the walk rather than something crossing it.
+     *
+     * The BOTTOM flight keeps the radial ramp: nobody arrives at it along a
+     * flight, they walk out of the chamber, and radial is the way they come.
+     */
+    const previous = i > 0 ? flights[i - 1] : null
+    if (previous && previous.length >= 2) {
+      const floorY = floorYOf(i, 'foot')
+      /*
+       * Start at the previous flight's LAST TREAD, not at its landing. The
+       * landing is pushed half a flight-width along the climb and so sits almost
+       * on top of this flight's first tread — a hand-off from there had 0.14 m of
+       * run for 0.19 m of rise. From the last tread the run is a full step angle,
+       * the rise is one riser, and the slope comes out the same as the stair's
+       * own. Which is what it is: the flights are one helix, and the hand-off is
+       * simply the step between them.
+       */
+      const from = previous[previous.length - 1]
+      out.push([
+        { azimuthDeg: from.azimuthDeg, treadY: floorY, midRadius: from.midRadius },
+        { azimuthDeg: steps[0].azimuthDeg, treadY: steps[0].treadY, midRadius: steps[0].midRadius },
+      ])
+    } else {
+      approach(steps[0], floorYOf(i, 'foot'), false)
+    }
     approach(steps[steps.length - 1], floorYOf(i, 'head'), true)
 
     /*
