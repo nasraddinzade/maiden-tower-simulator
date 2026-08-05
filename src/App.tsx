@@ -343,7 +343,17 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
 
   const sky = useControls('Sun', {
     showSky: true,
-    showBeams: true,
+    /*
+     * The solar beams. OFF by default, on the same rule as the water system and
+     * the scale rod: fabric is drawn, diagrams are a click away.
+     *
+     * They are drawn as visible shafts standing in the chambers, and they are a
+     * claim about the ORIGINAL building — this file's header is explicit that the
+     * purpose and solar layers must never read as statements about the fabric you
+     * walk through today. Shown by default inside a current-state model they do
+     * exactly that.
+     */
+    showBeams: false,
     showCompass: false,
   })
 
@@ -456,7 +466,13 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         apertures={buildApertures(windowData.windows as never, FLOORS)}
         visible={sky.showBeams || !!hypothesisVisuals.solarBeam}
       />
-      <HypothesisVisualsLayer visuals={hypothesisVisuals} />
+      {/*
+        Corbels, the string course, the solar cone — a DIAGRAM of whichever
+        purpose hypothesis is selected, not fabric. Gated behind the same switch
+        as the beams so that walking into the tower shows the building and
+        nothing argued about it.
+      */}
+      {sky.showBeams && <HypothesisVisualsLayer visuals={hypothesisVisuals} />}
 
       <HotspotMarkers
         visible={hotspots.showHotspots}
