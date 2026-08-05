@@ -96,7 +96,55 @@ const TOP_Y = GROUND_Y + HEIGHT
 // why the assumed 0.8 needs no revision.
 const GROUND_CLEAR = 3.0 // m — [İçərişəhər] 1st storey clear height
 const UPPER_CLEAR = 2.5 // m — [İçərişəhər] upper storeys, average → [ASSUMPTION] applied to each
-const CEILING_STRUCTURE = 0.8 // m — [ASSUMPTION] masonry + fill above the cupola crown, up to the next floor
+/**
+ * Owner's stature, metres. Stated by them, and it is the only anthropometric
+ * input in the model — used solely to turn the roof measurement into metres.
+ */
+const OWNER_STATURE = 1.85
+/**
+ * m — how high the phone was above the roof deck. The owner shot the roof
+ * footage "на уровне груди" on a Xiaomi 11 Lite. A chest-level grip sits at
+ * about 0.73 ± 0.05 of stature, between elbow (0.63) and suprasternale (0.82),
+ * so 1.35 ± 0.10 m. [ASSUMPTION] on the fraction, [OWNER] on the stature.
+ */
+const ROOF_CAMERA_HEIGHT = OWNER_STATURE * 0.73
+
+/**
+ * m — the roof parapet, above the deck. [VIDEO] 0.75 ± 0.06.
+ *
+ * This is the one vertical dimension in the model that is MEASURED, and it is
+ * measured in a way that needs no camera calibration at all. In the roof frame
+ * that shows the sea horizon, the parapet stands at 0.556 of the camera's own
+ * height above the deck — two independent columns of the frame agreeing to 0.4%.
+ * For a rectilinear camera that ratio is exactly focal-length-independent, and
+ * these frames test rectilinear to 0.25 px rms against the horizon itself. So
+ * the only unknown in it is how high the phone was held, which the owner has
+ * now stated.
+ */
+const PARAPET = 0.556 * ROOF_CAMERA_HEIGHT
+
+/**
+ * m — masonry and fill above each cupola crown, up to the next floor.
+ *
+ * [DERIVED], and no longer the assumption it was. With the sill datum applied
+ * the vertical budget closes, and with the parapet MEASURED rather than left as
+ * the residual it is this that falls out of it:
+ *
+ *   C = (HEIGHT − sill − GROUND_CLEAR − 7×UPPER_CLEAR − PARAPET) / 8 = 0.78
+ *
+ * The assumption it replaces was 0.80, so the number barely moves — which is the
+ * point. It is now a quantity with an equation, an error bar and a named datum
+ * dependency instead of a figure tuned until the stack summed to 29.5.
+ *
+ * Tolerance ±0.19, and essentially all of it is dH: ∂C/∂H = 1/8 against the
+ * ±1.5 m ambiguity in which face [ICOMOS 958] measured 29.5 m on (~28 m seaward,
+ * ~31 m landward). The parapet contributes almost nothing — ∂C/∂P = −1/8, so
+ * even ±0.06 on it is ±0.007 here. Measuring the parapet better would not help;
+ * knowing which face the 29.5 m belongs to would.
+ */
+const CEILING_STRUCTURE =
+  (HEIGHT - SILL_ABOVE_GROUND - GROUND_CLEAR - (FLOOR_COUNT - 1) * UPPER_CLEAR - PARAPET) /
+  FLOOR_COUNT
 // Rise (стрела подъёма) of the shallow cupola, measured down from the crown to where
 // it springs off the inner wall. [ASSUMPTION] — no source gives it. Kept deliberately
 // small: [ref] calls the vaults "пологие" (shallow), and photographs of the one
@@ -280,6 +328,8 @@ export const TOWER = {
   cupolaRise: CUPOLA_RISE,
   /** Visible thickness of an annular floor slab [ASSUMPTION]. */
   floorSlab: FLOOR_SLAB,
+  /** m — masonry and fill above each cupola crown [DERIVED]; see the note above. */
+  ceilingStructure: CEILING_STRUCTURE,
   /** Default oculus radius [PLACEHOLDER] — see the note at its definition. */
   oculusRadius: OCULUS_RADIUS_DEFAULT,
 } as const

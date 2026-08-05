@@ -80,14 +80,20 @@ describe('floor stack', () => {
      * were short. They are not: 2.07 m of it was the omitted 2.00 m sill.
      */
     const clearSum = FLOORS.reduce((s, f) => s + f.clearHeight, 0)
-    const ceilings = FLOORS.length * 0.8 // CEILING_STRUCTURE, per floor
+    // read the real value, never a literal: CEILING_STRUCTURE is DERIVED from
+    // this very budget now, and a hard-coded 0.8 here would hide it drifting
+    const ceilings = FLOORS.length * TOWER.ceilingStructure
     expect(ENTRANCE.sillY + clearSum + ceilings + TOWER.parapetHeight).toBeCloseTo(
       TOWER.height,
       6,
     )
-    // and the parapet that falls out is a plausible one, not a storey's worth
-    expect(TOWER.parapetHeight).toBeGreaterThan(0.3)
-    expect(TOWER.parapetHeight).toBeLessThan(1.2)
+    // and the parapet is the MEASURED input now, not the residual: the horizon
+    // ratio 0.556 against a chest-level grip for a 1.85 m owner
+    expect(TOWER.parapetHeight).toBeCloseTo(0.556 * 1.85 * 0.73, 6)
+    // the ceiling structure that falls out must stay near the 0.8 it replaced —
+    // if this ever drifts far, the datum or a sourced clear height has moved
+    expect(TOWER.ceilingStructure).toBeGreaterThan(0.6)
+    expect(TOWER.ceilingStructure).toBeLessThan(1.0)
   })
 })
 
