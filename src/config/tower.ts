@@ -301,27 +301,21 @@ export const TOWER = {
   floorCount: FLOOR_COUNT,
   foundationDepth: FOUNDATION_DEPTH,
   /**
-   * Residual height above the top storey — the roof parapet [ASSUMPTION].
+   * m — the roof parapet above the deck. [VIDEO] 0.75 ± 0.06; see PARAPET.
    *
-   * CONTRADICTED BY MEASUREMENT, and left standing so the contradiction stays
-   * visible rather than being tuned away.
+   * RESOLVED. This note used to record it as an open contradiction: the config
+   * gave 2.6 m as the residual of the stack while the roof footage measured
+   * about half a metre, and that was read as evidence that eight storey heights
+   * were each some 0.26 m short. They were not. The whole gap was an arithmetic
+   * slip in the datum — [ICOMOS 958]'s 29.5 m is height ABOVE GROUND, and the
+   * stack laid it off from the storey-1 floor, 2 m up the wall, omitting the
+   * sourced sill. 2.07 m of discrepancy against a 2.00 m omission.
    *
-   * This is not measured at all: it is whatever is left of the sourced 29.5 m
-   * [ICOMOS 958] once eight storeys of ASSUMED heights are stacked under it, and
-   * it comes to 2.6 m. Measured off the roof footage it is about 0.53 m.
-   *
-   * The measurement does not depend on knowing any absolute size. Taken against
-   * the sea horizon, the parapet stands at 0.556 of the phone's own height above
-   * the deck — two independent columns of the frame agreeing to 0.4%. For the
-   * parapet to be 2.6 m the phone would have had to be held 4.7 m above the roof.
-   * So the residual is wrong whatever scale is assumed, which means the fault is
-   * in the STACK below it: GROUND_CLEAR, UPPER_CLEAR, CEILING_STRUCTURE and
-   * CUPOLA_RISE are all assumptions and together they run some 2 m short.
-   *
-   * Not corrected by spreading the 2 m across the storeys — that is fitting
-   * geometry so a total comes out, which is the one thing this model must not do.
-   * The storeys are being measured against the visitors standing in them; when
-   * those land, the stack changes and this becomes a real residual.
+   * It is no longer a residual at all. PARAPET is the measured input now and
+   * CEILING_STRUCTURE is what falls out of the budget, which is the right way
+   * round: one of them was measured and the other never was. This expression
+   * stays as a consistency check — it must reproduce PARAPET, and if it ever
+   * stops doing so the datum or a sourced clear height has moved.
    */
   parapetHeight: TOP_Y - TOP_OF_FLOORS,
   /** Rise of each shallow cupola, crown down to its springing [ASSUMPTION]. */
@@ -330,7 +324,7 @@ export const TOWER = {
   floorSlab: FLOOR_SLAB,
   /** m — masonry and fill above each cupola crown [DERIVED]; see the note above. */
   ceilingStructure: CEILING_STRUCTURE,
-  /** Default oculus radius [PLACEHOLDER] — see the note at its definition. */
+  /** Default oculus radius [PHOTO] ±0.15 — see the note at its definition. */
   oculusRadius: OCULUS_RADIUS_DEFAULT,
 } as const
 

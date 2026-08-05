@@ -141,3 +141,32 @@ describe('well', () => {
     expect(FLOORS[WELL.startsAtFloorIndex].floorNumber).toBe(2)
   })
 })
+
+/**
+ * The parapet is now an INPUT, not a residual — but the stack still has to
+ * reproduce it. This is the consistency check that would catch the datum, a
+ * sourced clear height or the storey count moving underneath it.
+ */
+describe('the vertical budget stays closed', () => {
+  it('reproduces the measured parapet as the stack residual', () => {
+    const topOfFloors = FLOORS[FLOORS.length - 1].ceilingY + TOWER.ceilingStructure
+    expect(TOWER.topY - topOfFloors).toBeCloseTo(TOWER.parapetHeight, 9)
+  })
+
+  it('puts the top of the tower HEIGHT above the ground, not above the floor', () => {
+    // the slip this whole correction was about: 29.5 m is height above ground
+    expect(TOWER.topY - TOWER.groundY).toBeCloseTo(TOWER.height, 9)
+    expect(TOWER.topY).not.toBeCloseTo(TOWER.height, 3)
+  })
+
+  it('lands the topmost exterior slit above the storey-8 floor, not in the parapet', () => {
+    /*
+     * The second conflict the datum slip created. Photographs put the highest
+     * slit at about 0.94 of the tower's height; with the old stack that fell
+     * inside solid parapet, which no real opening can do.
+     */
+    const slitY = TOWER.groundY + 0.94 * TOWER.height
+    expect(slitY).toBeGreaterThan(FLOORS[FLOORS.length - 1].floorY)
+    expect(slitY).toBeLessThan(TOWER.topY - TOWER.parapetHeight)
+  })
+})
