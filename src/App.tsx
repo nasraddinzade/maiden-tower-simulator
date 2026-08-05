@@ -324,7 +324,19 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   // Phase-9 spec: the water system gets its own layer — "Водосбор" — because it
   // is the best-documented part of the tower and shown almost nowhere.
   const water = useControls('Водосбор', {
-    showWater: true,
+    /*
+     * The water-collection layer: the ring channels, the downpipe and the buried
+     * intakes. OFF by default now.
+     *
+     * In the tower it is inside the masonry and under the paving — you cannot see
+     * a metre of it. Drawn in the walkable model it puts a 0.22 m ceramic hoop
+     * round every chamber at chest height and stands the downpipe up out of the
+     * wellhead like a post in the middle of storey 2, which is the first thing
+     * anyone walking in asks about. It is a DIAGRAM of a system [ref] describes,
+     * not fabric you could touch, and the model's target is the building as it
+     * stands. Kept as a layer, one click away, where a diagram belongs.
+     */
+    showWater: false,
     highlightWater: false,
     xrayWalls: false,
   })
