@@ -416,6 +416,58 @@ describe('the stair leaves no slot that looks through', () => {
       }
     })
 
+    it('hands off between flights ALONG the walk, not across it', () => {
+      /*
+       * The fix that finally got the walk from the street to the roof, and the
+       * one most likely to be undone by someone tidying up.
+       *
+       * A walker coming off a flight is travelling round the helix. A ramp that
+       * climbs RADIALLY is met broadside, and a ramp met broadside is a ledge
+       * whatever its slope — no ray from the capsule centre can even see it,
+       * because it sits 0.74 m below. That cost three wrong diagnoses and stopped
+       * the climb at storey 3 for a long time.
+       *
+       * So every flight above the bottom must be entered by an approach whose two
+       * ends differ in AZIMUTH, not in radius. The bottom flight is the exception
+       * and must stay radial: nobody arrives at it along a flight, they walk out
+       * of the chamber.
+       */
+      let tangential = 0
+      let radial = 0
+      for (const [a, b] of approaches) {
+        const dAz = Math.abs(a.azimuthDeg - b.azimuthDeg)
+        const dR = Math.abs(a.midRadius - b.midRadius)
+        if (dAz > 1e-9) tangential++
+        else radial++
+        expect(dAz > 1e-9 || dR > 0.2, 'an approach that goes nowhere').toBe(true)
+      }
+      // one per flight above the bottom, and they are the majority
+      expect(tangential, 'the hand-offs went back to radial').toBeGreaterThanOrEqual(
+        flights.length - 1,
+      )
+      expect(radial, 'the bottom flight lost its way in from the chamber').toBeGreaterThan(0)
+    })
+
+    it('keeps the mid-flight landing level, so the run past it is clear', () => {
+      /*
+       * Storey 5 is left from partway along the 4→6 run — the one flight that
+       * passes a storey. Its landing was the last radial ramp in the model, and a
+       * ramp rising to a tread's height there stands proud of the flight it
+       * crosses. Level at the storey floor it is within half a riser of the
+       * flight wherever the two meet.
+       */
+      const passing = WALL_LIFTS.map((l, i) => ({ l, i })).filter(
+        ({ l }) => l.opensAtY.length > 0,
+      )
+      expect(passing).toHaveLength(1)
+      for (const floorY of passing[0].l.opensAtY) {
+        const landing = approaches.find(
+          ([a, b]) => Math.abs(a.treadY - floorY) < 1e-9 && Math.abs(b.treadY - floorY) < 1e-9,
+        )
+        expect(landing, `no level landing at y ${floorY.toFixed(2)}`).toBeTruthy()
+      }
+    })
+
     it('keeps every approach a walkable slope, never a face', () => {
       /*
        * The whole point of the approach is that it has no vertical face, so its
