@@ -10,6 +10,14 @@
  *   [OSM]          measured off the OpenStreetMap footprint (way 299418016)
  *   [ASSUMPTION]   modelling choice, NOT surveyed — flagged so it can be replaced
  *   [PLACEHOLDER]  value invented to fill a required field; no source exists yet
+ *   [ESTIMATE]     chosen by judgement on the owner's instruction of 2026-08-05,
+ *                  when they asked for the tower to be completed from what is in
+ *                  hand rather than left with holes. NOT measured, NOT sourced.
+ *                  Every one carries the reasoning that picked it. They exist so
+ *                  a later survey can find them all by searching one word and
+ *                  replace them without touching anything that was measured —
+ *                  which is the part of rule 1 that still matters even with the
+ *                  rule's first clause lifted.
  *
  * Units: metres. Y up. north = -Z, east = +X. Azimuth clockwise from north.
  *
@@ -471,6 +479,7 @@ export const STAIR: {
   width: number
   wallClearance: number
   startAzimuthDeg: number
+  doorwayWidth: number
 } = {
   winding: 'counterclockwise', // from photographs; contradicts the spec's assumed clockwise
   riserTarget: 0.2, // m — spec band 0.18–0.22; the real riser is rounded to fit each storey
@@ -492,6 +501,39 @@ export const STAIR: {
    */
   wallClearance: 0.25,
   startAzimuthDeg: 200, // ° — [PLACEHOLDER] where the first flight begins; no source fixes it
+  /**
+   * m — clear width of the doorway between a chamber and the stair passage.
+   * [ESTIMATE] 1.1, taken from the SOURCED main entrance, which [İçərişəhər]
+   * gives as 1.1 m wide.
+   *
+   * It used to be the flight's own width, 0.9. That is what a flight needs, not
+   * what a doorway needs: you arrive at a landing travelling ACROSS the opening
+   * and have to turn through it, and a 0.6 m walker turning into a 0.9 m hole
+   * catches on the jamb. Measured, the climb stopped at storey 3 with the walker
+   * pressed against a jamb 0.32 m away — the doorway ran out at azimuth 146.25°
+   * and the jamb sector began at 146.375°, so the opening was exactly as wide as
+   * the flight and not a centimetre more.
+   *
+   * Matching the main entrance is the least invented figure available: it is the
+   * only doorway width the sources give for this building, and a secondary
+   * opening being no wider than the front door is a safe way round. Replace it
+   * with a tape measurement across any stair doorway and everything downstream
+   * follows.
+   *
+   * IT DID NOT UNBLOCK THE CLIMB, and that is worth recording so nobody assumes
+   * it did. Walked afterwards, the walker still stops on the storey-3 floor at
+   * 7.08 m, pressed against the same jamb: probing puts the obstruction 0.339 m
+   * away at radius 3.80 and azimuth 145.0, which is the inner edge of the jamb
+   * occupying the sector centred on 152° (spanning 145.1–158.9° and 7.06–9.16 m).
+   * Widening the opening from 0.9 to 1.1 moved its edge from 146.25° to about
+   * 147.6°, so it now OVERLAPS that sector by 2.5° where before it abutted it —
+   * and the jamb should therefore have been clipped away over the doorway's
+   * height range. It was not. So the fault is in the clipping in
+   * wallColliders(), not in how wide the hole is, and this widening is a
+   * reasonable change that fixes a different problem than the one it was aimed
+   * at. See the chip filed for the jamb clipping.
+   */
+  doorwayWidth: 1.1,
 }
 
 // ———————————————————— vertical circulation, 2026 ————————————————————

@@ -506,12 +506,25 @@ export function stairDoorways(
    * middle storey has no way onto the stair at all.
    */
   opensAtYPerFlight: number[][] = [],
+  /**
+   * Clear width of the OPENING, which need not be the flight's width — and had
+   * better not be. A flight 0.9 m wide needs 0.9 m of tread; a walker arriving
+   * across the landing has to TURN through the doorway, and 0.6 m of walker
+   * turning into a 0.9 m hole catches on the jamb. Measured, that stopped the
+   * climb at storey 3.
+   *
+   * Note carefully that the AZIMUTH still comes from the flight width, via
+   * approachAzimuthDeg — the opening and the ramp up to it must share a centre
+   * line or they drift apart and the walker meets a jamb where the ramp says
+   * there is a way through. Only the opening's angular EXTENT widens.
+   */
+  doorwayWidth = width,
 ): StairDoorway[] {
   const out: StairDoorway[] = []
 
   const doorwayAt = (all: StepPlacement[], s: StepPlacement, floorY: number): StairDoorway => {
     // reach past the room face so the opening is a hole, not a blind recess
-    const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - width / 2)
+    const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - doorwayWidth / 2)
     // the same azimuth the ramp up to it uses — see approachAzimuthDeg()
     const azimuthDeg = approachAzimuthDeg(all, s, width)
     /*
@@ -529,7 +542,7 @@ export function stairDoorways(
     )
     return {
       azimuthDeg,
-      widthDeg: (width / Math.max(0.5, s.midRadius)) * (180 / Math.PI),
+      widthDeg: (doorwayWidth / Math.max(0.5, s.midRadius)) * (180 / Math.PI),
       /**
        * The threshold sits BELOW the floor, not at it.
        *
@@ -542,7 +555,7 @@ export function stairDoorways(
       bottomY: floorY - slabThickness - 0.15,
       topY: Math.max(floorY, underfoot.treadY) + height,
       innerRadius: Math.max(0.05, inner),
-      outerRadius: s.midRadius + width / 2 + 0.06,
+      outerRadius: s.midRadius + doorwayWidth / 2 + 0.06,
     }
   }
 
