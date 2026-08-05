@@ -566,6 +566,15 @@ function buildLifts(): StairLift[] {
     // footage shows it plainly: a free-standing dark-steel spiral with chequer
     // treads and a part-glazed balustrade, climbed 48–72 s, no landing on the way.
     lift('modernSpiral', 1, 2, '[OWNER] + [VIDEO] ascent 48–72 s'),
+    /*
+     * A caution on the uniformity this table implies. Moving time up 2→3 is
+     * 23.6 s against 8.8 s for 6→7, and no pause accounts for the difference.
+     * Either the flights differ markedly in length — which would kill the
+     * uniform 2.5 m storey — or the walker's pace varied that much. Nothing in
+     * the corpus separates the two, and no flight below the roof yielded a tread
+     * count: each begins with a straight run and breaks into winders inside the
+     * wall, so no single frame holds both the first tread and the last.
+     */
     lift('wallStair', 2, 3, '[OWNER] + [VIDEO] ascent 100–126 s'),
     lift('wallStair', 3, 4, '[OWNER] + [VIDEO] ascent 169–196 s'),
     // The exception. One flight, two storey heights, storey 5 entered from
@@ -577,11 +586,27 @@ function buildLifts(): StairLift[] {
      * The last two are [VIDEO] only — the owner's account stopped at 6→7. Both
      * walkthroughs show worn stone treads in a close ashlar passage with a bolted
      * tubular handrail at these levels, and no modern stair anywhere above the
-     * entry chamber, so stone is what the footage supports. Still worth the
-     * owner's word before it is treated as settled.
+     * entry chamber, so stone is what the footage supports.
+     *
+     * 8→roof IS NOT ONE FLIGHT, and the model has it wrong. Verified frame by
+     * frame in the ascent and corroborated by the descent's matching traverse:
+     * the walker leaves the storey-8 floor at 429.0 s, climbs 3–4 risers to a
+     * LANDING by 432.5, stands seven seconds at a barred gate — behind which a
+     * SEPARATE blocked stair rises to a window slit — turns at 441.8, then climbs
+     * a straight run of 13 ± 1 risers to the deck at 449.4. Sixteen or seventeen
+     * risers in two flights about a landing, plus a branch that is not modelled
+     * at all. Left as one flight here only because splitting it needs a level
+     * that is not a floor, and that is a change to the lift table's shape.
+     *
+     * What the count DOES establish: 16–17 risers over the derived 3.281 m rise
+     * is 0.193–0.205 m per riser, which brackets the assumed 0.2 exactly. Note
+     * the circularity — the rise came from the model — so this shows count and
+     * assumption are mutually consistent, not that either is right. The one
+     * independent photogrammetric estimate, 0.193–0.304 m off a calibrated
+     * still, has its lower edge in the same place.
      */
-    lift('wallStair', 7, 8, '[VIDEO] ascent 395–404 s — awaiting the owner'),
-    lift('wallStair', 8, FLOOR_COUNT + 1, '[VIDEO] ascent 429–449 s — awaiting the owner'),
+    lift('wallStair', 7, 8, '[VIDEO] ascent 395–404 s — frames extracted, never analysed'),
+    lift('wallStair', 8, FLOOR_COUNT + 1, '[VIDEO] ascent 429–449 s — 16–17 risers, TWO flights and a landing; see above'),
   ]
 }
 
