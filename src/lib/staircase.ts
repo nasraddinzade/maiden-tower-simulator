@@ -731,12 +731,23 @@ export function stairApproaches(
      * chamber floor, exactly like a foot approach taken the other way.
      */
     for (const floorY of opensAtYPerFlight[i] ?? []) {
+      /*
+       * LEVEL, like a head landing — not a ramp like a foot approach.
+       *
+       * This is the last place the radial ramp survived, and it is the one place
+       * a flight runs straight past. A ramp rising to a tread's height here
+       * stands proud of the flight it crosses, and the climber going by meets it
+       * broadside: the same ledge that stopped the climb at storey 3, in the
+       * middle of the 4→6 run instead of at its end. Level at the storey floor,
+       * the landing is within half a riser of the flight wherever they meet,
+       * because the tread chosen is the one nearest that floor.
+       */
       approach(
         steps.reduce((best, cur) =>
           Math.abs(cur.treadY - floorY) < Math.abs(best.treadY - floorY) ? cur : best,
         ),
         floorY,
-        false,
+        true,
       )
     }
   })
