@@ -508,7 +508,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
           lampIntensity={lampCtl.lampIntensity}
         />
       ) : (
-        <OrbitControls target={[0, TOWER.height / 2, 0]} enableDamping />
+        <OrbitControls target={[0, TOWER.topY / 2, 0]} enableDamping />
       )}
     </>
   )

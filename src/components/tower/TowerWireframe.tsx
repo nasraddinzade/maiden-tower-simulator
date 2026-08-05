@@ -37,7 +37,7 @@ function ringPoints(radius: number, y: number, segments = RADIAL_SEGMENTS): Pt[]
  */
 function FeatureMarkers() {
   const R = TOWER.outerRadius
-  const H = TOWER.height
+  const H = TOWER.topY
 
   const buttress = useMemo(() => {
     const d = azimuthToVector(BUTTRESS.azimuthDeg) // radial direction
@@ -105,7 +105,7 @@ export function TowerWireframe({ showInner, showFloors, showScaleRef, showFeatur
   return (
     <group>
       {/* Outer wall — near-vertical drum, constant radius */}
-      <mesh position={[0, TOWER.height / 2, 0]}>
+      <mesh position={[0, TOWER.topY / 2, 0]}>
         <cylinderGeometry
           args={[TOWER.outerRadius, TOWER.outerRadius, TOWER.height, RADIAL_SEGMENTS, 1, true]}
         />
@@ -114,7 +114,7 @@ export function TowerWireframe({ showInner, showFloors, showScaleRef, showFeatur
 
       {/* Inner surface — truncated cone: wider at the top (wall thins from inside) */}
       {showInner && (
-        <mesh position={[0, TOWER.height / 2, 0]}>
+        <mesh position={[0, TOWER.topY / 2, 0]}>
           <cylinderGeometry
             args={[
               innerRadiusAt(TOWER.height),

@@ -2,20 +2,31 @@ import { describe, expect, it } from 'vitest'
 import { BUTTRESS, ENTRANCE, FLOORS, SITE, TOWER, WELL, innerRadiusAt, wallThicknessAt } from './tower'
 
 describe('wall thickness', () => {
-  it('is 5.0 m at the base [ICOMOS 958]', () => {
-    expect(wallThicknessAt(0)).toBe(TOWER.wallThicknessBase)
+  it('is 5.0 m at the GROUND, not at the storey-1 floor [ICOMOS 958]', () => {
+    /*
+     * The base of the wall is the ground outside, and the entrance is raised, so
+     * the storey-1 floor is 2 m up it. This used to assert the 5.0 m at y = 0 and
+     * so tapered the whole wall over the wrong interval — which is the same slip
+     * that built the tower 31.5 m tall above its own ground line.
+     */
+    expect(wallThicknessAt(TOWER.groundY)).toBeCloseTo(TOWER.wallThicknessBase, 10)
+    expect(wallThicknessAt(0)).toBeLessThan(TOWER.wallThicknessBase)
   })
   it('is 3.7 m at the top [mean of 3.2–4.2]', () => {
-    expect(wallThicknessAt(TOWER.height)).toBeCloseTo(TOWER.wallThicknessTop, 10)
+    expect(wallThicknessAt(TOWER.topY)).toBeCloseTo(TOWER.wallThicknessTop, 10)
   })
 })
 
 describe('inner radius (wall thins from inside → grows with height)', () => {
   it('gives inner Ø ≈ 6.5 m at the base (matches reference "~6.5 m внизу")', () => {
-    expect(innerRadiusAt(0) * 2).toBeCloseTo(6.5, 10)
+    // at the GROUND, where the sourced 5.0 m wall thickness is measured
+    expect(innerRadiusAt(TOWER.groundY) * 2).toBeCloseTo(6.5, 10)
+    // and at the storey-1 floor, 2 m up the taper, still within the source's "~"
+    expect(innerRadiusAt(0) * 2).toBeGreaterThan(6.5)
+    expect(innerRadiusAt(0) * 2).toBeLessThan(6.8)
   })
   it('gives inner Ø within ~8–10 m at the top (matches reference)', () => {
-    const topDiameter = innerRadiusAt(TOWER.height) * 2
+    const topDiameter = innerRadiusAt(TOWER.topY) * 2
     expect(topDiameter).toBeGreaterThanOrEqual(8)
     expect(topDiameter).toBeLessThanOrEqual(10)
   })
@@ -57,10 +68,26 @@ describe('floor stack', () => {
     expect(top).toBeLessThan(TOWER.height)
     expect(TOWER.parapetHeight).toBeGreaterThan(0)
   })
-  it('reconciles the stack to the total height (3.0 + 7×2.5 + 8×0.8 + parapet = 29.5)', () => {
+  it('reconciles the stack to the total height ONLY once the sill is counted', () => {
+    /*
+     * The identity that matters, and the one that was wrong.
+     *
+     * [ICOMOS 958]'s 29.5 m is height ABOVE GROUND. The storey stack starts at
+     * the floor of storey 1, which the sourced sill puts 2 m above the ground. So
+     * the budget is sill + storeys + ceilings + parapet, and the sill term was
+     * simply missing. Its absence left 2.6 m over for a parapet measured at about
+     * half a metre, and that gap was read as evidence that the storey heights
+     * were short. They are not: 2.07 m of it was the omitted 2.00 m sill.
+     */
     const clearSum = FLOORS.reduce((s, f) => s + f.clearHeight, 0)
     const ceilings = FLOORS.length * 0.8 // CEILING_STRUCTURE, per floor
-    expect(clearSum + ceilings + TOWER.parapetHeight).toBeCloseTo(TOWER.height, 6)
+    expect(ENTRANCE.sillY + clearSum + ceilings + TOWER.parapetHeight).toBeCloseTo(
+      TOWER.height,
+      6,
+    )
+    // and the parapet that falls out is a plausible one, not a storey's worth
+    expect(TOWER.parapetHeight).toBeGreaterThan(0.3)
+    expect(TOWER.parapetHeight).toBeLessThan(1.2)
   })
 })
 

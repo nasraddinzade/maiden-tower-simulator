@@ -393,7 +393,7 @@ export function buildShellGeometry(p: ShellParams): {
   stats: ShellStats
 } {
   const R = TOWER.outerRadius
-  const H = TOWER.height
+  const H = TOWER.topY
 
   /*
    * Outer drum. It reaches BELOW the threshold, down past the street.

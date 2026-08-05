@@ -23,10 +23,10 @@ export function HypothesisVisualsLayer({ visuals }: HypothesisVisualsProps) {
   const fires = useMemo(() => {
     const n = visuals.roofFires ?? 0
     if (n <= 0) return []
-    const r = (TOWER.outerRadius + innerRadiusAt(TOWER.height)) / 2
+    const r = (TOWER.outerRadius + innerRadiusAt(TOWER.topY)) / 2
     return Array.from({ length: n }, (_, i) => {
       const a = (i / n) * Math.PI * 2
-      return { key: i, position: [Math.cos(a) * r, TOWER.height + 0.7, Math.sin(a) * r] as [number, number, number] }
+      return { key: i, position: [Math.cos(a) * r, TOWER.topY + 0.7, Math.sin(a) * r] as [number, number, number] }
     })
   }, [visuals.roofFires])
 
@@ -36,7 +36,7 @@ export function HypothesisVisualsLayer({ visuals }: HypothesisVisualsProps) {
    */
   const corbels = useMemo(() => {
     if (!visuals.highlightCorbels) return []
-    const beltY = TOWER.height * CORBELS.beltHeightFraction
+    const beltY = TOWER.topY * CORBELS.beltHeightFraction
     const make = (count: number, y: number, band: 'lower' | 'upper') =>
       Array.from({ length: count }, (_, i) => {
         const a = (i / count) * Math.PI * 2
@@ -50,7 +50,7 @@ export function HypothesisVisualsLayer({ visuals }: HypothesisVisualsProps) {
       })
     return [
       ...make(CORBELS.lowerCount, beltY * 0.62, 'lower'),
-      ...make(CORBELS.upperCount, beltY + (TOWER.height - beltY) * 0.55, 'upper'),
+      ...make(CORBELS.upperCount, beltY + (TOWER.topY - beltY) * 0.55, 'upper'),
     ]
   }, [visuals.highlightCorbels])
 
@@ -93,7 +93,7 @@ export function HypothesisVisualsLayer({ visuals }: HypothesisVisualsProps) {
       ))}
 
       {visuals.beacon && (
-        <group position={[0, TOWER.height + 1.6, 0]}>
+        <group position={[0, TOWER.topY + 1.6, 0]}>
           <mesh>
             <sphereGeometry args={[0.75, 16, 16]} />
             <meshBasicMaterial color="#fff3cc" />

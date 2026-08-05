@@ -82,8 +82,8 @@ export function TowerColliders({
     const bands = [
       ENTRANCE.groundY - 0.5,
       ...FLOORS.map((f) => f.floorY),
-      TOWER.height - TOWER.parapetHeight,
-      TOWER.height,
+      TOWER.topY - TOWER.parapetHeight,
+      TOWER.topY,
     ]
       .filter((y, i, a) => a.indexOf(y) === i)
       .sort((a, b) => a - b)
@@ -95,7 +95,7 @@ export function TowerColliders({
       // down to the plinth, so the wall is solid where it meets the street and a
       // walker outside cannot step into the tower's base
       baseY: ENTRANCE.groundY - 0.5,
-      topY: TOWER.height,
+      topY: TOWER.topY,
       bandBoundaries: bands,
       entrance: {
         azimuthDeg: ENTRANCE.azimuthDeg,

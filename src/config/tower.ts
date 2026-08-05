@@ -46,6 +46,34 @@ const WALL_TOP = 3.7 // m — mean of 3.2–4.2 m [ICOMOS 958] (some sources 4.5
 const FLOOR_COUNT = 8 // [İçərişəhər], [ICOMOS 958]
 const FOUNDATION_DEPTH = 15 // m — [ICOMOS 958] shaft/foundation extends ~15 m below ground
 
+/**
+ * m — how far the doorway sill stands above the former ground surface.
+ * [İçərişəhər], "2 m above former ground surface". Hoisted up here because the
+ * whole vertical datum hangs off it; ENTRANCE below reads it back.
+ */
+const SILL_ABOVE_GROUND = 2.0
+
+/**
+ * THE VERTICAL DATUM, and the thing that was wrong.
+ *
+ * y = 0 is the floor of storey 1, because that is what every interior dimension
+ * is naturally measured from. The GROUND is not there — the entrance is raised,
+ * and the sourced sill height says by exactly 2 m.
+ *
+ * HEIGHT is [ICOMOS 958]'s height ABOVE GROUND. The stack used to lay it off
+ * from y = 0 anyway, which built the tower 31.5 m tall above its own ground line
+ * and left 2.6 m over for a parapet. That was recorded here as an open conflict
+ * against a parapet measured at about half a metre, and treated as evidence that
+ * eight storey heights were each ~0.26 m short. They are not. The discrepancy
+ * was 2.07 m against an omitted, already-sourced 2.00 m: an arithmetic slip in
+ * the datum, not a survey problem. With it applied the parapet comes out at
+ * 0.60 m, which lands inside the measured band, and CEILING_STRUCTURE's assumed
+ * 0.8 m survives untouched — the closed form gives 0.79 ± 0.24.
+ */
+const GROUND_Y = -SILL_ABOVE_GROUND
+/** World Y of the top of the parapet: HEIGHT above the ground, not above y = 0. */
+const TOP_Y = GROUND_Y + HEIGHT
+
 // ———————————————————————— floor-stack model ————————————————————————
 // Clear (floor-to-cupola-crown) heights ARE sourced [İçərişəhər / az.Wikipedia]:
 //   ground storey 3.0 m; upper storeys 2.5 m "on average" (orta hesabla).
@@ -53,16 +81,19 @@ const FOUNDATION_DEPTH = 15 // m — [ICOMOS 958] shaft/foundation extends ~15 m
 // [ASSUMPTION]. Ceiling structure and parapet are NOT surveyed [ASSUMPTION]; they are
 // tuned so the stack sums to HEIGHT. floorY/ceilingY are DERIVED (never hardcoded):
 //   3.0 + 7×2.5 (clear) + 8×0.8 (ceilings) + 2.6 (parapet) = 29.5 m ✓
-// OPEN CONFLICT, recorded rather than tuned away. Measuring the exterior slit
-// windows against tower height in the photographs puts the topmost slit at
-// ≈0.94 H ≈ 27.7 m — which this stack places INSIDE the parapet (storey-8 ceiling
-// lands at 26.1 m, ceiling structure ends at 26.9 m). A real opening cannot sit in
-// solid parapet, so at least one of these is wrong: the uniform 2.5 m UPPER_CLEAR,
-// the 0.8 m CEILING_STRUCTURE, or the 2.6 m parapet residual that follows from them.
-// The same photographs give a mean vertical slit spacing of ≈2.8 m against the 3.3 m
-// storey pitch derived here, pointing the same way. Do NOT fit the stack to the
-// slits: that would silently convert a measurement into an assumption. Resolve it
-// with the İçərişəhər survey.
+// RESOLVED, and it was arithmetic rather than survey. The budget is
+//   sill 2.0 + 3.0 + 7×2.5 + 8×0.8 + parapet = 29.5  →  parapet 0.60 m
+// The sill term used to be missing, which left 2.6 m over for the parapet and made
+// eight storeys look ~0.26 m short apiece. They are not. Measured against the sea
+// horizon the parapet is 0.556 of the phone's height above the deck — 0.53 m at a
+// low grip, 0.81–0.89 m at a normal one — and the derived 0.60 sits inside that.
+// The slit conflict went with it: the topmost exterior slit at ≈0.94 H now lands
+// 2.1 m ABOVE the storey-8 floor instead of inside solid parapet.
+// What is still open is which face and which ground line [ICOMOS 958] measured
+// 29.5 m on; the report records ~28 m seaward against ~31 m landward, and the
+// whole correction rests on the 2.0 m sill being the right offset. dC/dH = 1/8, so
+// the ±1.5 m spread is ±0.19 m on CEILING_STRUCTURE — hence 0.79 ± 0.24, which is
+// why the assumed 0.8 needs no revision.
 const GROUND_CLEAR = 3.0 // m — [İçərişəhər] 1st storey clear height
 const UPPER_CLEAR = 2.5 // m — [İçərişəhər] upper storeys, average → [ASSUMPTION] applied to each
 const CEILING_STRUCTURE = 0.8 // m — [ASSUMPTION] masonry + fill above the cupola crown, up to the next floor
@@ -101,7 +132,9 @@ const FLOOR_SLAB = 0.3 // m — [ASSUMPTION] visible thickness of the annular fl
 
 /** Wall thickness at height y (linear taper base→top). Exported per Phase-1 spec. */
 export function wallThicknessAt(y: number): number {
-  return taperedWallThickness(y, HEIGHT, WALL_BASE, WALL_TOP)
+  // the taper runs over the tower's REAL extent, ground to top — not from the
+  // storey-1 floor, which is 2 m up the wall
+  return taperedWallThickness(y - GROUND_Y, HEIGHT, WALL_BASE, WALL_TOP)
 }
 
 /**
@@ -207,7 +240,12 @@ const TOP_OF_FLOORS = FLOORS[FLOOR_COUNT - 1].ceilingY + CEILING_STRUCTURE
 // —————————————————————————— tower summary ——————————————————————————
 
 export const TOWER = {
+  /** m — [ICOMOS 958] height ABOVE GROUND. Not a world Y; see topY. */
   height: HEIGHT,
+  /** World Y of the ground outside — the datum HEIGHT is measured from. */
+  groundY: GROUND_Y,
+  /** World Y of the top of the parapet. THIS is the tower's top, not `height`. */
+  topY: TOP_Y,
   outerDiameter: OUTER_DIAMETER,
   outerRadius: OUTER_RADIUS,
   wallThicknessBase: WALL_BASE,
@@ -237,7 +275,7 @@ export const TOWER = {
    * The storeys are being measured against the visitors standing in them; when
    * those land, the stack changes and this becomes a real residual.
    */
-  parapetHeight: HEIGHT - TOP_OF_FLOORS,
+  parapetHeight: TOP_Y - TOP_OF_FLOORS,
   /** Rise of each shallow cupola, crown down to its springing [ASSUMPTION]. */
   cupolaRise: CUPOLA_RISE,
   /** Visible thickness of an annular floor slab [ASSUMPTION]. */
@@ -314,7 +352,7 @@ export const ENTRANCE = {
    * former ground surface is 2 m BELOW it, out in the street. That is also the
    * plain meaning of a raised entrance.
    */
-  sillY: 2.0,
+  sillY: SILL_ABOVE_GROUND,
   /** World Y of the threshold: the floor of storey 1, which it opens onto. */
   get thresholdY() {
     return FLOORS[0].floorY

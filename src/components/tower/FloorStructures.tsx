@@ -410,7 +410,7 @@ export function FloorStructures({
                 topY={
                   FLOORS[f.index + 1]
                     ? FLOORS[f.index + 1].floorY - TOWER.floorSlab
-                    : TOWER.height - TOWER.parapetHeight
+                    : TOWER.topY - TOWER.parapetHeight
                 }
                 cut={throughCupola}
                 material={xray ? undefined : material}
