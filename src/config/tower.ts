@@ -13,18 +13,24 @@
  *
  * Units: metres. Y up. north = -Z, east = +X. Azimuth clockwise from north.
  *
- * TARGET STATE: the tower AS IT STANDS AFTER THE 2009–2013 RESTORATION.
+ * TARGET STATE: the tower AS IT STANDS IN 2026, modern fabric included.
  * This is a deliberate choice, and it decides several arguments in advance:
- *   - the staircase was replaced during that restoration, so the present stone
- *     stair is the one to model, not whatever the pre-2007 photographs show;
+ *   - the staircase was replaced in the 2009–2013 restoration, so the present
+ *     stone stair is the one to model, not whatever the pre-2007 photographs show;
  *   - the current stone paving of the floors is post-restoration and counts as
  *     correct, even though it hides the drainage channels described in [ref];
  *   - reference photographs from 2007–2008 (the Flickr set) document an EARLIER
  *     state — use them for masonry texture and for features the restoration
  *     covered up, but never for geometry that the restoration changed.
- * Modern visitor fittings (glass well covers, guard rails, handrails, strip
- * lights, the metal spiral stair) are part of that state but are NOT modelled:
- * they are museum equipment, not architecture.
+ *
+ * MODERN INSERTIONS ARE MODELLED. This header used to say the opposite — that
+ * the metal spiral stair and the rest were museum equipment and no part of the
+ * job — and that stopped being true on 2026-08-04, when the owner set the target
+ * as the building you can walk today. The steel spiral from storey 1 to storey 2
+ * IS the only way between those floors; leaving it out left the visitor route
+ * with a hole where it begins. They live in config/modern.ts and config/site.ts,
+ * apart from this file, so a figure read off a phone video of 2010s steelwork can
+ * never be quoted as evidence about the 12th-century drum.
  */
 
 import { azimuthToVector, taperedWallThickness } from '../lib/geometry'
