@@ -147,9 +147,19 @@ describe('orientation', () => {
 })
 
 describe('well', () => {
-  it('starts at the 2nd storey (0-based index 1) [reference]', () => {
-    expect(WELL.startsAtFloorIndex).toBe(1)
-    expect(FLOORS[WELL.startsAtFloorIndex].floorNumber).toBe(2)
+  it('starts at the storey the 2026 footage shows, not the one [ref] records', () => {
+    /*
+     * STOREY 3, and the change is deliberate. [ref] says the well was FOUND on
+     * the 2nd storey and İçərişəhər's own captions say the 3rd, so the documents
+     * already disagree. Both of the owner's 2026 walkthroughs — read blind of
+     * each other — put the glass-covered head in the THIRD chamber's floor, with
+     * the case of ceramic pipe sections beside it, and both call the second
+     * chamber's floor unbroken. The model's target is the tower as it stands, so
+     * the footage decides where a visitor meets it; the excavation note remains
+     * evidence about its history, and the two need not agree.
+     */
+    expect(WELL.startsAtFloorIndex).toBe(2)
+    expect(FLOORS[WELL.startsAtFloorIndex].floorNumber).toBe(3)
   })
 })
 

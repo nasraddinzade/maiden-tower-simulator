@@ -685,7 +685,24 @@ export const WELL = {
   mouthDiameter: 1.08,
   collarDepth: 1.0, // m — [ASSUMPTION] how far down the funnel narrows to the bore
   depth: 21, // m — [ref] to the aquifer; İçərişəhər says 13 m
-  startsAtFloorIndex: 1, // 0-based → 2nd storey [ref]; captions elsewhere say the 3rd
+  /**
+   * 0-based index of the storey whose floor the wellhead opens in. 2 → STOREY 3.
+   *
+   * [VIDEO], and it overrides [ref]'s 2nd storey. Two independent readings of
+   * the owner's 2026 walkthroughs — the ascent and the descent, read blind of
+   * each other — both put the glass-covered wellhead in the floor of the third
+   * chamber, alongside the display case of stacked ceramic pipe sections, and
+   * both describe the second chamber's floor as unbroken.
+   *
+   * The conflict is real and is NOT resolved by preference. [ref] says the well
+   * was FOUND on the 2nd storey and İçərişəhər's own captions elsewhere say the
+   * 3rd, so the documents already disagree with each other. What settles it for
+   * THIS model is the target: the tower as it stands in 2026, and the footage is
+   * that state. A 1962-63 excavation note about where a shaft was discovered is
+   * evidence about the building's history, not about which floor a visitor sees
+   * it in today — and if the two are genuinely different, both are right.
+   */
+  startsAtFloorIndex: 2,
   /** Azimuth of the wellhead within the room. [PLACEHOLDER] — no source fixes it. */
   azimuthDeg: 20,
   /** Distance of the wellhead from the tower axis. [PLACEHOLDER]. */
