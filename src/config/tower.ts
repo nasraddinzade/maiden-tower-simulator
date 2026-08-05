@@ -94,6 +94,30 @@ const TOP_Y = GROUND_Y + HEIGHT
 // whole correction rests on the 2.0 m sill being the right offset. dC/dH = 1/8, so
 // the ±1.5 m spread is ±0.19 m on CEILING_STRUCTURE — hence 0.79 ± 0.24, which is
 // why the assumed 0.8 needs no revision.
+/*
+ * INDEPENDENTLY CONFIRMED, once, and it is the only confirmation the vertical
+ * model has.
+ *
+ * Storey 3's springing — where the vault leaves the vertical wall — was measured
+ * at 1.65 ± 0.09 m by fitting two circles in one frame (the floor junction and
+ * the vault soffit), solving camera pitch and roll as free parameters, and
+ * taking the scale from the tower's OWN sourced taper rather than from anything
+ * in the room. The model implies clear − cupolaRise = 2.5 − 0.9 = 1.60. They
+ * agree to 0.05 m, half a sigma.
+ *
+ * That confirms the PAIR, not either number: nothing measured separates a clear
+ * height from its vault rise. Storeys 2, 4, 6 and 7 remain entirely unmeasured,
+ * and the uniform 2.5 m is still an assumption laid over a sourced AVERAGE.
+ *
+ * Two other candidate measurements were rejected rather than adopted. Storey 5's
+ * springing was scaled off this file's own ROOF_CAMERA_HEIGHT, so it is a
+ * measured ratio times an assumption and shares that assumption with PARAPET —
+ * not independent. Storey 8's was scaled off a fire extinguisher taken as
+ * 0.55 m tall, a dimension imported from outside the building to size the
+ * building, and it is contradicted by an integer: 16–17 risers from the storey-8
+ * floor to the roof deck would force a 0.284 m riser, 40% above every other
+ * estimate.
+ */
 const GROUND_CLEAR = 3.0 // m — [İçərişəhər] 1st storey clear height
 const UPPER_CLEAR = 2.5 // m — [İçərişəhər] upper storeys, average → [ASSUMPTION] applied to each
 /**
@@ -154,16 +178,28 @@ const CUPOLA_RISE = 0.9 // m — [ASSUMPTION]
  * Oculus radius. [PHOTO] — measured, not assumed, but with a stated tolerance.
  *
  * Derived from an interior photograph of the owner's (20260801_165136.jpg, Galaxy
- * S23 Ultra). EXIF gives a 23 mm equivalent focal length, so the horizontal field
- * is 2·atan(18/23) = 76.1° and the focal length is 2555 px on the 4000 px frame.
- * The oculus ellipse spans 31.1° across its major axis, which for a horizontal
- * circle is its true diameter seen at its own distance:
+ * S23 Ultra).
  *
- *   camera 2.0 m from the axis → Ø 1.23 m → r 0.61
- *   camera 2.5 m               → Ø 1.48 m → r 0.74
- *   camera 3.0 m               → Ø 1.75 m → r 0.87
+ * THE FOCAL CONVENTION, which this got wrong for a long time and which anyone
+ * reusing these frames needs: FocalLengthIn35mmFilm is a DIAGONAL equivalent,
+ * and the sensor's native frame is 4:3, not 3:2. So the half-width to use is
+ * (43.267/2)·(4/5) = 17.3066 mm, not the 18 mm half-width of a 36×24 frame.
+ * The field along the 4000 px axis is therefore 2·atan(17.3066/23) = 73.92° and
+ * the focal length 2658 px — against 2555 px from the old reading, which made
+ * every distance-dependent length off that frame 4.3% too large. Checked three
+ * ways: the manufacturer's published fields of view, the implied sensor
+ * diagonals, and a Manhattan-frame calibration on 20260801_163903.jpg giving
+ * 2670 ± 50 px measured. Width-on-36 mm is out by 4.5%, diagonal-on-16:9 by
+ * 9.4%, diagonal-on-4:3 by 0.45%.
  *
- * So r = 0.75 ± 0.15, and the standing distance is the only free variable.
+ * The oculus ellipse spans its major axis at a known angle, which for a
+ * horizontal circle is its true diameter seen at its own distance:
+ *
+ *   camera 2.0 m from the axis → r 0.58
+ *   camera 2.5 m               → r 0.71
+ *   camera 3.0 m               → r 0.83
+ *
+ * So r = 0.72 ± 0.14, and the standing distance is the only free variable.
  *
  * This REPLACES the Phase-3 spec's 1.2 m, which was a starting guess, and it
  * sits between the other readings rather than agreeing with any: the older
@@ -173,7 +209,7 @@ const CUPOLA_RISE = 0.9 // m — [ASSUMPTION]
  * it is one frame shot straight up from under the oculus: the springing ring and
  * the opening then appear concentric and the distance drops out of the ratio.
  */
-const OCULUS_RADIUS_DEFAULT = 0.75 // m radius — [PHOTO] ±0.15, see note above
+const OCULUS_RADIUS_DEFAULT = 0.72 // m radius — [PHOTO] ±0.14, see note above
 const FLOOR_SLAB = 0.3 // m — [ASSUMPTION] visible thickness of the annular floor slab
 
 // ———————————————————————— derived helpers ————————————————————————
@@ -567,7 +603,19 @@ export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair
 //     at floor level will look narrower than every reference photograph.
 export const WELL = {
   diameter: 0.7, // m — [ref]; see the note above on bore vs mouth
-  mouthDiameter: 1.3, // m — [ASSUMPTION] the funnel collar seen in the photographs
+  /**
+   * m — the funnel collar at the wellhead. [PHOTO] ±0.11.
+   *
+   * Measured on 20260801_165004.jpg, main camera, DigitalZoomRatio 1.0. The
+   * mouth's ellipse has an axis ratio of 0.865, so the optical axis was 30.2°
+   * off the floor normal and the distance follows from the phone's height; the
+   * 1850 px major axis then gives 1.08 m. Replaces an assumed 1.30, which was
+   * 17% — two sigma — too wide.
+   *
+   * It also settles a suspicion this file already recorded: [ref]'s 0.70 m is
+   * the BORE, not the mouth. WELL.diameter stays at 0.70.
+   */
+  mouthDiameter: 1.08,
   collarDepth: 1.0, // m — [ASSUMPTION] how far down the funnel narrows to the bore
   depth: 21, // m — [ref] to the aquifer; İçərişəhər says 13 m
   startsAtFloorIndex: 1, // 0-based → 2nd storey [ref]; captions elsewhere say the 3rd
