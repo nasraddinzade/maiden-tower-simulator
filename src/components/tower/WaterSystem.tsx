@@ -65,7 +65,9 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
   /** The downpipe: from the highest channel down into the wellhead. */
   const downpipe = useMemo(() => {
     const top = rings.length ? rings[rings.length - 1].y : FLOORS[6].floorY
-    const bottom = wellY
+    // Stops at the elbow, not at the rim: the leg crosses over the mouth and
+    // the water falls in. See WATER.downpipeElbowRise.
+    const bottom = wellY + WATER.downpipeElbowRise
     const height = Math.max(0.5, top - bottom)
     return { top, bottom, height, midY: (top + bottom) / 2 }
   }, [rings, wellY])
@@ -86,13 +88,17 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
    * the chase and letting the chase move outward with the wall.
    */
   const pipeClearance = -WATER.downpipeDiameter * 0.55
-  const bottomRadius = innerRadiusAt(wellY) - pipeClearance
+  const bottomRadius = innerRadiusAt(wellY + WATER.downpipeElbowRise) - pipeClearance
   const topRadius = innerRadiusAt(downpipeTopY) - pipeClearance
   const downpipeX = wellDir.x * bottomRadius
   const downpipeZ = wellDir.z * bottomRadius
 
   const downpipeLean = useMemo(() => {
-    const a = new THREE.Vector3(wellDir.x * bottomRadius, wellY, wellDir.z * bottomRadius)
+    const a = new THREE.Vector3(
+      wellDir.x * bottomRadius,
+      wellY + WATER.downpipeElbowRise,
+      wellDir.z * bottomRadius,
+    )
     const b = new THREE.Vector3(wellDir.x * topRadius, downpipeTopY, wellDir.z * topRadius)
     const dir = b.clone().sub(a)
     return {
@@ -246,7 +252,11 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
 
       {/* the elbow: wall run across to the wellhead, just above the mouth */}
       <mesh
-        position={[(downpipeX + wellX) / 2, wellY + 0.25, (downpipeZ + wellZ) / 2]}
+        position={[
+          (downpipeX + wellX) / 2,
+          wellY + WATER.downpipeElbowRise,
+          (downpipeZ + wellZ) / 2,
+        ]}
         quaternion={elbowQuaternion}
       >
         <cylinderGeometry

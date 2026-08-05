@@ -717,6 +717,20 @@ export const WELL = {
 export const WATER = {
   /** Main downpipe from the niches into the well. */
   downpipeDiameter: 0.30, // m — [ref]
+
+  /*
+   * How far above the wellhead's rim the horizontal leg crosses to the mouth.
+   * [ESTIMATE] — no measurement exists for it, and none is likely to: the last
+   * courses of the real pipe were lifted long ago and the museum's cutaway
+   * draws the junction schematically. 0.25 m is a plumber's clearance, enough
+   * to see daylight between leg and rim.
+   *
+   * It is a named constant because the vertical run must END here rather than
+   * carry on to the rim. It used to run past the leg and stop 0.25 m lower,
+   * which read as a pipe standing IN the wellhead and rising out of it — water
+   * running the wrong way. A downpipe delivers from above.
+   */
+  downpipeElbowRise: 0.25, // m — [ESTIMATE]
   /** Ring channels collecting from the floors. */
   channelDiameter: 0.225, // m — [ref] gives 0.20–0.25; midpoint
   channelWallThickness: 0.022, // m — [ref]
