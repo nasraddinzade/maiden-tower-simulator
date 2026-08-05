@@ -4,6 +4,7 @@ import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier
 import { stairRampBoxes } from '../../lib/collision'
 import { ENTRANCE, TOWER, innerRadiusAt } from '../../config/tower'
 import { EXTERNAL_STAIR, EXTERNAL_STAIR_RISE, GROUND_Y, SITE } from '../../config/site'
+import { LIMESTONE_LIGHT } from '../../lib/masonry'
 
 const DEG = Math.PI / 180
 
@@ -96,6 +97,15 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     () => new THREE.MeshStandardMaterial({ color: '#8d8577', roughness: 0.95 }),
     [],
   )
+  /*
+   * The passage sill is the tower's own stone, not the museum's paving.
+   * Sharing the paving material made it read as a pale panel let into the wall,
+   * which is the first thing you look at walking up the stair.
+   */
+  const sillStone = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: LIMESTONE_LIGHT, roughness: 0.95 }),
+    [],
+  )
   const steel = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#4a4a4e', roughness: 0.6, metalness: 0.4 }),
     [],
@@ -103,9 +113,10 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
   useEffect(
     () => () => {
       paving.dispose()
+      sillStone.dispose()
       steel.dispose()
     },
-    [paving, steel],
+    [paving, sillStone, steel],
   )
 
   return (
@@ -124,7 +135,7 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
 
           {/* the passage sill, so the threshold reads as a floor and not a hole */}
           <mesh
-            material={paving}
+            material={sillStone}
             position={passage.position}
             quaternion={passage.quaternion}
             receiveShadow
