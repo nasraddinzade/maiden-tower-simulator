@@ -647,6 +647,16 @@ export function stairApproaches(
      * height the flight HAS THERE, not at the height of the end tread it was
      * named after. Otherwise the shift simply trades a wall at one end for a lip
      * at the other, and this character controller will not climb a lip either.
+     *
+     * TRIED AND REVERTED: anchoring the foot ramp on the END TREAD's height
+     * instead, so it climbs one riser over a metre — 10° — rather than the two
+     * or three risers the shifted-azimuth tread gives. It is gentler, and it
+     * makes things WORSE. Walked, the climb then stopped at storey 2 instead of
+     * storey 3: a ramp that ends one riser up no longer reaches the flight,
+     * which by then is two or three risers higher at that azimuth, so the walker
+     * arrives at the ramp's top facing the flight's side as a ledge. The steep
+     * anchor is doing necessary work. Whatever fixes the storey-3 hand-off, it
+     * is not this.
      */
     const approach = (endTread: StepPlacement, floorY: number, level: boolean) => {
       const azimuthDeg = approachAzimuthDeg(steps, endTread, width)
