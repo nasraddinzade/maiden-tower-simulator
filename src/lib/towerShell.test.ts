@@ -541,6 +541,15 @@ describe('the shell carries a floor under every tread', () => {
     let worst = 0
     flights.forEach((steps, fi) => {
       steps.forEach((s, si) => {
+        /*
+         * The top tread of a flight is the exception, and it is not a let-off.
+         * planFlight lands it FLUSH with the floor above, so what carries it is
+         * that storey's slab — or, at the top of the tower, the roof deck — and
+         * both are FloorStructures, not shell. At the roof the shell must in
+         * fact be open there: the parapet has to have a hole in it or there is
+         * no way out onto the terrace.
+         */
+        if (si === steps.length - 1) return
         for (const dr of [-0.35, -0.18, 0, 0.18, 0.35]) {
           const below = firstSurfaceAbove(s.azimuthDeg, s.midRadius + dr).filter(
             (y) => y < s.treadY - 0.01,

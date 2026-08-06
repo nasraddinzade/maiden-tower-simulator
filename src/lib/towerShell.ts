@@ -345,7 +345,20 @@ export function stairBearingClip(sections: PassageSection[]): THREE.BufferGeomet
       innerRadius: Math.max(0.05, s.innerRadius - spread),
       outerRadius: s.outerRadius + spread,
       topY: s.bottomY,
-      bottomY: s.bottomY - TOWER.floorSlab,
+      /*
+       * A HAUNCH, not a skin. One slab thickness was the first depth tried and
+       * it is too thin to do the job: a doorway threshold notches a little way
+       * into the bed, a window reveal takes over below the notch, and the two
+       * voids merge into 1.98 m of nothing under the top tread of a flight.
+       * Three slabs puts the whole of that notch inside protected stone.
+       *
+       * Deep, but not arbitrary at the other end either — a window is 1.9 m tall
+       * and this leaves the great majority of any reveal free to cut. Where the
+       * stair and a slit genuinely cross, the reveal reads as interrupted by the
+       * flight, which is the honest picture of an unresolved clash between two
+       * unsourced azimuths.
+       */
+      bottomY: s.bottomY - 3 * TOWER.floorSlab,
     })),
     { arched: false },
   )

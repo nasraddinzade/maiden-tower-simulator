@@ -549,7 +549,16 @@ export function stairDoorways(
 ): StairDoorway[] {
   const out: StairDoorway[] = []
 
-  const doorwayAt = (all: StepPlacement[], s: StepPlacement, floorY: number): StairDoorway => {
+  const doorwayAt = (
+    all: StepPlacement[],
+    s: StepPlacement,
+    floorY: number,
+    /**
+     * True where the flight ENDS at this floor. Past the top tread there is no
+     * more stair to follow, so the threshold is the floor's, not the flight's.
+     */
+    atHead = false,
+  ): StairDoorway => {
     // reach past the room face so the opening is a hole, not a blind recess
     const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - doorwayWidth / 2)
     // the same azimuth the ramp up to it uses — see approachAzimuthDeg()
@@ -631,11 +640,39 @@ export function stairDoorways(
      * cannot climb a lip of any height: the walking surface here is the ramp
      * chain from stairApproaches(), and the shell carries no collider.
      */
+    /*
+     * AT A HEAD, THE SILL MAY NOT RISE ABOVE THE FLOOR IT SERVES.
+     *
+     * The rake is right at both ends — the stair really is climbing past the
+     * opening — but at a head it climbs UP TO the floor and stops, so the high
+     * end of a raked sill can finish above floor level. On the roof it did:
+     * 0.42 m of swing across the opening put the sill 0.12 m proud of the deck
+     * and left a wedge of masonry leaning over the stair mouth, in the open,
+     * visible from the whole terrace.
+     *
+     * The whole sill drops by however much that overshoot was, keeping the rake.
+     * The cost is digging that same 0.12 m under the bed for the width of one
+     * doorway — a threshold notch, where the alternative was a slab standing on
+     * the roof.
+     *
+     * Levelling it instead was tried and is worse: the head of one flight and
+     * the foot of the next are only a few degrees apart, so a level sill at the
+     * head cuts straight under the first treads of the flight above — measured,
+     * 2.39 m of nothing beneath them.
+     *
+     * No clamp at a foot. There the leftover is a low step up into the doorway,
+     * standing in a wall rather than on an open floor, which is what a stair
+     * threshold looks like in stone.
+     */
+    const halfTangential = (s.midRadius + doorwayWidth / 2) * Math.sin((widthDeg / 2) * (Math.PI / 180))
+    const sillTop = bedAtCentre + Math.abs(rake) * halfTangential
+    const headClamp = atHead ? Math.max(0, sillTop - (floorY - 0.02)) : 0
+
     return {
       azimuthDeg,
       widthDeg,
       bottomRake: rake,
-      bottomY: bedAtCentre,
+      bottomY: bedAtCentre - headClamp,
       topY: Math.max(floorY, underfoot.treadY) + height,
       innerRadius: Math.max(0.05, inner),
       outerRadius: s.midRadius + doorwayWidth / 2 + 0.06,
@@ -646,7 +683,7 @@ export function stairDoorways(
     if (steps.length === 0) return
     for (const end of ['foot', 'head'] as const) {
       const s = end === 'foot' ? steps[0] : steps[steps.length - 1]
-      out.push(doorwayAt(steps, s, floorYOf(i, end)))
+      out.push(doorwayAt(steps, s, floorYOf(i, end), end === 'head'))
     }
     // and the openings partway along, for a flight that passes a storey
     for (const floorY of opensAtYPerFlight[i] ?? []) {
