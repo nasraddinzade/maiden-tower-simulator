@@ -173,7 +173,23 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
     <group>
       {/* ————————————————— fabric: what a visitor meets ————————————————— */}
 
-      {/* the shaft — the lathe carries world Y already, so only X/Z offset it */}
+      {/*
+        BELOW THE MOUTH, NOTHING IS DRAWN BY DEFAULT.
+
+        The bore runs 21 m down from storey 3's floor, so it necessarily crosses
+        storeys 2 and 1 — but no source says what carries it there. The footage is
+        about the head, not about what is under it. Two guesses were tried and
+        both are guesses: a bare tube hanging in the middle of the rooms, and a
+        masonry pier around it. The pier is what the owner found standing in
+        chamber 2, and it was right to object: a 7 m column of [ASSUMPTION] in the
+        middle of two rooms is not the tower, it is us filling a gap.
+
+        So the visitor meets the mouth, which is documented, and the shaft belongs
+        with the diagram, which is what it is — an argument about the building
+        rather than the building. If a survey ever says what stands in chambers 1
+        and 2, this comes back as fabric.
+      */}
+      {showSchematic && (
       <mesh geometry={shaft} position={[wellX, 0, wellZ]}>
         <meshStandardMaterial
           color={highlighted ? '#2f6f8f' : '#4b4740'}
@@ -182,6 +198,7 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
           emissive={highlighted ? '#123448' : '#000000'}
         />
       </mesh>
+      )}
 
       {/*
         Masonry casing where the shaft crosses the rooms below its mouth.
@@ -192,12 +209,13 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
         an upper floor is carried in a built shaft; this is that shaft, stopping
         at ground level where the bore enters rock.
 
-        It is drawn with the well rather than with the diagram, because the
-        alternative is that hanging tube in the default view. What no source
-        confirms is a PIER in chambers 1 and 2 — the footage is about the head,
-        not about what carries it — so the casing is [ASSUMPTION] riding on
-        fabric, and that is the weakest thing now shown by default.
+        It used to be drawn with the well rather than with the diagram, on the
+        argument that the alternative was a hanging tube. Both alternatives were
+        wrong: what no source confirms is a PIER in chambers 1 and 2, so this is
+        [ASSUMPTION] the whole way down and belongs behind the switch with the
+        rest of the reasoning.
       */}
+      {showSchematic && (
       <mesh position={[wellX, (wellY + 0) / 2, wellZ]}>
         <cylinderGeometry
           args={[
@@ -211,6 +229,7 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
         />
         <meshStandardMaterial color="#6a6152" side={THREE.DoubleSide} roughness={0.95} />
       </mesh>
+      )}
 
       {/* wellhead ring, so the mouth reads as a rim rather than a hole */}
       <mesh position={[wellX, wellY + 0.06, wellZ]} rotation={[-Math.PI / 2, 0, 0]}>
