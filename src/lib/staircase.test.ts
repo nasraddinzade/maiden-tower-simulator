@@ -196,10 +196,33 @@ describe('planAllFlights — one flight per lift', () => {
   })
 
   it('climbs without ever descending across the whole tower', () => {
+    /*
+     * Never DOWN, but level is allowed now: the roof climb has a landing in it,
+     * modelled as treads that repeat their height. This read `toBeGreaterThan`
+     * before landings existed, and leaving it that way would make a landing
+     * anywhere in the tower a test failure — the wrong signal. A descent still
+     * is one.
+     */
     const all = flights.flat()
     for (let i = 1; i < all.length; i++) {
-      expect(all[i].treadY).toBeGreaterThan(all[i - 1].treadY)
+      expect(all[i].treadY).toBeGreaterThanOrEqual(all[i - 1].treadY)
     }
+  })
+
+  it('runs level exactly where a landing is declared, and nowhere else', () => {
+    WALL_LIFTS.forEach((lift, i) => {
+      const level = flights[i].filter((s, k) => k > 0 && s.treadY === flights[i][k - 1].treadY)
+      if (lift.landingsAtY.length === 0) {
+        expect(level).toEqual([])
+        return
+      }
+      expect(level.length).toBeGreaterThan(0)
+      for (const s of level) {
+        // within a riser of the declared height: the landing sits on the tread
+        // that first reaches it, not at the exact fraction
+        expect(Math.min(...lift.landingsAtY.map((y) => Math.abs(s.treadY - y)))).toBeLessThan(0.25)
+      }
+    })
   })
 
   it('reaches the head of the last lift — the roof deck, not the top floor', () => {

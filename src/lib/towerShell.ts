@@ -344,7 +344,19 @@ export function stairBearingClip(sections: PassageSection[]): THREE.BufferGeomet
       ...s,
       innerRadius: Math.max(0.05, s.innerRadius - spread),
       outerRadius: s.outerRadius + spread,
-      topY: s.bottomY,
+      /*
+       * Lapped a little INTO the passage, not stopped flush with its floor.
+       *
+       * Flush, the protected block's top face is coplanar with the passage floor
+       * the cut has just made, and where a window trims round the block the
+       * evaluator loses both — leaving the whole haunch reading as void from
+       * below. The signature is unmistakable once seen: a drop of exactly one
+       * tread-depth plus the haunch, 1.23 m, under the affected treads.
+       *
+       * The lap is buried inside the tread blocks, which run from the tread
+       * surface down to this same floor, so nothing shows.
+       */
+      topY: s.bottomY + 0.05,
       /*
        * A HAUNCH, not a skin. One slab thickness was the first depth tried and
        * it is too thin to do the job: a doorway threshold notches a little way

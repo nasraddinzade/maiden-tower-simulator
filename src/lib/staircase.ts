@@ -57,6 +57,19 @@ export interface FlightParams {
   /** Preferred tread depth measured along the walking line. */
   goingTarget: number
   winding: Winding
+  /**
+   * Heights at which the flight stops rising and runs level for a while.
+   *
+   * A landing is not a separate flight here, and that is deliberate. Split into
+   * two runs it would need a floor to start and end at, and stairDoorways()
+   * would cut an opening into whatever is at that height — which, halfway up the
+   * wall between storey 8 and the roof, is solid masonry. Expressed as treads
+   * that happen not to rise, everything downstream follows for free: the passage
+   * runs level over it, the ramp chain lies flat, and no doorway is invented.
+   */
+  landingsAtY?: number[]
+  /** Arc length of each landing along the walking line, metres. */
+  landingLength?: number
 }
 
 export interface StepPlacement {
@@ -106,15 +119,13 @@ export function planFlight(p: FlightParams): StepPlacement[] {
 
   const steps: StepPlacement[] = []
   let azimuth = p.startAzimuthDeg
-  for (let i = 0; i < count; i++) {
-    // tread i is the surface you arrive on after climbing i+1 risers
-    const treadY = p.fromY + riser * (i + 1)
+  const emit = (treadY: number) => {
     const midRadius = p.innerRadiusAt(treadY) + p.width / 2
     // the going is held constant along the walking line, so a wider course
     // higher up turns through a smaller angle
     const dAngle = stepAngleDeg(p.goingTarget, midRadius) * sign
     steps.push({
-      index: i,
+      index: steps.length,
       azimuthDeg: azimuth,
       angularWidthDeg: Math.abs(dAngle),
       treadY,
@@ -122,7 +133,49 @@ export function planFlight(p: FlightParams): StepPlacement[] {
     })
     azimuth += dAngle
   }
+
+  const landings = [...(p.landingsAtY ?? [])].sort((a, b) => a - b)
+  const landingTreads = Math.max(
+    1,
+    Math.round((p.landingLength ?? p.goingTarget * 4) / p.goingTarget),
+  )
+  let next = 0
+
+  for (let i = 0; i < count; i++) {
+    // tread i is the surface you arrive on after climbing i+1 risers
+    const treadY = p.fromY + riser * (i + 1)
+    emit(treadY)
+    /*
+     * The landing goes AFTER the tread that first reaches its level, so the
+     * walker arrives on the flat rather than stepping up onto it. Its treads
+     * repeat that height, which is what makes it level; the riser count is
+     * untouched, so the flight still lands exactly on toY.
+     */
+    while (next < landings.length && treadY >= landings[next] - 1e-6) {
+      for (let k = 0; k < landingTreads; k++) emit(treadY)
+      next += 1
+    }
+  }
   return steps
+}
+
+/**
+ * The riser a flight actually climbs by, taken from the steps themselves.
+ *
+ * NOT rise / step-count. A flight with a landing in it has treads that do not
+ * rise, so dividing the total by the number of treads gives a riser smaller than
+ * any real one — and everything derived from it shrinks with it. treadDepth()
+ * would then cut the tread blocks thinner than the drop to the passage floor and
+ * the flight would go hollow again, which is the fault this project has spent
+ * the longest chasing. The largest step between consecutive treads is the riser
+ * the mason cut; the level ones are the landing.
+ */
+export function flightRiser(steps: StepPlacement[], fallback = 0.2): number {
+  let riser = 0
+  for (let i = 1; i < steps.length; i += 1) {
+    riser = Math.max(riser, Math.abs(steps[i].treadY - steps[i - 1].treadY))
+  }
+  return riser > 1e-6 ? riser : fallback
 }
 
 /** Total angle a flight sweeps, degrees (unsigned). */
@@ -168,12 +221,16 @@ export interface StairSettings {
   width: number
   wallClearance: number
   startAzimuthDeg: number
+  /** Arc length of a landing along the walking line, metres. */
+  landingLength?: number
 }
 
 /** The part of a lift this function needs: two heights and nothing else. */
 export interface FlightRun {
   fromY: number
   toY: number
+  /** See FlightParams.landingsAtY. */
+  landingsAtY?: number[]
 }
 
 /**
@@ -209,6 +266,8 @@ export function planAllFlights(
       riserTarget: cfg.riserTarget,
       goingTarget: cfg.goingTarget,
       winding: cfg.winding,
+      landingsAtY: run.landingsAtY,
+      landingLength: cfg.landingLength,
     })
     flights.push(steps)
     if (steps.length > 1) {
@@ -272,8 +331,7 @@ export function stairPassageSections(
    * exactly on the underside of the treads at the midpoints, which is as close
    * as a linear sweep can sit without eating them.
    */
-  const riserOf = (steps: StepPlacement[]): number =>
-    steps.length > 1 ? Math.abs(steps[1].treadY - steps[0].treadY) : 0.2
+  const riserOf = (steps: StepPlacement[]): number => flightRiser(steps)
 
   const sectionAt = (
     s: StepPlacement,
@@ -605,7 +663,7 @@ export function stairDoorways(
      * old flat drop stays as a floor for the value so the room side still has no
      * lip where the arc happens to contain no low tread.
      */
-    const riser = all.length > 1 ? Math.abs(all[1].treadY - all[0].treadY) : 0.2
+    const riser = flightRiser(all)
     const stepAngle = all.length > 1 ? all[1].azimuthDeg - all[0].azimuthDeg : 1
     /*
      * The stair's own gradient, expressed the way the cutter needs it: metres of

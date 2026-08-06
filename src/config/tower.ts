@@ -487,6 +487,7 @@ export const STAIR: {
   wallClearance: number
   startAzimuthDeg: number
   doorwayWidth: number
+  landingLength: number
 } = {
   winding: 'counterclockwise', // from photographs; contradicts the spec's assumed clockwise
   riserTarget: 0.2, // m — spec band 0.18–0.22; the real riser is rounded to fit each storey
@@ -541,6 +542,16 @@ export const STAIR: {
    * at. See the chip filed for the jamb clipping.
    */
   doorwayWidth: 1.1,
+
+  /**
+   * How far a landing runs along the walking line, metres. [ESTIMATE]
+   *
+   * Long enough to stand on and turn round in, which is what a landing between
+   * two flights is for, and short enough not to eat the climb: at the 0.3 m
+   * going this is four treads' worth. No source gives it — the footage shows the
+   * turn, not its length.
+   */
+  landingLength: 1.2,
 }
 
 // ———————————————————— vertical circulation, 2026 ————————————————————
@@ -581,6 +592,14 @@ export interface StairLift {
   opensAtY: number[]
   /** The same storeys as 1-based numbers, for the slab cuts and for labels. */
   opensAtFloorNumbers: number[]
+  /**
+   * Heights where the flight runs level for a few treads before climbing on.
+   *
+   * Only the roof climb has one. It is not a storey and there is no room at that
+   * level — see FlightParams.landingsAtY for why it is modelled as level treads
+   * rather than as two separate flights.
+   */
+  landingsAtY: number[]
   /** For labels and for provenance in the UI. */
   fromFloorNumber: number
   toFloorNumber: number
@@ -599,12 +618,15 @@ function buildLifts(): StairLift[] {
     to: number,
     source: string,
     opensOnto: number[] = [],
+    /** Fractions of the climb at which the flight pauses on the level. */
+    landingsAt: number[] = [],
   ): StairLift => ({
     kind,
     fromY: y(from),
     toY: y(to),
     opensAtY: opensOnto.map(y),
     opensAtFloorNumbers: opensOnto,
+    landingsAtY: landingsAt.map((t) => y(from) + (y(to) - y(from)) * t),
     fromFloorNumber: from,
     toFloorNumber: to,
     source,
@@ -655,7 +677,27 @@ function buildLifts(): StairLift[] {
      * still, has its lower edge in the same place.
      */
     lift('wallStair', 7, 8, '[VIDEO] ascent 395–404 s — frames extracted, never analysed'),
-    lift('wallStair', 8, FLOOR_COUNT + 1, '[VIDEO] ascent 429–449 s — 16–17 risers, TWO flights and a landing; see above'),
+    /*
+     * The roof climb, and the only lift with a landing in it.
+     *
+     * [VIDEO] ascent 429–449 s: 16–17 risers, TWO flights with a landing between
+     * them. The count and the landing's existence are read off the footage; WHERE
+     * along the climb it falls is not — the frames show the turn but not how many
+     * steps preceded it, and the camera is at chest height on a moving body.
+     *
+     * Halfway is therefore [ESTIMATE], chosen because it is what two flights of
+     * equal length means and because nothing in the footage argues for an uneven
+     * split. If anyone ever counts the risers before and after the turn, this is
+     * one number to change.
+     */
+    lift(
+      'wallStair',
+      8,
+      FLOOR_COUNT + 1,
+      '[VIDEO] ascent 429–449 s — 16–17 risers, TWO flights and a landing; the landing is placed at mid-climb [ESTIMATE]',
+      [],
+      [0.5],
+    ),
   ]
 }
 

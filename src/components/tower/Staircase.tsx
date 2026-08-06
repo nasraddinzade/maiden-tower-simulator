@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import {
   PASSAGE_SIDE_CLEARANCE,
+  flightRiser,
   planAllFlights,
   stairApproaches,
   stairTreadVertices,
@@ -56,9 +57,15 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
     )
 
     const out: PlacedStep[] = []
-    flights.forEach((steps, i) => {
+    flights.forEach((steps) => {
       if (steps.length === 0) return
-      const riser = (WALL_LIFTS[i].toY - WALL_LIFTS[i].fromY) / steps.length
+      /*
+       * From the steps, not from rise / count: a flight with a landing has
+       * treads that do not rise, and dividing by all of them gives a riser
+       * smaller than any real one — which would cut the tread blocks thinner
+       * than the drop to the passage floor and hollow the flight out again.
+       */
+      const riser = flightRiser(steps)
       for (const s of steps) {
         out.push({
           ...s,
