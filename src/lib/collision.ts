@@ -454,6 +454,106 @@ export function stairRampBoxes(
   return out
 }
 
+/**
+ * Depth of the entrance sill slab, metres.
+ *
+ * Nothing measures it and nothing needs to: only the sill's TOP face is ever
+ * touched, and that face is pinned to the threshold. This is the figure the
+ * component carried before the passage moved into this module.
+ */
+const ENTRANCE_SILL_THICKNESS = 0.3
+
+export interface EntrancePassageParams {
+  azimuthDeg: number
+  /** Clear width of the doorway; the passage is cut this wide right through. */
+  width: number
+  /** Clear height of the opening above the threshold. */
+  height: number
+  /** World Y of the threshold — the top of the sill. */
+  thresholdY: number
+  /** Room-side end of the passage: the wall's inner face at the threshold. */
+  innerRadius: number
+  /** Outer face of the drum. */
+  outerRadius: number
+  /** Depth of the sill slab below the threshold. */
+  sillThickness?: number
+  /** Lateral thickness of the masonry cheek either side of the passage. */
+  jambThickness?: number
+}
+
+export interface EntrancePassageColliders {
+  /** The walking surface through the wall. Also drawn, so the doorway is a floor. */
+  sill: BoxSpec
+  /** The cheeks either side of it. Collider only — the shell already draws them. */
+  jambs: BoxSpec[]
+}
+
+/**
+ * The entrance passage as the walker meets it: a sill to walk in on, and a
+ * solid cheek either side of it.
+ *
+ * The sill alone was not enough, and the reason is the one that governs every
+ * wall box in this module. boxAt() clamps each box to WALL_BOX_THICKNESS at the
+ * room face, so past about 4.14 m of radius the drum carries no collider at ANY
+ * azimuth — and this passage is 4.9 m deep. With only the sill emitted, a
+ * walker who drifted 0.85 m off the centreline (half the doorway plus a capsule
+ * radius) ran out of plank, fell 2 m onto the site's ground cylinder, which
+ * runs UNDER the tower, and stood inside solid drawn masonry. Photographed.
+ *
+ * So the entrance is treated exactly as the stair passage already is above:
+ * solid on BOTH sides, never a walking surface floating in a void. The cheeks
+ * take the same WALL_BOX_THICKNESS for the same argument — thin enough that the
+ * AABBs stay small, thick enough that 1.4 m/s at 30 fps cannot cross one
+ * between steps.
+ *
+ * Two choices worth stating, because both are approximations of drawn stone:
+ *
+ *  - the cheeks stand ON the sill's edges, at ±width/2, so they take nothing
+ *    off the 1.1 m the doorway is sourced at. Their inner faces are the drawn
+ *    reveal.
+ *  - they rise as one box to the full clear height instead of following the
+ *    drawn barrel vault. Above the springing that puts the face slightly
+ *    OUTSIDE the stone, which lets a head clip some 9 cm into masonry it cannot
+ *    see and costs nothing; chasing the arch would take five boxes a side to
+ *    buy the same walk.
+ */
+export function entrancePassageBoxes(p: EntrancePassageParams): EntrancePassageColliders {
+  const sillThickness = p.sillThickness ?? ENTRANCE_SILL_THICKNESS
+  const jambThickness = p.jambThickness ?? WALL_BOX_THICKNESS
+  const rad = p.azimuthDeg * DEG
+  const depth = p.outerRadius - p.innerRadius
+  const midRadius = p.innerRadius + depth / 2
+  const quaternion = yawThenTilt(radialYaw(rad), 0)
+  const centre: [number, number] = [Math.sin(rad) * midRadius, -Math.cos(rad) * midRadius]
+  // local +X is radial, so local +Z is the lateral axis the cheeks sit on. Taken
+  // off the quaternion rather than written out again, so the two cannot drift.
+  const lateral = rotate(quaternion, [0, 0, 1])
+
+  const sill: BoxSpec = {
+    halfExtents: [depth / 2, sillThickness / 2, p.width / 2],
+    position: [centre[0], p.thresholdY - sillThickness / 2, centre[1]],
+    quaternion,
+    kind: 'floor',
+  }
+
+  const offset = p.width / 2 + jambThickness / 2
+  const jambs = [-1, 1].map(
+    (side): BoxSpec => ({
+      halfExtents: [depth / 2, p.height / 2, jambThickness / 2],
+      position: [
+        centre[0] + side * lateral[0] * offset,
+        // stands on the sill's top face, so the two are flush in plan
+        p.thresholdY + p.height / 2,
+        centre[1] + side * lateral[2] * offset,
+      ],
+      quaternion,
+      kind: 'wall',
+    }),
+  )
+
+  return { sill, jambs }
+}
+
 /** Total collider count, for the budget readout. */
 export function colliderCount(...groups: BoxSpec[][]): number {
   return groups.reduce((n, g) => n + g.length, 0)

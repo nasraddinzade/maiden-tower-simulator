@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
-import { stairRampBoxes } from '../../lib/collision'
+import { entrancePassageBoxes, stairRampBoxes } from '../../lib/collision'
 import { ENTRANCE, TOWER, innerRadiusAt } from '../../config/tower'
 import { EXTERNAL_STAIR, EXTERNAL_STAIR_RISE, GROUND_Y, SITE } from '../../config/site'
 import { LIMESTONE_LIGHT } from '../../lib/masonry'
@@ -68,30 +68,27 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
   }, [az])
 
   /*
-   * The floor of the entrance passage, from the outer face through to the room.
+   * The entrance passage, from the outer face through to the room: the sill you
+   * walk in on and the masonry either side of it.
    *
-   * Without it the doorway is an opening with nothing under it: the walker
+   * Without the sill the doorway is an opening with nothing under it: the walker
    * reaches the threshold and drops through the wall. wallColliders leaves the
    * entrance open as a gap in the wall bands, which is right — but a gap needs a
-   * sill to walk on.
+   * sill to walk on, and a sill on its own is a plank over a 2 m drop. The
+   * cheeks are why; entrancePassageBoxes argues it where the shapes are made.
    */
-  const passage = useMemo(() => {
-    const inner = innerRadiusAt(ENTRANCE.thresholdY)
-    const depth = TOWER.outerRadius - inner
-    return {
-      position: [
-        Math.sin(az) * (inner + depth / 2),
-        ENTRANCE.thresholdY - 0.15,
-        -Math.cos(az) * (inner + depth / 2),
-      ] as [number, number, number],
-      halfExtents: [depth / 2, 0.15, ENTRANCE.width / 2] as [number, number, number],
-      // local +X radial, so yaw the box to face the entrance
-      quaternion: new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 1, 0),
-        Math.PI / 2 - az,
-      ),
-    }
-  }, [az])
+  const passage = useMemo(
+    () =>
+      entrancePassageBoxes({
+        azimuthDeg: ENTRANCE.azimuthDeg,
+        width: ENTRANCE.width,
+        height: ENTRANCE.height,
+        thresholdY: ENTRANCE.thresholdY,
+        innerRadius: innerRadiusAt(ENTRANCE.thresholdY),
+        outerRadius: TOWER.outerRadius,
+      }),
+    [],
+  )
 
   const paving = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#8d8577', roughness: 0.95 }),
@@ -133,15 +130,21 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
             </mesh>
           ))}
 
-          {/* the passage sill, so the threshold reads as a floor and not a hole */}
+          {/* the passage sill, so the threshold reads as a floor and not a hole.
+              Only the sill is drawn: the cheeks beside it are already in the
+              shell, as the stone the entrance arch was cut out of. */}
           <mesh
             material={sillStone}
-            position={passage.position}
-            quaternion={passage.quaternion}
+            position={passage.sill.position}
+            quaternion={passage.sill.quaternion}
             receiveShadow
           >
             <boxGeometry
-              args={[passage.halfExtents[0] * 2, passage.halfExtents[1] * 2, passage.halfExtents[2] * 2]}
+              args={[
+                passage.sill.halfExtents[0] * 2,
+                passage.sill.halfExtents[1] * 2,
+                passage.sill.halfExtents[2] * 2,
+              ]}
             />
           </mesh>
         </>
@@ -163,11 +166,14 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
               quaternion={b.quaternion}
             />
           ))}
-          <CuboidCollider
-            args={passage.halfExtents}
-            position={passage.position}
-            quaternion={passage.quaternion}
-          />
+          {[passage.sill, ...passage.jambs].map((b, i) => (
+            <CuboidCollider
+              key={`epassage-${i}`}
+              args={b.halfExtents}
+              position={b.position}
+              quaternion={b.quaternion}
+            />
+          ))}
         </RigidBody>
       )}
     </group>

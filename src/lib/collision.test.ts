@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  entrancePassageBoxes,
   floorColliders,
   rotate,
   stairRampBoxes,
@@ -8,6 +9,7 @@ import {
   type BoxSpec,
   type PassageWindow,
 } from './collision'
+import { PLAYER } from '../config/player'
 
 /** World-space corners of a box, via its actual quaternion. */
 function corners(b: BoxSpec): Array<[number, number, number]> {
@@ -313,6 +315,98 @@ describe('floorColliders', () => {
     const radii = corners(b).map((c) => c[0] * radialDir[0] + c[2] * radialDir[2])
     expect(Math.min(...radii)).toBeCloseTo(1.2, 6)
     expect(Math.max(...radii)).toBeCloseTo(3.42, 6)
+  })
+})
+
+describe('entrancePassageBoxes', () => {
+  // the real passage: a 1.1 m doorway [İçərişəhər] with 4.9 m of wall to cross
+  const passage = {
+    azimuthDeg: 270,
+    width: 1.1,
+    height: 2,
+    thresholdY: 0,
+    innerRadius: 3.338,
+    outerRadius: 8.25,
+  }
+
+  /**
+   * A box's real extent in the passage's own frame — radial, lateral, vertical.
+   * Off the transformed corners, like the wall tests: the whole point is to
+   * catch a box whose fields look right and whose orientation is not.
+   */
+  function frame(b: BoxSpec, azimuthDeg: number) {
+    const rad = azimuthDeg * DEG
+    const cs = corners(b)
+    const r = cs.map((c) => c[0] * Math.sin(rad) + c[2] * -Math.cos(rad))
+    const t = cs.map((c) => c[0] * Math.cos(rad) + c[2] * Math.sin(rad))
+    const y = cs.map((c) => c[1])
+    return {
+      r: [Math.min(...r), Math.max(...r)] as [number, number],
+      t: [Math.min(...t), Math.max(...t)] as [number, number],
+      y: [Math.min(...y), Math.max(...y)] as [number, number],
+    }
+  }
+
+  it('carries the walker in on a sill topped exactly at the threshold', () => {
+    const { sill } = entrancePassageBoxes(passage)
+    const f = frame(sill, passage.azimuthDeg)
+    expect(f.y[1]).toBeCloseTo(passage.thresholdY, 9)
+    expect(f.r[0]).toBeCloseTo(passage.innerRadius, 9)
+    expect(f.r[1]).toBeCloseTo(passage.outerRadius, 9)
+    expect(f.t[1] - f.t[0]).toBeCloseTo(passage.width, 9)
+  })
+
+  it('stands the cheeks on the sill edges without narrowing the doorway', () => {
+    const { sill, jambs } = entrancePassageBoxes(passage)
+    const s = frame(sill, passage.azimuthDeg)
+    expect(jambs).toHaveLength(2)
+    for (const j of jambs.map((b) => frame(b, passage.azimuthDeg))) {
+      // flush on top of the sill, so a plan projection of the two means something
+      expect(j.y[0]).toBeCloseTo(s.y[1], 9)
+      expect(j.y[1]).toBeCloseTo(passage.thresholdY + passage.height, 9)
+      // same radial run as the sill: the cheeks stop nowhere it does not
+      expect(j.r[0]).toBeCloseTo(passage.innerRadius, 9)
+      expect(j.r[1]).toBeCloseTo(passage.outerRadius, 9)
+      // and outside the clear width — 1.1 m is sourced, physics must not eat it
+      const face = Math.min(Math.abs(j.t[0]), Math.abs(j.t[1]))
+      expect(face).toBeCloseTo(passage.width / 2, 9)
+    }
+  })
+
+  it('leaves no lateral gap beside the sill anywhere along the run', () => {
+    /*
+     * The fault this pins. The passage used to be a 1.1 m plank with nothing on
+     * its sides: boxAt clamps every wall box to WALL_BOX_THICKNESS at the room
+     * face, so past ~4.14 m of radius the drum carries no collider at ANY
+     * azimuth, and this passage is 4.9 m deep. From 0.85 m off the centreline —
+     * half the doorway plus a capsule radius — the walker ran out of plank,
+     * fell 2 m onto the site's ground cylinder, which runs under the tower, and
+     * ended up standing inside solid drawn masonry.
+     */
+    const { sill, jambs } = entrancePassageBoxes(passage)
+    const spans = [sill, ...jambs].map((b) => frame(b, passage.azimuthDeg))
+    const reach = passage.width / 2 + PLAYER.radius
+
+    for (let r = passage.innerRadius; r <= passage.outerRadius + 1e-9; r += 0.05) {
+      const here = spans
+        .filter((s) => s.r[0] <= r + 1e-9 && s.r[1] >= r - 1e-9)
+        .map((s): [number, number] => [...s.t])
+        .sort((a, b) => a[0] - b[0])
+
+      const merged: Array<[number, number]> = []
+      for (const [lo, hi] of here) {
+        const last = merged[merged.length - 1]
+        if (last && lo <= last[1] + 1e-9) last[1] = Math.max(last[1], hi)
+        else merged.push([lo, hi])
+      }
+
+      const where = `radius ${r.toFixed(2)} m`
+      // one solid band, not three islands: any gap at all is a way off the sill
+      expect(merged, where).toHaveLength(1)
+      // and it closes further out than the capsule can reach from the centreline
+      expect(merged[0][0], where).toBeLessThanOrEqual(-reach)
+      expect(merged[0][1], where).toBeGreaterThanOrEqual(reach)
+    }
   })
 })
 
