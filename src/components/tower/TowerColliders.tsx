@@ -142,6 +142,44 @@ export function TowerColliders({
       )
     })
 
+    /*
+     * THE ROOF DECK, which is walked on and was not carried.
+     *
+     * The last lift climbs from storey 8 to `TOP_OF_FLOORS` — the level this same
+     * expression already marks as a wall band boundary a few lines up, and the
+     * level config/tower.ts hands the 8→roof lift as its toY. FLOORS stops at
+     * storey 8, so the loop above emitted nothing here, and the parapet band is a
+     * vertical ring of wall boxes, which holds a walker in but does not hold one
+     * up. The walker therefore arrived at the head of the last flight with
+     * nothing underfoot, on drawn deck (FloorStructures' ceiling fill tops out
+     * exactly here), and fell 3.28 m to storey 8. Same class of fault as the
+     * stairwell wedge that used to be dropped whole out of a slab.
+     *
+     * It is NOT a floor slab — it is the top of the masonry mass, which is why it
+     * has no FLOORS entry and no stairwell cut in App.tsx — but the walker cannot
+     * tell the difference, so it gets a ring like any storey.
+     *
+     * FLUSH, never proud. floorColliders() hangs its boxes BELOW floorY, so the
+     * surface lands exactly on the level the last tread and the head landing sit
+     * at, and the walker steps off the landing onto it sideways. A deck a
+     * centimetre higher would be a lip, and this controller will not climb a lip
+     * of any height — measured, it refused 0.20 m with autostep at 0.60.
+     */
+    const deckY = TOWER.topY - TOWER.parapetHeight
+    floors.push(
+      ...floorColliders({
+        sectors: Math.min(sectors, 24),
+        floorY: deckY,
+        thickness: TOWER.floorSlab,
+        // the same rule the storeys follow: the hole in a surface is cut by the
+        // vault BELOW it. Storey 8's vault is closed, so the deck is unbroken.
+        oculusRadius: FLOORS[FLOORS.length - 1].oculusRadius,
+        // out to the room face, where the parapet band's inner face begins — the
+        // two are the same radius at this height, so they meet without a seam
+        outerRadius: innerRadiusAt(deckY),
+      }),
+    )
+
     return [...walls, ...floors]
   }, [stairPassage, stairwells, doorways, sectors])
 
