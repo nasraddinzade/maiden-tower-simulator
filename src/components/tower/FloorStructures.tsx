@@ -267,6 +267,7 @@ function FloorSlab({
   thickness,
   y,
   solid,
+  onBedrock,
   cut,
   material,
   xray,
@@ -276,14 +277,21 @@ function FloorSlab({
   holeR: number
   thickness: number
   y: number
+  /** No hole in the middle — draw a full disc rather than a ring. */
   solid: boolean
+  /**
+   * This floor IS the top of the plinth, and the shell already draws it. The
+   * only such floor is storey 1; see the branch below for why the distinction
+   * had to be made explicit rather than inferred from `solid`.
+   */
+  onBedrock?: boolean
   cut: StairwellCut | undefined
   material?: THREE.Material
   xray?: boolean
   segments?: number
 }) {
   const ring = useSlabGeometry(innerR, holeR, thickness, y, cut, segments)
-  if (solid) {
+  if (onBedrock) {
     /*
      * Storey 1 rests on the rock, and the SHELL already draws that surface.
      *
@@ -309,6 +317,29 @@ function FloorSlab({
      * of one material instead of a dark disc in a light room.
      */
     return null
+  }
+  if (solid) {
+    /*
+     * Every OTHER unpierced floor is a real slab and has to be drawn. It is
+     * bedded into the wall by WALL_EMBED: built at innerR exactly, its edge and
+     * the wall face coincide, and the polygonal mismatch between a coarse lathe
+     * and the shell's 96-segment drum opens a ring slit right round the room —
+     * 3.5 mm at the full lathe, 111 mm at the coarsest LOD.
+     *
+     * This branch was briefly deleted along with storey 1's, on the reasoning
+     * that the shell already draws the surface. It does — but only at the
+     * bottom of the cavity. Storeys 3, 5, 6 and 8 hang in the middle of it with
+     * nothing beneath them, so returning null there did not remove a duplicate,
+     * it removed the floor. Hence the two separate flags: `onBedrock` is the one
+     * floor the shell also draws, `solid` is merely a floor without a hole.
+     */
+    const outer = innerR + WALL_EMBED
+    return (
+      <mesh position={[0, y - thickness / 2, 0]} material={material} receiveShadow>
+        <cylinderGeometry args={[outer, outer, thickness, segments ?? RADIAL_SEGMENTS]} />
+        {!material && <meshStandardMaterial color="#a89f8c" roughness={0.95} />}
+      </mesh>
+    )
   }
   if (material) return <mesh geometry={ring} material={material} receiveShadow />
   return (
@@ -400,7 +431,7 @@ export function FloorStructures({
 }: FloorStructuresProps) {
   return (
     <group>
-      {FLOORS.map((f) => {
+      {FLOORS.map((f, i) => {
         /*
          * Scale factor, not a value: `oculusRadius` from leva is compared against
          * the config default so a untouched control leaves the survey alone.
@@ -483,6 +514,7 @@ export function FloorStructures({
                 thickness={TOWER.floorSlab}
                 y={f.floorY}
                 solid={!f.hasFloorOpening}
+                onBedrock={i === 0}
                 cut={throughFloor}
                 material={xray ? undefined : material}
                 xray={xray}
