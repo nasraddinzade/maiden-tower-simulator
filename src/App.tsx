@@ -30,6 +30,7 @@ import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAnd
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
 import { windowCentreY, type WindowSpec } from './lib/windows'
+import { WindowGrilles } from './components/tower/WindowGrilles'
 import windowData from './data/windows.json'
 import { TowerWireframe } from './components/tower/TowerWireframe'
 import { TowerShell, type ShellStats } from './components/tower/TowerShell'
@@ -435,6 +436,11 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
           onStats={onStats}
         />
       )}
+      {/*
+        The grilles go with the shell: they exist only where its openings do, and
+        without the shell there are no openings to cover.
+      */}
+      {showShell && !cutaway && windows && <WindowGrilles windows={windows} />}
       {showWireframe && (
         <TowerWireframe showInner showFloors showScaleRef={false} showFeatures={false} />
       )}

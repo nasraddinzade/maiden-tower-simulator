@@ -8,6 +8,8 @@ import {
   type WindowSpec,
   windowCentreY,
   centreYDrift,
+  windowStoreyIndex,
+  sillAboveFloor,
 } from './windows'
 import windowData from '../data/windows.json'
 import { FLOORS, SITE, TOWER, wallThicknessAt } from '../config/tower'
@@ -187,5 +189,36 @@ describe('window height comes from the photograph, not from the storey', () => {
      */
     const worst = Math.max(...drifts.map((d) => Math.abs(d.drift)))
     expect(worst).toBeGreaterThan(1)
+  })
+})
+
+describe('which storey an opening actually lights', () => {
+  const windows = windowData.windows as WindowSpec[]
+  const floorYs = FLOORS.map((f) => f.floorY)
+  const storeyOf = (w: WindowSpec) => windowStoreyIndex(w, floorYs, TOWER.groundY, TOWER.height)
+
+  it('never puts an opening below the floor it is said to light', () => {
+    for (const w of windows) {
+      expect(sillAboveFloor(w, floorYs, TOWER.groundY, TOWER.height)).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it('rises monotonically with the opening, so the mapping cannot double back', () => {
+    const byHeight = [...windows].sort((a, b) => a.heightFraction - b.heightFraction)
+    for (let i = 1; i < byHeight.length; i += 1) {
+      expect(storeyOf(byHeight[i])).toBeGreaterThanOrEqual(storeyOf(byHeight[i - 1]))
+    }
+  })
+
+  it("disagrees with the file's own floorIndex, which is the point", () => {
+    /*
+     * Not a tolerance. floorIndex was written against the old
+     * floorIndex + heightAboveFloor formula and several entries no longer match
+     * where the photographs put the opening. This asserts the disagreement is
+     * real so nobody quietly starts trusting the field again; if a survey ever
+     * rewrites windows.json, this fails and should then be deleted.
+     */
+    const disagreeing = windows.filter((w) => storeyOf(w) !== w.floorIndex)
+    expect(disagreeing.length).toBeGreaterThan(0)
   })
 })

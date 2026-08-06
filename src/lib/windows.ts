@@ -138,3 +138,46 @@ export function centreYDrift(
     return { id: w.id, fromFraction, fromSill, drift: fromFraction - fromSill }
   })
 }
+
+/**
+ * Which storey an opening actually lights, derived from where it IS.
+ *
+ * windows.json also carries a `floorIndex`, and it is no longer trustworthy: it
+ * was written when geometry came from floorIndex + heightAboveFloor, so it names
+ * the storey the old formula would have put the opening in. Once heights started
+ * coming from the photographs, several openings moved past a slab — lower-1 is
+ * filed under storey 3 and lights storey 2; upper-2 is filed under storey 6 and
+ * its sill is level with storey 7's floor.
+ *
+ * The storey lit is the one whose floor is the highest floor at or below the
+ * opening's SILL, not its centre: a slit whose sill is above a slab lights the
+ * room above it however far its head reaches.
+ */
+export function windowStoreyIndex(
+  w: WindowSpec,
+  floorYs: number[],
+  groundY: number,
+  height: number,
+): number {
+  const sill = windowCentreY(w, groundY, height) - w.outerHeight / 2
+  let best = 0
+  for (let i = 0; i < floorYs.length; i += 1) if (floorYs[i] <= sill) best = i
+  return best
+}
+
+/**
+ * How far an opening's sill stands above the floor of the room it lights.
+ *
+ * Negative where the sill is below that floor, which happens when a slit
+ * straddles a slab — the reason to report the number rather than assume it is
+ * positive.
+ */
+export function sillAboveFloor(
+  w: WindowSpec,
+  floorYs: number[],
+  groundY: number,
+  height: number,
+): number {
+  const sill = windowCentreY(w, groundY, height) - w.outerHeight / 2
+  return sill - floorYs[windowStoreyIndex(w, floorYs, groundY, height)]
+}

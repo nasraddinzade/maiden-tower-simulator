@@ -675,6 +675,31 @@ export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair
 //   - Ø 0.7 m is almost certainly the BORE, not the mouth — the photographs show
 //     a funnel collar visibly wider than the shaft below it, so modelling 0.7 m
 //     at floor level will look narrower than every reference photograph.
+/**
+ * The grilles over the openings.
+ *
+ * MODERN FABRIC, and in scope: CLAUDE.md lists window grilles among the
+ * insertions the 2026 target state includes. The tower's slits carry a plain
+ * welded grid, set back in the reveal rather than flush with the face.
+ *
+ * Every number here is [ESTIMATE] and none of it can be measured from what we
+ * have: the exterior photographs resolve the grid as a texture, not as bars, and
+ * no interior frame shows one close enough to count. What they do establish is
+ * the character — a coarse grid of a few bars each way, not a fine mesh and not
+ * a single stanchion — so the values are chosen to read as that at walking
+ * distance and are deliberately round, to look like the guesses they are.
+ */
+export const WINDOW_GRILLE = {
+  /** Square bar, side in metres. [ESTIMATE] */
+  barSide: 0.02,
+  /** Clear gap between bars, both ways. [ESTIMATE] */
+  gap: 0.12,
+  /** Set back from the outer face, so the grid sits inside the reveal. [ESTIMATE] */
+  inset: 0.1,
+  /** How far each bar runs past the opening into the jamb. [ESTIMATE] */
+  embed: 0.05,
+} as const
+
 export const WELL = {
   diameter: 0.7, // m — [ref]; see the note above on bore vs mouth
   /**
