@@ -488,6 +488,7 @@ export const STAIR: {
   startAzimuthDeg: number
   doorwayWidth: number
   landingLength: number
+  endLandingLength: number
 } = {
   winding: 'counterclockwise', // from photographs; contradicts the spec's assumed clockwise
   riserTarget: 0.2, // m — spec band 0.18–0.22; the real riser is rounded to fit each storey
@@ -552,6 +553,22 @@ export const STAIR: {
    * turn, not its length.
    */
   landingLength: 1.2,
+
+  /**
+   * m — the level platform inside the passage at each end of a flight.
+   * [ESTIMATE], and the smallest one that is honestly a landing.
+   *
+   * There has to be something here. Without it the doorway opens straight onto
+   * the nosing of the first step, with the passage's end cap a doorway's depth
+   * behind it, and from the chamber that reads as a raw rectangular pocket in
+   * the wall — which is what the owner saw and called unhewn. A stair in a wall
+   * is entered onto a landing.
+   *
+   * 0.9 m is three treads at the 0.3 m going: enough to stand on with the door
+   * behind you before the first riser, and short enough that four of them (two
+   * flights' worth) do not push the stack round the drum. No source gives it.
+   */
+  endLandingLength: 0.9,
 }
 
 // ———————————————————— vertical circulation, 2026 ————————————————————

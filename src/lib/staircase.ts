@@ -70,6 +70,17 @@ export interface FlightParams {
   landingsAtY?: number[]
   /** Arc length of each landing along the walking line, metres. */
   landingLength?: number
+  /**
+   * Arc length of the LEVEL PLATFORM at each end of the flight, metres.
+   *
+   * Without it a doorway opens straight onto the nosing of the first step, and
+   * behind the doorway's own depth there is nothing but the end cap of the
+   * passage — which reads from the chamber as a raw rectangular pocket cut into
+   * the wall, flat-faced and unfinished, because that is exactly what it is. A
+   * stair in a wall is entered onto a landing; the landing is what the doorway
+   * opens onto and what hides the cut.
+   */
+  endLandingLength?: number
 }
 
 export interface StepPlacement {
@@ -139,7 +150,13 @@ export function planFlight(p: FlightParams): StepPlacement[] {
     1,
     Math.round((p.landingLength ?? p.goingTarget * 4) / p.goingTarget),
   )
+  const endTreads = p.endLandingLength
+    ? Math.max(1, Math.round(p.endLandingLength / p.goingTarget))
+    : 0
   let next = 0
+
+  // the landing you step onto from the room, level with its floor
+  for (let k = 0; k < endTreads; k++) emit(p.fromY)
 
   for (let i = 0; i < count; i++) {
     // tread i is the surface you arrive on after climbing i+1 risers
@@ -156,6 +173,10 @@ export function planFlight(p: FlightParams): StepPlacement[] {
       next += 1
     }
   }
+
+  // and the landing at the head, level with the floor the flight arrives on
+  for (let k = 0; k < endTreads; k++) emit(p.toY)
+
   return steps
 }
 
@@ -223,6 +244,8 @@ export interface StairSettings {
   startAzimuthDeg: number
   /** Arc length of a landing along the walking line, metres. */
   landingLength?: number
+  /** Arc length of the level platform at each end of a flight, metres. */
+  endLandingLength?: number
 }
 
 /** The part of a lift this function needs: two heights and nothing else. */
@@ -283,6 +306,7 @@ export function planAllFlights(
       winding: cfg.winding,
       landingsAtY: run.landingsAtY,
       landingLength: cfg.landingLength,
+      endLandingLength: cfg.endLandingLength,
     })
 
   return runs.map((run) => {
@@ -304,10 +328,29 @@ export function planAllFlights(
      * you would not notice in the building and is the honest cost of the landing
      * being real.
      */
-    const landingArc = first.reduce(
-      (arc, s, k) => (k > 0 && s.treadY === first[k - 1].treadY ? arc + s.angularWidthDeg : arc),
-      0,
-    )
+    /*
+     * Only the landings INSIDE the climb are paid for.
+     *
+     * The platforms at the two ends consume arc as well, but every flight has
+     * the same ones, so they shift the whole stack together and parallelism
+     * survives. An interior landing is different: it belongs to one flight only,
+     * and past it that flight falls behind the others.
+     */
+    const firstRise = first.findIndex((s, k) => k > 0 && s.treadY > first[k - 1].treadY)
+    let lastRise = -1
+    first.forEach((s, k) => {
+      if (k > 0 && s.treadY > first[k - 1].treadY) lastRise = k
+    })
+    const landingArc =
+      firstRise < 0
+        ? 0
+        : first.reduce(
+            (arc, s, k) =>
+              k > firstRise && k < lastRise && s.treadY === first[k - 1].treadY
+                ? arc + s.angularWidthDeg
+                : arc,
+            0,
+          )
     if (landingArc === 0) return first
     return plan(run, cfg.startAzimuthDeg - windingSign(cfg.winding) * landingArc)
   })
@@ -699,12 +742,28 @@ export function stairDoorways(
     const riser = flightRiser(all)
     const stepAngle = all.length > 1 ? all[1].azimuthDeg - all[0].azimuthDeg : 1
     /*
+     * A doorway now stands on a LANDING at each end of a flight, and a landing is
+     * level. Raking its threshold with the flight's average gradient tilts a sill
+     * that has no gradient under it — which is how the roof exit came to have a
+     * wedge of stone leaning over it, and it would happen at every doorway now.
+     * So the rake is measured locally, from the treads the opening actually
+     * spans, and comes out zero on a landing without a special case.
+     */
+    const localRise = (() => {
+      const arcHalf = (doorwayWidth / 2 / Math.max(0.5, s.midRadius)) * (180 / Math.PI)
+      const near = all.filter((t) => Math.abs(t.azimuthDeg - s.azimuthDeg) <= arcHalf * 1.5)
+      if (near.length < 2) return 0
+      const ys = near.map((t) => t.treadY)
+      return Math.max(...ys) - Math.min(...ys)
+    })()
+    /*
      * The stair's own gradient, expressed the way the cutter needs it: metres of
      * rise per metre of travel round the arc, positive toward increasing
      * azimuth. `stepAngle` carries the winding's sign, so this comes out
      * negative on a counterclockwise stair without a special case.
      */
-    const rake = riser / stepAngle / (Math.max(0.5, s.midRadius) * (Math.PI / 180))
+    const rake =
+      localRise < 1e-6 ? 0 : riser / stepAngle / (Math.max(0.5, s.midRadius) * (Math.PI / 180))
 
     // where the passage bed sits directly under the doorway's centre line
     const bedAtCentre =
