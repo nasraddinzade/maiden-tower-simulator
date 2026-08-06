@@ -25,7 +25,7 @@ export interface BoxSpec {
   /** Orientation as a quaternion (x, y, z, w). */
   quaternion: [number, number, number, number]
   /** What this box is, for the F4 debug view and for tests. */
-  kind: 'wall' | 'passageOuter' | 'floor' | 'ramp'
+  kind: 'wall' | 'passageOuter' | 'floor' | 'ramp' | 'guard'
 }
 
 /**
@@ -379,6 +379,85 @@ export function floorColliders(p: FloorColliderParams): BoxSpec[] {
       position: [Math.sin(rad) * mid, p.floorY - p.thickness / 2, -Math.cos(rad) * mid],
       quaternion: yawThenTilt(radialYaw(rad), 0),
       kind: 'floor',
+    })
+  }
+  return out
+}
+
+/**
+ * Radial thickness of a guard-ring collider box, metres.
+ *
+ * Deliberately thicker than the glass it stands for. OPENING_GUARD.thickness is
+ * 20 mm, and 20 mm is thinner than a solver step: WALL_BOX_THICKNESS's note runs
+ * this same sum the other way — at 1.4 m/s and 30 fps the walker covers 0.047 m
+ * between steps, 0.087 m at the run speed. A pane-thin collider is exactly the
+ * shape a contact can be missed on, and the thing missing it falls down the hole
+ * the guard exists to close. 0.12 m is more than the worst step and still well
+ * under a 0.3 m capsule radius, so the walker is never stopped anywhere they
+ * could see they had room to stand.
+ */
+const GUARD_BOX_THICKNESS = 0.12
+
+export interface GuardRingParams {
+  /** Boxes round the ring. */
+  sectors: number
+  /** Radius of the opening being guarded. This is the ring's INNER face. */
+  openingRadius: number
+  /** World Y of the floor surface the guard stands on. */
+  floorY: number
+  /** Height of the guard above that surface. */
+  height: number
+  /** Radial thickness of the boxes; defaults to GUARD_BOX_THICKNESS. */
+  thickness?: number
+}
+
+/**
+ * A closed ring of boxes standing on a floor round a hole in it.
+ *
+ * The ring grows OUTWARD from the opening's edge, and that is the whole of its
+ * collision design. floorColliders() ends its annulus at exactly `oculusRadius`,
+ * so putting the guard's inner face on the same radius makes floor and guard
+ * meet on one plane: no strip of unguarded floor between them, and nothing
+ * standing over the void with no slab under it.
+ *
+ * It is a WALL, not a step, which is the distinction this controller cares
+ * about. Its bottom face is flush with the floor surface — floorColliders hangs
+ * its boxes below floorY, so there is no lip at the join in either direction —
+ * and its only horizontal face is the top, a metre up, far past anything the
+ * autostep will try to mount. The walker walks into it and stops, the way they
+ * stop at a wall. Nothing here has to be climbed, so the rule that governs every
+ * walking surface in this model — ramps, never lips — simply does not apply: a
+ * guard the walker COULD get onto would be a launch pad into the hole.
+ *
+ * Rapier has no annulus, so the ring is segments, like the floors. Each box's
+ * inner face is tangent to the opening at its own azimuth, which leaves the free
+ * space a hair wider at the corners than the drawn circle — 21 mm on a 1.2 m
+ * ring at 16 sectors, against a 300 mm capsule.
+ */
+export function guardRingBoxes(p: GuardRingParams): BoxSpec[] {
+  const out: BoxSpec[] = []
+  if (p.openingRadius <= 0 || p.height <= 0 || p.sectors < 3) return out
+
+  const thickness = p.thickness ?? GUARD_BOX_THICKNESS
+  const sectorDeg = 360 / p.sectors
+  // half-chord taken at the OUTER face, as floorColliders does: measured at the
+  // mid radius the corners fall short of the sector and a gap opens between
+  // neighbours — narrow, but the thing on the far side of it is a drop
+  const halfChord = (p.openingRadius + thickness) * Math.tan((sectorDeg / 2) * DEG) * 1.06
+  const midRadius = p.openingRadius + thickness / 2
+
+  for (let s = 0; s < p.sectors; s++) {
+    const rad = (s * sectorDeg + sectorDeg / 2) * DEG
+    out.push({
+      halfExtents: [thickness / 2, p.height / 2, halfChord],
+      position: [
+        Math.sin(rad) * midRadius,
+        // stands ON the surface: floorColliders hangs its slab below floorY
+        p.floorY + p.height / 2,
+        -Math.cos(rad) * midRadius,
+      ],
+      quaternion: yawThenTilt(radialYaw(rad), 0),
+      kind: 'guard',
     })
   }
   return out

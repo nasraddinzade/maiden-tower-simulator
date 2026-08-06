@@ -288,6 +288,13 @@ export interface FloorSpec {
  * storey-8 opening measures ~0.5 m smaller than storey 5's; that difference is
  * visible in the footage but sits only just outside the method's own tolerance,
  * so treat it as likely rather than settled.
+ *
+ * That guard is fabric and is now built — config/modern.ts, OPENING_GUARD for
+ * its height and GUARDED_OPENINGS for which of these three holes carries one.
+ * Note which way the dependency runs before quoting either at the other: the
+ * guard's height is the ASSUMED ruler these figures were read against, not a
+ * second measurement that corroborates them. The numbers below are frozen
+ * results, not expressions in it, so correcting the guard does NOT correct them.
  */
 const OPENINGS: Record<number, { radius: number; note: string }> = {
   // keyed by the index of the storey whose VAULT is pierced

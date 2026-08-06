@@ -1,7 +1,14 @@
 import { useMemo } from 'react'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import { ENTRANCE, FLOORS, TOWER, innerRadiusAt } from '../../config/tower'
-import { floorColliders, wallColliders, type BoxSpec, type PassageWindow } from '../../lib/collision'
+import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
+import {
+  floorColliders,
+  guardRingBoxes,
+  wallColliders,
+  type BoxSpec,
+  type PassageWindow,
+} from '../../lib/collision'
 import type { PassageSection, StairDoorway } from '../../lib/staircase'
 import type { StairwellCut } from './FloorStructures'
 
@@ -180,7 +187,39 @@ export function TowerColliders({
       }),
     )
 
-    return [...walls, ...floors]
+    /*
+     * THE GLASS GUARDS round the floor openings.
+     *
+     * floorColliders() cuts each pierced slab back to the opening radius and
+     * stops there, which is correct — dropping through an oculus should land you
+     * on the floor below, and that is what an oculus is. What was missing is the
+     * thing standing at that edge. config/tower.ts's OPENINGS diameters were
+     * MEASURED against a frameless glass guard, so the guard is documented in
+     * the same sentence as the holes; the model drew the holes and not the
+     * guard, leaving two unfenced drops of 1.4 and 2.4 m across in surfaces the
+     * walker crosses on the way up.
+     *
+     * Which openings get one, and why storey 2's does not, is argued out in
+     * GUARDED_OPENINGS. The rings are built here rather than in
+     * FloorStructures for the reason at the top of that file: structure is
+     * drawn, collision is primitives, and the two never come off one mesh.
+     */
+    const guards: BoxSpec[] = []
+    for (const g of GUARDED_OPENINGS) {
+      guards.push(
+        ...guardRingBoxes({
+          // a 1.2 m ring does not need the drum's 32: at 16 the chord is 0.23 m
+          // and the corners stand 0.02 m proud of the circle, against a 0.3 m
+          // capsule. Still taken off `sectors` so it can never exceed the drum's.
+          sectors: Math.min(sectors, 16),
+          openingRadius: g.radius,
+          floorY: g.floorY,
+          height: OPENING_GUARD.height,
+        }),
+      )
+    }
+
+    return [...walls, ...floors, ...guards]
   }, [stairPassage, stairwells, doorways, sectors])
 
   onCount?.(boxes.length)

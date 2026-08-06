@@ -139,3 +139,94 @@ export const MODERN_SPIRAL_VS_OPENING = {
     return this.spiralDiameter - 0.4 <= this.openingDiameter + 0.3
   },
 }
+
+// ————————————————— the glass guards round the openings —————————————————
+
+/**
+ * The frameless glass guard standing round each pierced floor opening.
+ *
+ * config/tower.ts's OPENINGS table was measured AGAINST this thing. Every one of
+ * those three diameters is a RATIO read off a frame — the opening's width against
+ * "the frameless glass guard round each opening", taken as 1.00–1.10 m. So the
+ * guard is the ruler the holes were measured with, and until now it was the one
+ * object in that sentence the model did not build: the openings were drawn as
+ * bare holes in a walking surface, 1.4 to 2.4 m across.
+ *
+ * Which fixes what the height below may and may not be quoted as. It is NOT an
+ * independent measurement of the guard, and reading it as one would be circular
+ * — it is the assumed reference size, exactly like the 150–170 mm head breadth
+ * that scales MODERN_SPIRAL.riser. What supports it is only that 1.00–1.10 m is
+ * the ordinary height for a guard, and that the two others in this model —
+ * EXTERNAL_STAIR.guardHeight 1.05 [ASSUMPTION] and MODERN_SPIRAL.guardHeight
+ * 1.0 ±0.2 [VIDEO] — were arrived at down separate routes and land in the band.
+ */
+export const OPENING_GUARD = {
+  /**
+   * m — height of the pane above the floor. [ASSUMPTION] 1.00–1.10 m, midpoint.
+   *
+   * The band is config/tower.ts's own; the midpoint is this file's choice,
+   * because nothing in the footage picks a value inside it. Moving it moves the
+   * drawn guard and the collider together, and does NOT move the openings —
+   * those diameters are frozen numbers in the OPENINGS table, not expressions in
+   * this constant. If the guard is ever really measured, the openings have to be
+   * re-derived by hand.
+   */
+  height: 1.05,
+  /**
+   * m — pane thickness. [ESTIMATE].
+   *
+   * Nothing measures it and the footage could not: a pane seen edge-on across a
+   * chamber is a pixel or two. 20 mm is the ordinary thickness of a frameless
+   * laminated toughened guard, and frameless is what the frames show — glass
+   * standing off the floor with no posts and no cap rail, which is why none are
+   * drawn either. It is here only because a drawn ring must have SOME thickness.
+   * Nothing depends on it: guardRingBoxes pins the collider's face to the
+   * OPENING's edge rather than to the pane, so whether this is 12 mm or 25 mm
+   * changes where the walker is stopped by nothing at all.
+   */
+  thickness: 0.02,
+} as const
+
+/** Storeys the modern spiral arrives in — the well it rises through is theirs. */
+const SPIRAL_WELL_FLOOR_INDICES = new Set(
+  LIFTS.filter((l) => l.kind === 'modernSpiral').map((l) => l.toFloorNumber - 1),
+)
+
+export interface GuardedOpening {
+  /** 0-based index of the storey whose FLOOR the hole is in. */
+  floorIndex: number
+  /** World Y of that floor's walking surface — the guard stands on it. */
+  floorY: number
+  /** Radius of the hole, from the vault BELOW, which is the one that cuts it. */
+  radius: number
+}
+
+/**
+ * Which openings actually get a guard, and where each one stands.
+ *
+ * Two exclusions are doing the work, and both are geometry rather than taste.
+ *
+ * A guard stands on a FLOOR, never under a vault. OPENINGS is keyed by the
+ * storey whose vault is pierced — 1, 4 and 7 — but the fall is off the floor
+ * ABOVE each of those: storeys 2, 5 and 8, which is what hasFloorOpening marks.
+ * Ringing the vaults would hang three glass collars in the ceilings.
+ *
+ * And storey 2 is then dropped, which is the judgement call here. That hole is
+ * the well the modern steel spiral rises through, and the spiral is WIDER than
+ * it: MODERN_SPIRAL_VS_OPENING records the conflict a few lines up — Ø 2.2 m
+ * ±0.4 of stair coming up through Ø 1.8 m ±0.3 of hole. A ring standing on the
+ * opening's edge therefore stands inside the flight, and a walker arriving at
+ * the top tread arrives inside the ring. It would not guard them; it would cage
+ * them, on the one stair that is the only link from the entry chamber to storey
+ * 2 — the visitor route's first turn. The real well must be guarded with a gap
+ * at the landing, and finding where that gap is means replanning the flight to
+ * get the last tread's azimuth. That is a separate job. Until it is done the
+ * well is left open, as it already was, rather than sealed in the wrong place.
+ */
+export const GUARDED_OPENINGS: GuardedOpening[] = FLOORS.filter(
+  (f) => f.hasFloorOpening && !SPIRAL_WELL_FLOOR_INDICES.has(f.index),
+).map((f) => ({
+  floorIndex: f.index,
+  floorY: f.floorY,
+  radius: FLOORS[f.index - 1].oculusRadius,
+}))

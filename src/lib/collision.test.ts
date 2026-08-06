@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   entrancePassageBoxes,
   floorColliders,
+  guardRingBoxes,
   rotate,
   stairRampBoxes,
   wallColliders,
@@ -315,6 +316,88 @@ describe('floorColliders', () => {
     const radii = corners(b).map((c) => c[0] * radialDir[0] + c[2] * radialDir[2])
     expect(Math.min(...radii)).toBeCloseTo(1.2, 6)
     expect(Math.max(...radii)).toBeCloseTo(3.42, 6)
+  })
+})
+
+describe('guardRingBoxes', () => {
+  // storey 5's opening: the widest of the three, on a floor 13.6 m up
+  const guard = { sectors: 16, openingRadius: 1.2, floorY: 13.625, height: 1.05 }
+
+  it('stands on the floor surface, neither sunk into it nor floating', () => {
+    /*
+     * floorColliders hangs its slab BELOW floorY, so the walking surface IS
+     * floorY. A guard sunk under it leaves the top of the pane low; a guard
+     * floating above it leaves a slot at ankle height at the edge of a drop.
+     */
+    for (const b of guardRingBoxes(guard)) {
+      const ys = corners(b).map((c) => c[1])
+      expect(Math.min(...ys)).toBeCloseTo(guard.floorY, 9)
+      expect(Math.max(...ys)).toBeCloseTo(guard.floorY + guard.height, 9)
+    }
+  })
+
+  it('meets the floor collider on one plane at the opening edge', () => {
+    /*
+     * The pairing that matters. floorColliders ends its annulus at oculusRadius
+     * and the guard starts there, so there is no strip of unguarded floor
+     * between them and no part of the ring standing over the void with no slab
+     * beneath it.
+     */
+    const floor = floorColliders({
+      sectors: 24,
+      floorY: guard.floorY,
+      thickness: 0.3,
+      oculusRadius: guard.openingRadius,
+      outerRadius: 3.939,
+    })
+    for (const b of floor) expect(innerFaceRadius(b)).toBeCloseTo(guard.openingRadius, 6)
+    for (const b of guardRingBoxes(guard)) {
+      expect(innerFaceRadius(b)).toBeCloseTo(guard.openingRadius, 6)
+      // and it grows OUTWARD from that edge, never inward over the hole
+      expect(Math.hypot(b.position[0], b.position[2])).toBeGreaterThan(guard.openingRadius)
+    }
+  })
+
+  it('leaves no gap between neighbours for a walker to slip through', () => {
+    for (const sectors of [12, 16, 24]) {
+      const sectorDeg = 360 / sectors
+      for (const b of guardRingBoxes({ ...guard, sectors })) {
+        const faceRadius = Math.hypot(b.position[0], b.position[2]) + b.halfExtents[0]
+        expect(b.halfExtents[2]).toBeGreaterThan(faceRadius * Math.tan((sectorDeg / 2) * DEG))
+      }
+    }
+  })
+
+  it('is a barrier and not a lip — nothing the controller has to mount', () => {
+    /*
+     * The rule the whole collision model is built round: this controller will
+     * not climb a vertical face of any height, so every walking surface has to
+     * be a ramp. A guard is the one shape that must NOT be walkable — its only
+     * horizontal face is the top of the pane, and if the autostep could reach
+     * that the guard would be a launch pad into the hole rather than a fence.
+     */
+    for (const b of guardRingBoxes(guard)) {
+      const top = Math.max(...corners(b).map((c) => c[1]))
+      expect(top - guard.floorY).toBeGreaterThan(PLAYER.autostepMaxHeight)
+    }
+  })
+
+  it('is thicker than a solver step, so a contact cannot be missed', () => {
+    /*
+     * WALL_BOX_THICKNESS's argument, run the other way. The drawn pane is 20 mm
+     * and the walker covers 0.087 m between steps at the run speed — a
+     * pane-thin collider is exactly the shape a sweep can pass, and what is on
+     * the far side of this one is a drop of a storey.
+     */
+    const worstStep = PLAYER.runSpeed / 30
+    for (const b of guardRingBoxes(guard)) {
+      expect(b.halfExtents[0] * 2).toBeGreaterThan(worstStep)
+    }
+  })
+
+  it('builds nothing for an opening that is not there', () => {
+    expect(guardRingBoxes({ ...guard, openingRadius: 0 })).toHaveLength(0)
+    expect(guardRingBoxes({ ...guard, height: 0 })).toHaveLength(0)
   })
 })
 

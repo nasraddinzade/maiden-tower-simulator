@@ -4,6 +4,7 @@ import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from '../../lib/cupola'
 import { azimuthToVector } from '../../lib/geometry'
 import { FLOORS, TOWER, innerRadiusAt } from '../../config/tower'
+import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import { isStoreyVisible, lodSegments } from '../../lib/visibility'
 
 /** Where a flight breaks through the structure above, in plan. */
@@ -316,6 +317,51 @@ function FloorSlab({
 }
 
 /**
+ * The frameless glass guard standing round a pierced floor opening.
+ *
+ * Modern fabric, drawn by default on this repo's own rule — you can put a hand
+ * on it, so it is not a diagram — and it is the object config/tower.ts measured
+ * the openings AGAINST: each of those three diameters is a ratio against this
+ * guard's height. The model has been drawing the holes and not the thing round
+ * them ever since the survey landed.
+ *
+ * Frameless means frameless: no posts, no cap rail, nothing but the pane. The
+ * footage shows glass standing off the floor on its own, and a handrail here
+ * would be a fitting nobody has seen. The pane's INNER face sits on the opening's
+ * edge, so the guard takes nothing off the surveyed diameter — which is also how
+ * the diameter was read, the guard being the thing standing at the rim.
+ *
+ * Same material as the wellhead's cover in WaterSystem, deliberately: both are
+ * the post-2013 visitor fit-out and they should read as one hand.
+ */
+function OpeningGuard({
+  radius,
+  floorY,
+  segments,
+}: {
+  radius: number
+  floorY: number
+  segments?: number
+}) {
+  const midRadius = radius + OPENING_GUARD.thickness / 2
+  return (
+    <mesh position={[0, floorY + OPENING_GUARD.height / 2, 0]}>
+      <cylinderGeometry
+        args={[midRadius, midRadius, OPENING_GUARD.height, segments ?? RADIAL_SEGMENTS, 1, true]}
+      />
+      <meshPhysicalMaterial
+        color="#cfe3ea"
+        transparent
+        opacity={0.22}
+        roughness={0.06}
+        metalness={0}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  )
+}
+
+/**
  * Phase 3 — the eight storeys' ceilings and floors.
  *
  * Each storey's opening comes from ITS OWN surveyed radius, not from one figure
@@ -356,6 +402,8 @@ export function FloorStructures({
         const vaultOpening = f.oculusRadius * openingScale
         /** The hole in THIS storey's floor is cut by the vault BELOW it. */
         const slabOpening = (FLOORS[f.index - 1]?.oculusRadius ?? 0) * openingScale
+        /** Whether that hole is one of the ones a glass guard rings. */
+        const guarded = GUARDED_OPENINGS.some((g) => g.floorIndex === f.index)
         // Phase 11: a closed storey three floors away is never visible, so it is
         // not drawn; the ones just above and below drop to a coarser lathe.
         if (!isStoreyVisible(f.index, viewerStorey, { showAll: showAllStoreys })) return null
@@ -432,6 +480,22 @@ export function FloorStructures({
                 segments={segments}
               />
               </Solid>
+            )}
+            {/*
+              Goes with the floor, not with the vault: no floor drawn means no
+              hole drawn, and a glass ring standing in mid-air over an unbroken
+              slab. It follows the leva multiplier for the same reason the slab's
+              own hole does — the two must not part company on the slider.
+            */}
+            {showFloors && guarded && slabOpening > 0 && (
+              <OpeningGuard
+                // through the SAME clamp the slab's hole goes through, or a
+                // slider pushed far enough leaves the guard standing out in the
+                // room while the hole it rings has stopped growing
+                radius={effectiveOpeningRadius(slabOpening, f.innerRadiusAtLevel)}
+                floorY={f.floorY}
+                segments={segments}
+              />
             )}
           </group>
         )
