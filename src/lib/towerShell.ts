@@ -362,7 +362,12 @@ export function stairBearingClip(sections: PassageSection[]): THREE.BufferGeomet
        * it is too thin to do the job: a doorway threshold notches a little way
        * into the bed, a window reveal takes over below the notch, and the two
        * voids merge into 1.98 m of nothing under the top tread of a flight.
-       * Three slabs puts the whole of that notch inside protected stone.
+       * Two slabs puts the whole of that notch inside protected stone.
+       *
+       * Two and not three, and the ceiling is not arbitrary either: with the
+       * flights stacked one above another there is only about 0.65 m of masonry
+       * between one passage's crown and the next one's floor, and a haunch deeper
+       * than that reaches into the tunnel below.
        *
        * Deep, but not arbitrary at the other end either — a window is 1.9 m tall
        * and this leaves the great majority of any reveal free to cut. Where the
@@ -370,7 +375,7 @@ export function stairBearingClip(sections: PassageSection[]): THREE.BufferGeomet
        * flight, which is the honest picture of an unresolved clash between two
        * unsourced azimuths.
        */
-      bottomY: s.bottomY - 3 * TOWER.floorSlab,
+      bottomY: s.bottomY - 2 * TOWER.floorSlab,
     })),
     { arched: false },
   )

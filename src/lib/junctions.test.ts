@@ -20,6 +20,7 @@ import { PLAYER } from '../config/player'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from './cupola'
 import {
   PASSAGE_SIDE_CLEARANCE,
+  flightRiser,
   planAllFlights,
   stairApproaches,
   stairPassageSections,
@@ -173,12 +174,15 @@ describe('the stair leaves no slot that looks through', () => {
     WALL_LIFTS,
     innerRadiusAt,
   )
-  const sections = stairPassageSections(
-    flights,
-    STAIR.width,
-    PLAYER.stairHeadroom,
-    innerRadiusAt,
-  ).flat()
+  /*
+   * Per flight AND flattened. The flights are stacked in one sector of the wall
+   * now, so the same azimuth occurs in every one of them: anything that matches
+   * a tread to its passage section has to do it within a flight, or it will pair
+   * a tread on storey 2 with a section on storey 7. The flat list is still right
+   * for questions about the passage as a whole.
+   */
+  const tubes = stairPassageSections(flights, STAIR.width, PLAYER.stairHeadroom, innerRadiusAt)
+  const sections = tubes.flat()
 
   it('keeps the passage in the masonry, so the flight is not a niche onto the room', () => {
     /*
@@ -301,8 +305,8 @@ describe('the stair leaves no slot that looks through', () => {
   })
 
   it('keeps every tread inside the passage it runs in', () => {
-    const byAzimuth = new Map(sections.map((s) => [s.azimuthDeg.toFixed(4), s]))
-    for (const flight of flights) {
+    flights.forEach((flight, fi) => {
+      const byAzimuth = new Map(tubes[fi].map((s) => [s.azimuthDeg.toFixed(4), s]))
       for (const s of flight) {
         const section = byAzimuth.get(s.azimuthDeg.toFixed(4))
         expect(section, `no passage section at az ${s.azimuthDeg.toFixed(1)}`).toBeDefined()
@@ -324,7 +328,7 @@ describe('the stair leaves no slot that looks through', () => {
           `slot outside the tread at az ${s.azimuthDeg.toFixed(1)}`,
         ).toBeGreaterThanOrEqual(section.outerRadius - 1e-9)
       }
-    }
+    })
   })
 
   it('carries every tread down to the passage floor, leaving no void under the nosing', () => {
@@ -335,10 +339,10 @@ describe('the stair leaves no slot that looks through', () => {
      * risers, so the block runs down to the floor of the cut — which also makes
      * consecutive treads overlap and the stair become one solid mass.
      */
-    const byAzimuth = new Map(sections.map((s) => [s.azimuthDeg.toFixed(4), s]))
-    for (const flight of flights) {
-      if (flight.length < 2) continue
-      const riser = Math.abs(flight[1].treadY - flight[0].treadY)
+    flights.forEach((flight, fi) => {
+      if (flight.length < 2) return
+      const byAzimuth = new Map(tubes[fi].map((s) => [s.azimuthDeg.toFixed(4), s]))
+      const riser = flightRiser(flight)
       for (const s of flight) {
         const section = byAzimuth.get(s.azimuthDeg.toFixed(4))
         if (!section) continue
@@ -348,7 +352,7 @@ describe('the stair leaves no slot that looks through', () => {
           `az ${s.azimuthDeg.toFixed(1)}: tread bottom ${treadBottom.toFixed(3)} vs passage floor ${section.bottomY.toFixed(3)}`,
         ).toBeCloseTo(section.bottomY, 6)
       }
-    }
+    })
   })
 
   it('overlaps consecutive treads vertically, so the flight is one mass', () => {
@@ -416,36 +420,35 @@ describe('the stair leaves no slot that looks through', () => {
       }
     })
 
-    it('hands off between flights ALONG the walk, not across it', () => {
+    it('gives every flight its own way in from the chamber', () => {
       /*
-       * The fix that finally got the walk from the street to the roof, and the
-       * one most likely to be undone by someone tidying up.
+       * This test used to demand the opposite, and the story is worth keeping.
        *
-       * A walker coming off a flight is travelling round the helix. A ramp that
-       * climbs RADIALLY is met broadside, and a ramp met broadside is a ledge
-       * whatever its slope — no ray from the capsule centre can even see it,
-       * because it sits 0.74 m below. That cost three wrong diagnoses and stopped
-       * the climb at storey 3 for a long time.
+       * While the flights were chained into one helix, a walker coming off a
+       * flight was travelling ROUND it, so the ramp onto the next one had to run
+       * tangentially: a ramp that climbs radially is met broadside, and a ramp
+       * met broadside is a ledge whatever its slope — no ray from the capsule
+       * centre can even see it, because it sits 0.74 m below. That cost three
+       * wrong diagnoses and stopped the climb at storey 3 for a long time.
        *
-       * So every flight above the bottom must be entered by an approach whose two
-       * ends differ in AZIMUTH, not in radius. The bottom flight is the exception
-       * and must stay radial: nobody arrives at it along a flight, they walk out
-       * of the chamber.
+       * The flights are stacked now, not chained. Nobody arrives at a foot along
+       * a flight any more: you leave the passage below, cross the chamber, and
+       * walk in from the room. So every approach is radial again — which is what
+       * the bottom flight always did — and the tangential hand-off has no work
+       * left to do. If flights are ever re-chained, the broadside ledge comes
+       * straight back and this test has to be turned round with them.
        */
-      let tangential = 0
       let radial = 0
       for (const [a, b] of approaches) {
         const dAz = Math.abs(a.azimuthDeg - b.azimuthDeg)
         const dR = Math.abs(a.midRadius - b.midRadius)
-        if (dAz > 1e-9) tangential++
-        else radial++
+        if (dAz <= 1e-9) radial++
         expect(dAz > 1e-9 || dR > 0.2, 'an approach that goes nowhere').toBe(true)
       }
-      // one per flight above the bottom, and they are the majority
-      expect(tangential, 'the hand-offs went back to radial').toBeGreaterThanOrEqual(
-        flights.length - 1,
+      // a foot ramp for every flight, plus a level landing at every head
+      expect(radial, 'a flight lost its way in from the chamber').toBeGreaterThanOrEqual(
+        flights.length,
       )
-      expect(radial, 'the bottom flight lost its way in from the chamber').toBeGreaterThan(0)
     })
 
     it('keeps the mid-flight landing level, so the run past it is clear', () => {
@@ -506,7 +509,14 @@ describe('the stair leaves no slot that looks through', () => {
         const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
         const landingAz = last.azimuthDeg + halfWidthDeg * climbDir
 
-        for (const s of flights.flat()) {
+        /*
+         * Only ITS OWN flight. The flights are stacked in one sector of the wall,
+         * so every azimuth is shared with a flight a storey below and a storey
+         * above; asking whether a landing covers "a tread" across all of them
+         * asks whether it covers the stair three storeys down, which it always
+         * does and which means nothing.
+         */
+        for (const s of steps) {
           const inside = Math.abs(s.azimuthDeg - landingAz) <= halfWidthDeg + 1e-9
           if (!inside) continue
           expect(

@@ -242,25 +242,40 @@ export interface FlightRun {
  * heights, opening onto the storey between it partway along. Driving this off a
  * list of RUNS rather than off the floor table is what lets both be true.
  *
- * Flights are still chained: each resumes one step past where the previous ended,
- * so the masonry stair keeps turning the same way up the tower instead of
- * restarting at an arbitrary azimuth every storey. `innerRadiusOf` is injected so
- * this stays independent of the config module and can be exercised with synthetic
- * towers in tests.
+ * EVERY FLIGHT STARTS AT THE SAME AZIMUTH. They are stacked one above another in
+ * one sector of the wall, not chained into a single helix winding up the tower.
+ *
+ * The flights used to resume one step past where the previous ended, and the
+ * argument for it was that the stair should keep turning the same way rather than
+ * restart at an arbitrary azimuth. What that produced is a continuous 418° spiral
+ * — one unbroken stair from storey 2 to the roof — and the owner, who has walked
+ * the building, says that is wrong twice over. Their description of it separates
+ * "a SPIRAL stair from the first storey to the second" from "a PASSAGE with a
+ * stair" for every masonry lift above: the spiral is the modern steel insertion
+ * in the middle of the chamber, and the historic lifts are discrete passages. A
+ * chained helix makes all of them one thing.
+ *
+ * Stacking is the owner's answer to where they sit relative to each other: the
+ * same place in the wall, one above the next. It also happens to be safe, and not
+ * by luck — every flight climbs at the same rate per degree, because riser and
+ * going are held constant, so stacked passages stay exactly parallel and keep the
+ * storey height between them wherever they run. A passage is 2.6 m tall against a
+ * 3.28 m storey, so they clear by 0.65 m along their whole length. There is a
+ * test for that, since the clearance would vanish if either number moved.
+ *
+ * `innerRadiusOf` is injected so this stays independent of the config module and
+ * can be exercised with synthetic towers in tests.
  */
 export function planAllFlights(
   cfg: StairSettings,
   runs: FlightRun[],
   innerRadiusOf: (y: number) => number,
 ): StepPlacement[][] {
-  const flights: StepPlacement[][] = []
-  let cursor = cfg.startAzimuthDeg
-
-  for (const run of runs) {
-    const steps = planFlight({
+  const plan = (run: FlightRun, startAzimuthDeg: number) =>
+    planFlight({
       fromY: run.fromY,
       toY: run.toY,
-      startAzimuthDeg: cursor,
+      startAzimuthDeg,
       innerRadiusAt: (y) => innerRadiusOf(y) + cfg.wallClearance,
       width: cfg.width,
       riserTarget: cfg.riserTarget,
@@ -269,15 +284,33 @@ export function planAllFlights(
       landingsAtY: run.landingsAtY,
       landingLength: cfg.landingLength,
     })
-    flights.push(steps)
-    if (steps.length > 1) {
-      const stepAngle = steps[1].azimuthDeg - steps[0].azimuthDeg
-      cursor = steps[steps.length - 1].azimuthDeg + stepAngle
-    } else if (steps.length === 1) {
-      cursor = steps[0].azimuthDeg
-    }
-  }
-  return flights
+
+  return runs.map((run) => {
+    const first = plan(run, cfg.startAzimuthDeg)
+    /*
+     * A LANDING HAS TO BE PAID FOR IN ARC, or it pushes the flight down onto the
+     * one below.
+     *
+     * Level treads advance round the wall without gaining height, so past a
+     * landing the flight is behind the stack: at any azimuth it sits lower than
+     * an unbroken flight would by the landing's arc times the stair's gradient.
+     * Measured on the roof climb, whose 1.2 m landing cost 0.82 m of height, that
+     * closed the gap to the passage below from 3.28 m to 2.67 m — against a
+     * passage 2.63 m tall. Four centimetres of stone between two tunnels.
+     *
+     * So a flight with landings starts that much arc EARLIER, and from the
+     * landing onward it is exactly parallel to the stack again. The price is that
+     * its doorway sits about a metre to one side of the others, which is a thing
+     * you would not notice in the building and is the honest cost of the landing
+     * being real.
+     */
+    const landingArc = first.reduce(
+      (arc, s, k) => (k > 0 && s.treadY === first[k - 1].treadY ? arc + s.angularWidthDeg : arc),
+      0,
+    )
+    if (landingArc === 0) return first
+    return plan(run, cfg.startAzimuthDeg - windingSign(cfg.winding) * landingArc)
+  })
 }
 
 /** One cross-section of the passage the stair needs cut through the masonry. */
@@ -365,44 +398,44 @@ export function stairPassageSections(
   }
 
   /**
-   * ONE continuous tube for the whole stair, not one per flight.
+   * ONE TUBE PER FLIGHT. Each passage is its own tunnel with two ends.
    *
-   * Per-flight tools were the first attempt, out of a worry that a single sweep
-   * would wrap past itself and hand the CSG evaluator a self-intersecting solid.
-   * It does not: the helix turns about 1.4 times over the whole 23.6 m climb, so
-   * a full turn takes some 17 m of height while the tube is only 2.6 m tall — it
-   * never catches its own lower course. The per-flight version, meanwhile, put a
-   * flat end cap at every landing, and a cap is a wall of solid stone straight
-   * across the passage. Walking the model, that is exactly where the climb
-   * stopped: at the head of the first flight, facing masonry.
+   * This was a single continuous tube for the whole stair while the flights were
+   * chained into one helix — it had to be, because a flat end cap in the middle
+   * of a continuous climb is a wall of solid stone straight across the passage,
+   * and walking the model that is exactly where the climb stopped: at the head of
+   * the first flight, facing masonry.
    *
-   * Lead-in and lead-out carry the two remaining caps one step past the bottom
-   * and top treads, so neither stands where anyone walks. A real stair in a wall
-   * starts at a doorway off the room and ends at a landing, not flush with a
-   * tread.
+   * The flights are no longer chained. They stack in one sector of the wall, one
+   * above the next, so a cap at the end of a flight is not a wall across anything
+   * — it is the end of the passage, and you leave through the doorway cut in its
+   * inner side. Which is the whole point of the change: this is what makes the
+   * stair read as a series of passages rather than one endless spiral.
+   *
+   * Lead-in and lead-out still carry each tube's caps one step past its bottom
+   * and top treads, so no cap stands where anyone walks. A stair in a wall starts
+   * at a doorway off the room and ends at a landing, not flush with a tread.
    */
-  // each step carries its own flight's riser, since storeys round to different ones
-  const steps: Array<{ step: StepPlacement; riser: number }> = []
+  const tubes: PassageSection[][] = []
   for (const flight of flights) {
+    if (flight.length === 0) continue
+    // each flight carries its own riser, since storeys round to different ones
     const riser = riserOf(flight)
-    for (const step of flight) steps.push({ step, riser })
-  }
-
-  const body = steps.map(({ step, riser }) => sectionAt(step, riser))
-  if (body.length < 2) return [body]
-
-  const first = steps[0]
-  const last = steps[steps.length - 1]
-  const leadIn = first.step.azimuthDeg - (steps[1].step.azimuthDeg - first.step.azimuthDeg)
-  const leadOut =
-    last.step.azimuthDeg + (last.step.azimuthDeg - steps[steps.length - 2].step.azimuthDeg)
-  return [
-    [
-      sectionAt(first.step, first.riser, leadIn),
+    const body = flight.map((step) => sectionAt(step, riser))
+    if (flight.length < 2) {
+      tubes.push(body)
+      continue
+    }
+    const stepAngle = flight[1].azimuthDeg - flight[0].azimuthDeg
+    const last = flight[flight.length - 1]
+    const lastAngle = last.azimuthDeg - flight[flight.length - 2].azimuthDeg
+    tubes.push([
+      sectionAt(flight[0], riser, flight[0].azimuthDeg - stepAngle),
       ...body,
-      sectionAt(last.step, last.riser, leadOut),
-    ],
-  ]
+      sectionAt(last, riser, last.azimuthDeg + lastAngle),
+    ])
+  }
+  return tubes
 }
 
 /** Clearance kept either side of the flight inside the passage, metres. */
@@ -723,13 +756,28 @@ export function stairDoorways(
      * threshold looks like in stone.
      */
     const halfTangential = (s.midRadius + doorwayWidth / 2) * Math.sin((widthDeg / 2) * (Math.PI / 180))
-    const sillTop = bedAtCentre + Math.abs(rake) * halfTangential
+    /*
+     * The rake is capped so the sill never leaves the stone the stair sits on.
+     *
+     * At the stair's own gradient the sill swings about 0.4 m across a doorway,
+     * and the low end of that swing is below the bed by the same amount — a slot
+     * beside the flight, measured at 0.67 m under the treads four steps past a
+     * foot doorway. Held to one tread-depth of swing the threshold still rakes,
+     * visibly and in the right direction, but its lowest point is exactly the
+     * underside of the steps and never the masonry beneath them.
+     */
+    const maxSwing = treadDepth(riser)
+    const rakeCapped =
+      Math.abs(rake) * halfTangential > maxSwing
+        ? Math.sign(rake) * (maxSwing / Math.max(0.05, halfTangential))
+        : rake
+    const sillTop = bedAtCentre + Math.abs(rakeCapped) * halfTangential
     const headClamp = atHead ? Math.max(0, sillTop - (floorY - 0.02)) : 0
 
     return {
       azimuthDeg,
       widthDeg,
-      bottomRake: rake,
+      bottomRake: rakeCapped,
       bottomY: bedAtCentre - headClamp,
       topY: Math.max(floorY, underfoot.treadY) + height,
       innerRadius: Math.max(0.05, inner),
@@ -863,43 +911,22 @@ export function stairApproaches(
     }
 
     /*
-     * THE FOOT RAMP RUNS TANGENTIALLY, along the way the walker is travelling.
+     * A RADIAL FOOT RAMP FOR EVERY FLIGHT, now that none of them continues
+     * another.
      *
-     * This is what defeated three attempts. The approaches climbed RADIALLY —
-     * inward end to outward end at one azimuth — while a walker arriving off the
-     * flight below is moving TANGENTIALLY, around the helix. So they always met
-     * it broadside, and a ramp met broadside is a ledge however gentle its slope.
-     * Measured at storey 3: standing at 7.255 m facing a surface at 7.39, free to
-     * move in the four downhill directions and stuck in all four uphill ones,
-     * with no ray from the capsule centre able to see the thing at all.
+     * There used to be a special case here: a flight above the bottom took a
+     * TANGENTIAL hand-off from the head of the flight below, because the two were
+     * one helix and the walker arrived travelling round it. That is what defeated
+     * three earlier attempts and it was the right answer then — a ramp climbing
+     * radially is met broadside by someone moving tangentially, and a ramp met
+     * broadside is a ledge however gentle its slope.
      *
-     * Running it along the travel direction instead — from the storey floor at
-     * the previous flight's head, round to this flight's first tread — makes it a
-     * continuation of the walk rather than something crossing it.
-     *
-     * The BOTTOM flight keeps the radial ramp: nobody arrives at it along a
-     * flight, they walk out of the chamber, and radial is the way they come.
+     * With the flights stacked instead of chained, nobody arrives at a foot along
+     * a flight. You come out of the passage below at one end of the sector, cross
+     * the chamber, and walk into the next doorway from the room — radially, which
+     * is what the bottom flight always did and what has always worked.
      */
-    const previous = i > 0 ? flights[i - 1] : null
-    if (previous && previous.length >= 2) {
-      const floorY = floorYOf(i, 'foot')
-      /*
-       * Start at the previous flight's LAST TREAD, not at its landing. The
-       * landing is pushed half a flight-width along the climb and so sits almost
-       * on top of this flight's first tread — a hand-off from there had 0.14 m of
-       * run for 0.19 m of rise. From the last tread the run is a full step angle,
-       * the rise is one riser, and the slope comes out the same as the stair's
-       * own. Which is what it is: the flights are one helix, and the hand-off is
-       * simply the step between them.
-       */
-      const from = previous[previous.length - 1]
-      out.push([
-        { azimuthDeg: from.azimuthDeg, treadY: floorY, midRadius: from.midRadius },
-        { azimuthDeg: steps[0].azimuthDeg, treadY: steps[0].treadY, midRadius: steps[0].midRadius },
-      ])
-    } else {
-      approach(steps[0], floorYOf(i, 'foot'), false)
-    }
+    approach(steps[0], floorYOf(i, 'foot'), false)
     approach(steps[steps.length - 1], floorYOf(i, 'head'), true)
 
     /*

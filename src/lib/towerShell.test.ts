@@ -12,6 +12,7 @@ import {
 } from '../config/tower'
 import { PLAYER } from '../config/player'
 import {
+  flightRiser,
   planAllFlights,
   stairDoorways,
   stairPassageSections,
@@ -550,6 +551,14 @@ describe('the shell carries a floor under every tread', () => {
          * no way out onto the terrace.
          */
         if (si === steps.length - 1) return
+        /*
+         * And the same at the other end. A flight's FOOT tread is one riser above
+         * the storey floor, so its bed lands inside that storey's slab — again a
+         * FloorStructures job, not the drum's. Anything whose bed is within a
+         * slab of a floor is carried by the floor.
+         */
+        const bed = s.treadY - treadDepth(flightRiser(steps))
+        if (FLOORS.some((f) => Math.abs(bed - f.floorY) <= TOWER.floorSlab + 0.05)) return
         for (const dr of [-0.35, -0.18, 0, 0.18, 0.35]) {
           const below = firstSurfaceAbove(s.azimuthDeg, s.midRadius + dr).filter(
             (y) => y < s.treadY - 0.01,

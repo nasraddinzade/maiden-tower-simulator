@@ -184,14 +184,54 @@ describe('planAllFlights — one flight per lift', () => {
     expect(flights[0][0].azimuthDeg).toBeCloseTo(STAIR.startAzimuthDeg, 10)
   })
 
-  it('resumes each flight past the previous one — no azimuth jump back', () => {
+  it('stacks the flights in one sector of the wall instead of chaining them', () => {
+    /*
+     * The reverse of what this file asked for until now. Chained — each flight
+     * resuming a step past where the last ended — the six masonry lifts came out
+     * as ONE continuous 418° spiral from storey 2 to the roof. The owner, who has
+     * walked the tower, separates "a SPIRAL stair from the first storey to the
+     * second" (the modern steel insertion standing in the middle of the chamber)
+     * from "a PASSAGE with a stair" for every lift above it. A chained helix
+     * makes all of them the same thing.
+     *
+     * Stacked, each flight is its own passage: you leave it at one end of the
+     * sector, cross the chamber, and enter the next doorway at the other.
+     */
+    WALL_LIFTS.forEach((lift, i) => {
+      if (lift.landingsAtY.length > 0) {
+        // paid for its landing in arc — see the note in planAllFlights
+        expect(Math.abs(flights[i][0].azimuthDeg - STAIR.startAzimuthDeg)).toBeLessThan(25)
+        return
+      }
+      expect(flights[i][0].azimuthDeg).toBeCloseTo(STAIR.startAzimuthDeg, 10)
+    })
+  })
+
+  it('keeps a storey height between stacked passages wherever they run', () => {
+    /*
+     * The reason stacking is safe, and it is not luck. Riser and going are held
+     * constant, so every flight climbs at the same rate per degree and stacked
+     * passages stay exactly parallel. A passage is about 2.6 m tall against a
+     * 3.28 m storey, so they clear each other along their whole length — but the
+     * margin is only 0.65 m, and it would vanish if the headroom or the storey
+     * height moved. Hence the test.
+     */
     for (let i = 1; i < flights.length; i++) {
-      const prevLast = flights[i - 1][flights[i - 1].length - 1].azimuthDeg
-      const thisFirst = flights[i][0].azimuthDeg
-      const gap = Math.abs(thisFirst - prevLast)
-      // exactly one step of separation, never a discontinuity
-      expect(gap).toBeGreaterThan(0)
-      expect(gap).toBeLessThan(flights[i][0].angularWidthDeg * 2)
+      const below = flights[i - 1]
+      const above = flights[i]
+      for (const a of above) {
+        // the tread of the flight below nearest this azimuth
+        const b = below.reduce((best, cur) =>
+          Math.abs(cur.azimuthDeg - a.azimuthDeg) < Math.abs(best.azimuthDeg - a.azimuthDeg)
+            ? cur
+            : best,
+        )
+        if (Math.abs(b.azimuthDeg - a.azimuthDeg) > 2) continue // no overlap in plan
+        expect(
+          a.treadY - b.treadY,
+          `flights ${i - 1}/${i} at az ${a.azimuthDeg.toFixed(1)}`,
+        ).toBeGreaterThan(2.8)
+      }
     }
   })
 
@@ -241,11 +281,17 @@ describe('planAllFlights — one flight per lift', () => {
     }
   })
 
-  it('turns consistently in one direction throughout', () => {
-    const all = flights.flat()
-    const sign = Math.sign(all[1].azimuthDeg - all[0].azimuthDeg)
-    for (let i = 1; i < all.length; i++) {
-      expect(Math.sign(all[i].azimuthDeg - all[i - 1].azimuthDeg)).toBe(sign)
+  it('turns consistently in one direction within every flight', () => {
+    /*
+     * WITHIN a flight. Across flights the azimuth jumps back to the start now,
+     * because they are stacked rather than chained — see the test above. Asking
+     * the flattened list to turn one way would be asking for the helix back.
+     */
+    for (const flight of flights) {
+      for (let i = 1; i < flight.length; i++) {
+        const d = flight[i].azimuthDeg - flight[i - 1].azimuthDeg
+        expect(Math.sign(d) === windingSign(STAIR.winding) || d === 0).toBe(true)
+      }
     }
   })
 
