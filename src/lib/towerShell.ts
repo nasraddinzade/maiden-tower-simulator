@@ -125,30 +125,71 @@ export interface WindowCut {
 }
 
 /**
+ * How far a window cutter runs past each face of the wall. CSG hygiene, not a
+ * measurement of the building: the tool has to poke out both sides so the
+ * boolean never has to resolve two coplanar surfaces.
+ */
+const WINDOW_CUT_OVERSHOOT = 1 // m
+
+/**
  * Cutting tool for one window.
  *
  * Built as a box whose inner end is scaled up, then aimed along the opening's
  * azimuth. It runs from beyond the outer face to well inside the room, so the
  * subtraction removes the whole reveal in one go rather than leaving a lip.
+ *
+ * THE SPLAY IS DEFINED FACE TO FACE, and the overshoot is dead length.
+ *
+ * The tool used to taper linearly from end to end, over the whole wall + 2 m,
+ * which meant the section reaching the outer face had already been widened by
+ * the metre of overshoot in front of it: outerWidth × (1 + (innerWidth/outerWidth
+ * − 1) / depth). On storey 8, where the wall is thinnest and the tool therefore
+ * shortest relative to its overshoot, a 0.40 m slit came out 0.59 m outside —
+ * 48% wider than data/windows.json specifies — and by the same error the room-
+ * side mouth fell short of innerWidth. Both faces were wrong, in opposite
+ * directions, because the ends of the tool were the only places the widths were
+ * honoured and neither end is a face of the wall.
+ *
+ * So the box carries four vertex rings, not two: the taper runs from outerWidth
+ * exactly at r = outerRadius to innerWidth exactly at r = innerRadiusAt(centreY),
+ * and the two overshoot rings repeat their neighbour's section unchanged. The
+ * wall thickness that governs the splay is the ACTUAL one at this height, which
+ * is why the same slit reads differently near the base and near the parapet.
  */
 export function windowCutter(w: WindowCut): THREE.BufferGeometry {
   const R = TOWER.outerRadius
   const inner = innerRadiusAt(w.centreY)
-  const depth = R - inner + 2 // overshoot both faces so no coplanar slivers remain
+  const wall = R - inner // masonry actually crossed at this height
+  const depth = wall + 2 * WINDOW_CUT_OVERSHOOT
 
-  // A box spanning the wall, then tapered: vertices at the inner end pushed out.
-  const geom = new THREE.BoxGeometry(w.outerWidth, w.outerHeight, depth, 1, 1, 1)
+  // A box spanning the wall and both overshoots, then tapered: the rings from
+  // the outer face inward are pushed out to the room-side section.
+  const geom = new THREE.BoxGeometry(w.outerWidth, w.outerHeight, depth, 1, 1, 3)
   const pos = geom.attributes.position as THREE.BufferAttribute
   const halfDepth = depth / 2
   const wScale = w.innerWidth / w.outerWidth
   const hScale = w.innerHeight / w.outerHeight
+  /*
+   * Where the four rings go (local +Z is the inward end after the rotation
+   * below) and how far each is through the splay. BoxGeometry spaces them
+   * evenly, so the middle two get pulled onto the wall faces; a ring boundary
+   * is the only place a linear interpolation across a quad can change slope.
+   */
+  const ringZ = [
+    -halfDepth, // WINDOW_CUT_OVERSHOOT out in front of the outer face
+    -halfDepth + WINDOW_CUT_OVERSHOOT, // the outer face
+    halfDepth - WINDOW_CUT_OVERSHOOT, // the room-side face
+    halfDepth, // and past it into the room
+  ]
+  const ringT = [0, 0, 1, 1]
   for (let i = 0; i < pos.count; i++) {
-    // local +Z is the inward end after the rotation below
-    const t = (pos.getZ(i) + halfDepth) / depth // 0 at outer end, 1 at inner end
+    const ring = Math.round(((pos.getZ(i) + halfDepth) / depth) * 3)
+    const t = ringT[ring]
     const k = 1 + (wScale - 1) * t
     const kh = 1 + (hScale - 1) * t
     pos.setX(i, pos.getX(i) * k)
     pos.setY(i, pos.getY(i) * kh)
+    pos.setZ(i, ringZ[ring])
   }
   pos.needsUpdate = true
 
@@ -158,7 +199,8 @@ export function windowCutter(w: WindowCut): THREE.BufferGeometry {
   const dir = azimuthToVector(w.azimuthDeg)
   geom.rotateY(-w.azimuthDeg * DEG)
   // place it so the narrow end overshoots the outer face
-  geom.translate(dir.x * (R + 1 - depth / 2), w.centreY, dir.z * (R + 1 - depth / 2))
+  const centreRadius = R + WINDOW_CUT_OVERSHOOT - depth / 2
+  geom.translate(dir.x * centreRadius, w.centreY, dir.z * centreRadius)
   return mergeVertices(geom)
 }
 

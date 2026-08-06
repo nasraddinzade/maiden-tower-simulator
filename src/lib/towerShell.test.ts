@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BUTTRESS, ENTRANCE, FLOORS, TOWER, innerRadiusAt } from '../config/tower'
+import * as THREE from 'three'
+import { BUTTRESS, ENTRANCE, FLOORS, TOWER, innerRadiusAt, wallThicknessAt } from '../config/tower'
 import { azimuthToVector } from './geometry'
 import windowData from '../data/windows.json'
 import type { WindowSpec } from './windows'
@@ -110,6 +111,138 @@ describe('window cutter flares the right way', () => {
   })
 })
 
+/**
+ * Clear span of a void — or of a bare cutting tool, which is the same surfaces
+ * seen from the other side — on a window's bearing, where it crosses the plane
+ * `depth` metres out from the tower axis.
+ *
+ * Rays, not vertex positions: the fault these guard against lived BETWEEN the
+ * tool's vertex rings. Its two ends carried exactly the specified sections and
+ * every plane in between, including both faces of the wall, did not, so any
+ * check that only reads vertices agrees with a tool that is wrong everywhere it
+ * touches masonry.
+ *
+ * `depth` is the coordinate along the bearing (P·d), not the distance from the
+ * axis. That is the coordinate the cutter's sections are defined on; the two
+ * differ by 0.4 mm at a 0.4 m slit's jamb and the sections are constant there.
+ */
+function clearSpan(
+  geometry: THREE.BufferGeometry,
+  azimuthDeg: number,
+  depth: number,
+  y: number,
+  axis: 'tangential' | 'vertical' = 'tangential',
+): number {
+  // DoubleSide: a ray crossing a solid leaves through a back face, and the exit
+  // is half the measurement.
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }))
+  mesh.updateMatrixWorld(true)
+
+  const a = (azimuthDeg * Math.PI) / 180
+  const along =
+    axis === 'vertical'
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) // tangential, along the wall
+  const d = azimuthToVector(azimuthDeg)
+  const centre = new THREE.Vector3(d.x * depth, y, d.z * depth)
+
+  const REACH = 3 // m either side — past the opening but not round the drum
+  const raycaster = new THREE.Raycaster(
+    centre.clone().addScaledVector(along, -REACH),
+    along,
+    0,
+    2 * REACH,
+  )
+  // signed offsets from the opening's centre line
+  const hits = raycaster.intersectObject(mesh, false).map((h) => h.distance - REACH)
+  const before = hits.filter((s) => s < 0)
+  const after = hits.filter((s) => s > 0)
+  if (before.length === 0 || after.length === 0) return NaN
+  // the two surfaces that straddle the centre line; anything farther out is the
+  // drum, the buttress or another opening
+  return Math.min(...after) - Math.max(...before)
+}
+
+describe('the reveal splays face to face, not across the tool overshoot', () => {
+  /*
+   * The cutting prism runs a metre past each face of the wall so the boolean
+   * never has to resolve a coplanar surface, and it used to taper across that
+   * dead length as well: the section arriving at the outer face had already been
+   * widened by the overshoot in front of it, by (innerWidth/outerWidth − 1) /
+   * depth. Worst where the wall is thinnest — storey 8's 0.40 m slits came out
+   * 0.59 m outside, 47% wider than data/windows.json asks for, while the same
+   * error left the room-side mouth short of innerWidth.
+   *
+   * Heights are spread over the taper on purpose: the splay is governed by the
+   * wall thickness AT THAT HEIGHT, so a tool that gets the outer width right at
+   * one level and not another is exactly the bug coming back.
+   */
+  const HEIGHTS = [0, 10, 20, TOWER.topY - 1]
+  const slit = (centreY: number) => ({
+    azimuthDeg: 141,
+    centreY,
+    outerWidth: 0.4,
+    outerHeight: 1.9,
+    innerWidth: 1.5,
+    innerHeight: 2.4,
+  })
+
+  it('samples heights where the wall really is a different thickness', () => {
+    const thicknesses = HEIGHTS.map((y) => wallThicknessAt(y))
+    const spread = Math.max(...thicknesses) - Math.min(...thicknesses)
+    expect(spread).toBeGreaterThan(1.0)
+    expect(new Set(thicknesses).size).toBe(HEIGHTS.length)
+  })
+
+  it.each(HEIGHTS)('is exactly outerWidth at the outer face (y = %s)', (y) => {
+    const w = slit(y)
+    expect(clearSpan(windowCutter(w), w.azimuthDeg, TOWER.outerRadius, y)).toBeCloseTo(
+      w.outerWidth,
+      5,
+    )
+  })
+
+  it.each(HEIGHTS)('is exactly innerWidth at the room-side face (y = %s)', (y) => {
+    const w = slit(y)
+    expect(clearSpan(windowCutter(w), w.azimuthDeg, innerRadiusAt(y), y)).toBeCloseTo(
+      w.innerWidth,
+      5,
+    )
+  })
+
+  it.each(HEIGHTS)('carries the outer section unchanged through the overshoot (y = %s)', (y) => {
+    const w = slit(y)
+    // half a metre out in fresh air: nothing to cut there, and the tool must not
+    // have started flaring before it reaches the stone
+    expect(clearSpan(windowCutter(w), w.azimuthDeg, TOWER.outerRadius + 0.5, y)).toBeCloseTo(
+      w.outerWidth,
+      5,
+    )
+  })
+
+  it.each(HEIGHTS)('splays linearly in between, over the real wall thickness (y = %s)', (y) => {
+    const w = slit(y)
+    const wall = wallThicknessAt(y)
+    for (const f of [0.25, 0.5, 0.75]) {
+      const span = clearSpan(windowCutter(w), w.azimuthDeg, TOWER.outerRadius - f * wall, y)
+      expect(span).toBeCloseTo(w.outerWidth + (w.innerWidth - w.outerWidth) * f, 5)
+    }
+  })
+
+  it.each(HEIGHTS)('gives the head and sill the same treatment (y = %s)', (y) => {
+    const w = slit(y)
+    const az = w.azimuthDeg
+    expect(clearSpan(windowCutter(w), az, TOWER.outerRadius, y, 'vertical')).toBeCloseTo(
+      w.outerHeight,
+      5,
+    )
+    expect(clearSpan(windowCutter(w), az, innerRadiusAt(y), y, 'vertical')).toBeCloseTo(
+      w.innerHeight,
+      5,
+    )
+  })
+})
+
 describe('window openings pierce the wall (Phase 5)', () => {
   const testWindow = {
     azimuthDeg: 141,
@@ -138,6 +271,26 @@ describe('window openings pierce the wall (Phase 5)', () => {
     // the blind shell has wall here; the pierced one has the opening
     expect(blind[at]).toBeGreaterThan(TOWER.outerRadius - 0.01)
     expect(profile[at]).toBeLessThan(blind[at])
+  })
+
+  it('opens it to the width the data asks for, not to the tool overshoot', () => {
+    /*
+     * The same check as the cutter tests above, but on the boolean result, so a
+     * tool that is right and a subtraction that loses it cannot both pass.
+     * Measured 5 cm inside the outer face because that is the nearest plane with
+     * stone in it: the tangent plane AT the face lies entirely outside the drum.
+     */
+    const inset = 0.05
+    const wall = wallThicknessAt(testWindow.centreY)
+    const expected =
+      testWindow.outerWidth + (testWindow.innerWidth - testWindow.outerWidth) * (inset / wall)
+    const span = clearSpan(
+      pierced.geometry,
+      testWindow.azimuthDeg,
+      TOWER.outerRadius - inset,
+      testWindow.centreY,
+    )
+    expect(span).toBeCloseTo(expected, 3)
   })
 
   it('leaves the wall untouched on the opposite bearing', () => {
