@@ -29,7 +29,7 @@ import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
-import type { WindowSpec } from './lib/windows'
+import { windowCentreY, type WindowSpec } from './lib/windows'
 import windowData from './data/windows.json'
 import { TowerWireframe } from './components/tower/TowerWireframe'
 import { TowerShell, type ShellStats } from './components/tower/TowerShell'
@@ -291,8 +291,9 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   const windows = useMemo<WindowCut[] | undefined>(() => {
     if (!windowCtl.cutWindows) return undefined
     return (windowData.windows as WindowSpec[]).map((w) => {
-      const floor = FLOORS[w.floorIndex]
-      const centreY = floor.floorY + w.heightAboveFloor + w.outerHeight / 2
+      // From the photographic fraction, NOT from floorIndex + sill: see
+      // windowCentreY(). floorIndex survives only as a grouping key.
+      const centreY = windowCentreY(w, TOWER.groundY, TOWER.height)
       const outerWidth = w.outerWidth * windowCtl.widthScale
       return {
         azimuthDeg: w.azimuthDeg + windowCtl.azimuthNudgeDeg,

@@ -18,7 +18,13 @@ export interface WindowSpec {
   azimuthDeg: number
   /** Position up the tower as a fraction of total height, as measured in photos. */
   heightFraction: number
-  /** Sill height above that storey's floor. */
+  /**
+   * Sill height above that storey's floor.
+   *
+   * DOCUMENTATION, NOT GEOMETRY — read windowCentreY() before using it. Every
+   * entry in windows.json carries 1.4 here, which is a filler, while
+   * heightFraction carries the actual photographic reading.
+   */
   heightAboveFloor: number
   outerWidth: number
   outerHeight: number
@@ -90,4 +96,45 @@ export function groupByAzimuth(windows: WindowSpec[], toleranceDeg = 2): WindowS
     else groups.push([w])
   }
   return groups
+}
+
+/**
+ * Where an opening's centre sits in world Y.
+ *
+ * heightFraction is the MEASURED quantity: windows.json's own provenance note
+ * describes the two slit columns by their heightFraction ranges (0.28–0.61 and
+ * 0.67–0.94), established by cross-checking eleven exterior photographs.
+ * heightAboveFloor is 1.4 for every one of the nine openings — a filler that was
+ * never a reading of anything.
+ *
+ * The geometry used to be built from floorY + heightAboveFloor + outerHeight/2,
+ * so the measurement was documented and then ignored. That is what put storey
+ * 3's window above storey 3's own vault, drove storey 6's slits through into
+ * storey 7 at floor level, and stacked upper-3 and upper-4 at exactly the same
+ * height when the photographs put them 2.9 m apart.
+ *
+ * So: the fraction decides, and floorIndex is left for grouping alone. Both
+ * datums come from the tower's real extent — groundY is the outside ground
+ * line, not the entry floor, because that is where a photograph's scale starts.
+ */
+export function windowCentreY(w: WindowSpec, groundY: number, height: number): number {
+  return groundY + w.heightFraction * height
+}
+
+/**
+ * How far each opening moves when built from its fraction rather than its
+ * nominal sill. Reports the disagreement rather than hiding it: a large value
+ * means the two fields were telling different stories about the same window.
+ */
+export function centreYDrift(
+  windows: WindowSpec[],
+  floorYOf: (floorIndex: number) => number,
+  groundY: number,
+  height: number,
+): { id: string; fromFraction: number; fromSill: number; drift: number }[] {
+  return windows.map((w) => {
+    const fromFraction = windowCentreY(w, groundY, height)
+    const fromSill = floorYOf(w.floorIndex) + w.heightAboveFloor + w.outerHeight / 2
+    return { id: w.id, fromFraction, fromSill, drift: fromFraction - fromSill }
+  })
 }

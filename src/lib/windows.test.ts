@@ -6,9 +6,11 @@ import {
   splayHalfAngleDeg,
   validateWindow,
   type WindowSpec,
+  windowCentreY,
+  centreYDrift,
 } from './windows'
 import windowData from '../data/windows.json'
-import { FLOORS, SITE, wallThicknessAt } from '../config/tower'
+import { FLOORS, SITE, TOWER, wallThicknessAt } from '../config/tower'
 
 const WINDOWS = windowData.windows as WindowSpec[]
 
@@ -141,5 +143,49 @@ describe('validateWindow catches bad edits to the JSON', () => {
     expect(validateWindow({ ...good, heightFraction: 1.4 }, FLOORS.length, 4)).toContainEqual(
       expect.stringContaining('heightFraction'),
     )
+  })
+})
+
+describe('window height comes from the photograph, not from the storey', () => {
+  const windows = windowData.windows as WindowSpec[]
+  const drifts = centreYDrift(windows, (i) => FLOORS[i].floorY, TOWER.groundY, TOWER.height)
+
+  it('places every opening inside the tower, clear of ground and parapet', () => {
+    for (const w of windows) {
+      const y = windowCentreY(w, TOWER.groundY, TOWER.height)
+      expect(y - w.outerHeight / 2).toBeGreaterThan(TOWER.groundY)
+      expect(y + w.outerHeight / 2).toBeLessThan(TOWER.topY)
+    }
+  })
+
+  it('keeps the two topmost slits apart, as eleven photographs put them', () => {
+    /*
+     * upper-3 (0.84) and upper-4 (0.94) were built at IDENTICAL height while the
+     * geometry read heightAboveFloor — both storeys carry the filler 1.4 — so
+     * they merged into one wide double aperture 3° apart in azimuth. The
+     * photographs put them about 2.9 m apart vertically.
+     */
+    const y = (id: string) =>
+      windowCentreY(windows.find((w) => w.id === id)!, TOWER.groundY, TOWER.height)
+    expect(y('upper-4') - y('upper-3')).toBeGreaterThan(2.5)
+  })
+
+  it('preserves the order the photographs establish within each column', () => {
+    for (const column of groupByAzimuth(windows, 12)) {
+      const byFraction = [...column].sort((a, b) => a.heightFraction - b.heightFraction)
+      const ys = byFraction.map((w) => windowCentreY(w, TOWER.groundY, TOWER.height))
+      for (let i = 1; i < ys.length; i += 1) expect(ys[i]).toBeGreaterThan(ys[i - 1])
+    }
+  })
+
+  it('records how far the two fields disagreed, rather than hiding it', () => {
+    /*
+     * Not a tolerance to tighten. This asserts the disagreement was REAL and
+     * large — which is the whole reason the fraction now decides. If a survey
+     * ever refills heightAboveFloor with measurements, this test will fail and
+     * the failure is the signal to delete it.
+     */
+    const worst = Math.max(...drifts.map((d) => Math.abs(d.drift)))
+    expect(worst).toBeGreaterThan(1)
   })
 })
