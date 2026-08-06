@@ -13,8 +13,12 @@ import { ENTRANCE, FLOORS, TOWER, WATER, WELL, innerRadiusAt } from '../../confi
 import { isStoreyVisible } from '../../lib/visibility'
 
 export interface WaterSystemProps {
-  /** Draw the pipes and the shaft at all. */
-  visible: boolean
+  /**
+   * Draw the SCHEMATIC half of the layer — the ring channels, the junction leg
+   * across to the wellhead, the buried intakes. The fabric half (the well and
+   * the downpipe standing in its chase) is drawn whatever this says.
+   */
+  showSchematic: boolean
   /** Highlight mode: pipes glow and droplets run, for the "Водосбор" layer. */
   highlighted: boolean
   /** Storey the viewer is on, for culling (Phase 11). */
@@ -39,8 +43,31 @@ const TUBE_AROUND = 40
  * (bore, wall thickness, segment length), and it is missing from every
  * reconstruction I could find, so it gets its own layer rather than being
  * buried in the geometry.
+ *
+ * The layer is in TWO HALVES, split on this project's own rule: fabric a visitor
+ * can touch belongs to the default view, a diagram of a system does not.
+ *
+ * FABRIC — always drawn:
+ *   - the well. Mouth collar, rim, the glass disc flush in the floor and the
+ *     shaft below it. It is the one thing storey 3 is known for, and the 2026
+ *     footage shows a visitor walking up to it and looking down it. Hiding it
+ *     with the diagram was the whole reason for this split.
+ *   - the Ø 30 cm downpipe. It stands in a wall chase that was PHOTOGRAPHED with
+ *     the pipe inside it, and App.tsx cuts that chase into the shell
+ *     unconditionally — so hiding the pipe left a row of empty niches.
+ *
+ * SCHEMATIC — behind the switch:
+ *   - the ring channels. [ref] puts them inside the masonry; not a metre of them
+ *     is visible in the building.
+ *   - the buried intakes, under the paving, for the same reason.
+ *   - the junction leg from the chase across to the mouth. The real pipe's last
+ *     courses were lifted long ago (see WATER.downpipeElbowRise) and the museum
+ *     draws that junction schematically; drawn by default it lays a 0.3 m pipe
+ *     across storey 3's floor at ankle height, exactly where the footage shows
+ *     visitors standing at the glass.
+ *   - the falling droplets, which animate a process rather than model a thing.
  */
-export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = true }: WaterSystemProps) {
+export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, showAll = true }: WaterSystemProps) {
   const wellY = FLOORS[WELL.startsAtFloorIndex].floorY
   const wellDir = azimuthToVector(WELL.azimuthDeg)
   const wellX = wellDir.x * WELL.offsetFromAxis
@@ -138,14 +165,14 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
     mesh.instanceMatrix.needsUpdate = true
   })
 
-  if (!visible) return null
-
   const pipeColour = highlighted ? '#4fc3f7' : '#8a7a63'
   const pipeEmissive = highlighted ? '#1b6f9c' : '#000000'
   const channelOuter = pipeOuterDiameter(WATER.channelDiameter, WATER.channelWallThickness)
 
   return (
     <group>
+      {/* ————————————————— fabric: what a visitor meets ————————————————— */}
+
       {/* the shaft — the lathe carries world Y already, so only X/Z offset it */}
       <mesh geometry={shaft} position={[wellX, 0, wellZ]}>
         <meshStandardMaterial
@@ -159,11 +186,17 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
       {/*
         Masonry casing where the shaft crosses the rooms below its mouth.
 
-        The wellhead is on the 2nd storey's floor [ref], and the bore runs 21 m
-        down — so it necessarily passes through storey 1. Left bare it reads as
-        a funnel and a tube hanging in the middle of that room. A well sunk from
+        The wellhead is in storey 3's floor [VIDEO], and the bore runs 21 m down
+        — so it necessarily passes through storeys 2 and 1. Left bare it reads as
+        a funnel and a tube hanging in the middle of those rooms. A well sunk from
         an upper floor is carried in a built shaft; this is that shaft, stopping
         at ground level where the bore enters rock.
+
+        It is drawn with the well rather than with the diagram, because the
+        alternative is that hanging tube in the default view. What no source
+        confirms is a PIER in chambers 1 and 2 — the footage is about the head,
+        not about what carries it — so the casing is [ASSUMPTION] riding on
+        fabric, and that is the weakest thing now shown by default.
       */}
       <mesh position={[wellX, (wellY + 0) / 2, wellZ]}>
         <cylinderGeometry
@@ -206,21 +239,6 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
         />
       </mesh>
 
-      {/* collecting channels on storeys 2..7 */}
-      {rings
-        .filter((r) => isStoreyVisible(r.floorIndex, viewerStorey, { showAll }))
-        .map((r) => (
-        <mesh key={r.floorIndex} position={[0, r.y + channelOuter / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[r.radius, channelOuter / 2, TUBE_RADIAL, TUBE_AROUND]} />
-          <meshStandardMaterial
-            color={pipeColour}
-            emissive={pipeEmissive}
-            emissiveIntensity={highlighted ? 0.5 : 0}
-            roughness={0.85}
-          />
-        </mesh>
-      ))}
-
       {/*
         The Ø30 cm downpipe.
 
@@ -229,6 +247,9 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
         a free-standing column of pipe crossing every chamber is both wrong and
         the single most intrusive thing in the interior. It meets the wellhead
         with a short horizontal leg at the bottom.
+
+        Fabric, not diagram: the chase it stands in was photographed with the
+        pipe in it. Only its LEG into the well is schematic — see the header.
       */}
       <mesh position={downpipeLean.mid.toArray()} quaternion={downpipeLean.quaternion}>
         <cylinderGeometry
@@ -250,62 +271,83 @@ export function WaterSystem({ visible, highlighted, viewerStorey = 0, showAll = 
         />
       </mesh>
 
-      {/* the elbow: wall run across to the wellhead, just above the mouth */}
-      <mesh
-        position={[
-          (downpipeX + wellX) / 2,
-          wellY + WATER.downpipeElbowRise,
-          (downpipeZ + wellZ) / 2,
-        ]}
-        quaternion={elbowQuaternion}
-      >
-        <cylinderGeometry
-          args={[
-            WATER.downpipeDiameter / 2,
-            WATER.downpipeDiameter / 2,
-            Math.max(0.2, Math.hypot(downpipeX - wellX, downpipeZ - wellZ)),
-            12,
-            1,
-            true,
-          ]}
-        />
-        <meshStandardMaterial
-          color={pipeColour}
-          emissive={pipeEmissive}
-          emissiveIntensity={highlighted ? 0.5 : 0}
-          side={THREE.DoubleSide}
-          roughness={0.85}
-        />
-      </mesh>
+      {/* ——————————— schematic: the system [ref] describes ——————————— */}
 
-      {/* below ground: square-section pipes leaving through the wall [ref] */}
-      {[0, 120, 240].map((az) => {
-        const d = azimuthToVector(az)
-        const mid = (buried.from + buried.to) / 2
-        const len = buried.to - buried.from
-        return (
+      {showSchematic && (
+        <>
+          {/* collecting channels on storeys 2..7 */}
+          {rings
+            .filter((r) => isStoreyVisible(r.floorIndex, viewerStorey, { showAll }))
+            .map((r) => (
+            <mesh key={r.floorIndex} position={[0, r.y + channelOuter / 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[r.radius, channelOuter / 2, TUBE_RADIAL, TUBE_AROUND]} />
+              <meshStandardMaterial
+                color={pipeColour}
+                emissive={pipeEmissive}
+                emissiveIntensity={highlighted ? 0.5 : 0}
+                roughness={0.85}
+              />
+            </mesh>
+          ))}
+
+          {/* the elbow: wall run across to the wellhead, just above the mouth */}
           <mesh
-            key={az}
-            position={[d.x * mid, ENTRANCE.groundY - WATER.buriedPipeDepth, d.z * mid]}
-            rotation={[0, -(az * Math.PI) / 180 + Math.PI / 2, 0]}
+            position={[
+              (downpipeX + wellX) / 2,
+              wellY + WATER.downpipeElbowRise,
+              (downpipeZ + wellZ) / 2,
+            ]}
+            quaternion={elbowQuaternion}
           >
-            <boxGeometry args={[len, WATER.buriedPipeHeight, WATER.buriedPipeWidth]} />
+            <cylinderGeometry
+              args={[
+                WATER.downpipeDiameter / 2,
+                WATER.downpipeDiameter / 2,
+                Math.max(0.2, Math.hypot(downpipeX - wellX, downpipeZ - wellZ)),
+                12,
+                1,
+                true,
+              ]}
+            />
             <meshStandardMaterial
               color={pipeColour}
               emissive={pipeEmissive}
               emissiveIntensity={highlighted ? 0.5 : 0}
+              side={THREE.DoubleSide}
               roughness={0.85}
             />
           </mesh>
-        )
-      })}
 
-      {/* animated fall down the shaft */}
-      {highlighted && (
-        <instancedMesh ref={dropletsRef} args={[undefined, undefined, DROPLETS]}>
-          <sphereGeometry args={[0.075, 8, 8]} />
-          <meshBasicMaterial color="#8fd8ff" transparent opacity={0.85} />
-        </instancedMesh>
+          {/* below ground: square-section pipes leaving through the wall [ref] */}
+          {[0, 120, 240].map((az) => {
+            const d = azimuthToVector(az)
+            const mid = (buried.from + buried.to) / 2
+            const len = buried.to - buried.from
+            return (
+              <mesh
+                key={az}
+                position={[d.x * mid, ENTRANCE.groundY - WATER.buriedPipeDepth, d.z * mid]}
+                rotation={[0, -(az * Math.PI) / 180 + Math.PI / 2, 0]}
+              >
+                <boxGeometry args={[len, WATER.buriedPipeHeight, WATER.buriedPipeWidth]} />
+                <meshStandardMaterial
+                  color={pipeColour}
+                  emissive={pipeEmissive}
+                  emissiveIntensity={highlighted ? 0.5 : 0}
+                  roughness={0.85}
+                />
+              </mesh>
+            )
+          })}
+
+          {/* animated fall down the shaft */}
+          {highlighted && (
+            <instancedMesh ref={dropletsRef} args={[undefined, undefined, DROPLETS]}>
+              <sphereGeometry args={[0.075, 8, 8]} />
+              <meshBasicMaterial color="#8fd8ff" transparent opacity={0.85} />
+            </instancedMesh>
+          )}
+        </>
       )}
     </group>
   )

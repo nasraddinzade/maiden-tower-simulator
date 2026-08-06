@@ -326,18 +326,25 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   // is the best-documented part of the tower and shown almost nowhere.
   const water = useControls('Водосбор', {
     /*
-     * The water-collection layer: the ring channels, the downpipe and the buried
-     * intakes. OFF by default now.
+     * The SCHEMATIC half of the water-collection layer: the ring channels, the
+     * junction leg across to the wellhead, the buried intakes. OFF by default.
      *
-     * In the tower it is inside the masonry and under the paving — you cannot see
-     * a metre of it. Drawn in the walkable model it puts a 0.22 m ceramic hoop
-     * round every chamber at chest height and stands the downpipe up out of the
-     * wellhead like a post in the middle of storey 2, which is the first thing
-     * anyone walking in asks about. It is a DIAGRAM of a system [ref] describes,
-     * not fabric you could touch, and the model's target is the building as it
-     * stands. Kept as a layer, one click away, where a diagram belongs.
+     * In the tower none of it can be seen — [ref] puts the channels inside the
+     * masonry and the intakes under the paving, and the pipe's last courses at
+     * the well were lifted long ago. Drawn in the walkable model it puts a
+     * 0.22 m ceramic hoop round every chamber and lays a 0.3 m pipe across the
+     * floor where visitors stand at the glass. It is a DIAGRAM of a system [ref]
+     * describes, not fabric you could touch, and the model's target is the
+     * building as it stands. One click away, where a diagram belongs.
+     *
+     * What this switch NO LONGER hides is the well — the glass-covered head in
+     * storey 3's floor, its rim and shaft, and the downpipe standing in the
+     * chase this file cuts into the shell a few lines up. Those a visitor CAN
+     * touch, and the wellhead is the one thing that storey is known for; hiding
+     * it behind the diagram was hiding the building to hide the argument about
+     * it. Same rule as the beams and the scale rod, opposite answer.
      */
-    showWater: false,
+    showSchematic: false,
     highlightWater: false,
     xrayWalls: false,
   })
@@ -483,7 +490,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
       />
       <CompassDisc visible={sky.showCompass} year={date.getFullYear()} />
       <WaterSystem
-        visible={water.showWater}
+        showSchematic={water.showSchematic}
         highlighted={water.highlightWater}
         viewerStorey={viewerStorey}
         showAll={!firstPerson || !perf.cullStoreys || water.xrayWalls}
