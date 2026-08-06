@@ -349,6 +349,8 @@ export function stairPassageSections(
 
 /** Clearance kept either side of the flight inside the passage, metres. */
 export const PASSAGE_SIDE_CLEARANCE = 0.06
+/** See the overlap argument of stairTreadVertices(). */
+export const TREAD_OVERLAP_FRACTION = 0.12
 /** Tolerance between a tread's underside and the floor of the cut, metres. */
 export const PASSAGE_FOOT_TOLERANCE = 0.02
 
@@ -387,6 +389,23 @@ export function stairTreadVertices(
   width: number,
   thicknessOf: (s: StepPlacement) => number,
   arcSegments = 3,
+  /**
+   * How far each tread is stretched past its own wedge, as a fraction of that
+   * wedge, so consecutive treads INTERPENETRATE instead of meeting exactly.
+   *
+   * Meeting exactly is the obvious thing to want and it is wrong. Tread i+1 is
+   * thicker than a riser — it has to be, or it would be a plank on nothing — so
+   * its end face and tread i's end face are coplanar quads sharing the same
+   * 0.12 m band of the same plane. The depth buffer cannot separate them, and
+   * what shows in-game is a pure-black slit under the nosing of every step, the
+   * whole way up the tower. It reads as a hole; it is two surfaces arguing.
+   *
+   * A little overlap buries both faces inside the neighbouring block. The value
+   * is small enough that the treads' visible geometry is unchanged — the nosing
+   * still lands where the walking line says it does — and large enough to be far
+   * outside float precision at this scale.
+   */
+  overlapFraction = TREAD_OVERLAP_FRACTION,
 ): { positions: number[]; indices: number[] } {
   const positions: number[] = []
   const indices: number[] = []
@@ -398,10 +417,11 @@ export function stairTreadVertices(
     const outer = s.midRadius + width / 2
     const top = s.treadY
     const bottom = s.treadY - thicknessOf(s)
-    const half = s.angularWidthDeg / 2
+    const half = (s.angularWidthDeg / 2) * (1 + overlapFraction)
+    const span = half * 2
 
     for (let k = 0; k <= arcSegments; k++) {
-      const az = (s.azimuthDeg - half + (s.angularWidthDeg * k) / arcSegments) * DEG
+      const az = (s.azimuthDeg - half + (span * k) / arcSegments) * DEG
       const dx = Math.sin(az)
       const dz = -Math.cos(az)
       // four per station: inner-bottom, outer-bottom, outer-top, inner-top
@@ -476,6 +496,15 @@ export interface StairDoorway {
   innerRadius: number
   /** Reaches into the passage. */
   outerRadius: number
+  /**
+   * Rake of the sill and the head, metres of Y per metre of tangential offset
+   * toward increasing azimuth.
+   *
+   * A doorway onto a rising stair is not a flat-bottomed hole. See the note on
+   * the sill in stairDoorways(): a level sill wide enough to clear the lowest
+   * tread under its arc necessarily digs a pit under the highest one.
+   */
+  bottomRake: number
 }
 
 /**
@@ -496,8 +525,6 @@ export function stairDoorways(
   height: number,
   innerFaceRadiusAt: (y: number) => number,
   floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
-  /** Floor slab thickness, so the threshold can be dropped clear of it. */
-  slabThickness = 0.3,
   /**
    * Per flight, the floor levels it runs PAST and opens onto partway along.
    *
@@ -527,6 +554,8 @@ export function stairDoorways(
     const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - doorwayWidth / 2)
     // the same azimuth the ramp up to it uses — see approachAzimuthDeg()
     const azimuthDeg = approachAzimuthDeg(all, s, width)
+    const widthDeg = (doorwayWidth / Math.max(0.5, s.midRadius)) * (180 / Math.PI)
+
     /*
      * The head is measured from whatever the walker is standing on IN the
      * opening, not from the floor of the room.
@@ -540,19 +569,73 @@ export function stairDoorways(
     const underfoot = all.reduce((best, cur) =>
       Math.abs(cur.azimuthDeg - azimuthDeg) < Math.abs(best.azimuthDeg - azimuthDeg) ? cur : best,
     )
+
+    /*
+     * The sill goes as deep as it must and NOT ONE STEP DEEPER.
+     *
+     * Two constraints pull against each other and the old fixed drop honoured
+     * only one of them.
+     *
+     * Downward: a doorway is an arc a couple of steps wide, so a sill cut at
+     * floor level hangs over the tread just short of the landing — measured,
+     * that left 0.16 m over the second-to-last step of a flight and you could
+     * not get from the stair onto the floor. The sill must clear every tread
+     * that passes under the arc.
+     *
+     * Upward: the doorway is a straight radial box, so whatever it cuts on the
+     * room side it also cuts on the PASSAGE side, where the stone below the
+     * treads is what the stair stands on. A flat drop of slab+0.15 sat 0.33 m
+     * under the passage floor at the head of a flight and 0.65 m under it at the
+     * foot, and the ray test over the built shell found the pit growing step by
+     * step: 0.86 m of nothing under the first tread past a doorway, 1.07 under
+     * the second, 1.27 under the third.
+     *
+     * Both are satisfied by taking the lowest tread under the arc and dropping
+     * to the passage floor beneath THAT tread — clear of every tread in the
+     * opening by construction, and never below the bed the stair rests on. The
+     * old flat drop stays as a floor for the value so the room side still has no
+     * lip where the arc happens to contain no low tread.
+     */
+    const riser = all.length > 1 ? Math.abs(all[1].treadY - all[0].treadY) : 0.2
+    const stepAngle = all.length > 1 ? all[1].azimuthDeg - all[0].azimuthDeg : 1
+    /*
+     * The stair's own gradient, expressed the way the cutter needs it: metres of
+     * rise per metre of travel round the arc, positive toward increasing
+     * azimuth. `stepAngle` carries the winding's sign, so this comes out
+     * negative on a counterclockwise stair without a special case.
+     */
+    const rake = riser / stepAngle / (Math.max(0.5, s.midRadius) * (Math.PI / 180))
+
+    // where the passage bed sits directly under the doorway's centre line
+    const bedAtCentre =
+      underfoot.treadY +
+      rake * (azimuthDeg - underfoot.azimuthDeg) * Math.max(0.5, s.midRadius) * (Math.PI / 180) -
+      treadDepth(riser)
+    /*
+     * THE SILL IS THE BED. Nothing deeper.
+     *
+     * It was tempting to drop it to the underside of the room's slab so the slab
+     * could never leave a shelf standing in the opening, and that is what the
+     * first version of this did. Measured on the built shell, it dug 0.51 m
+     * below the bed under the bottom four treads of a flight — a slot beside the
+     * first step, at the one place every visitor looks.
+     *
+     * The premise was wrong. At the foot of a flight the bed sits ABOVE the room
+     * floor, not inside the slab: the first tread is a riser up and the bed a
+     * tread-depth under it, which comes out 0.18 m proud. So there is no shelf to
+     * cut away — there is a low step up into the doorway, which is what a stair
+     * doorway has. At the head the bed is below the slab already and the slab
+     * covers the notch by itself. Neither end needs the drop.
+     *
+     * Note that this lip is not a collision problem even though the controller
+     * cannot climb a lip of any height: the walking surface here is the ramp
+     * chain from stairApproaches(), and the shell carries no collider.
+     */
     return {
       azimuthDeg,
-      widthDeg: (doorwayWidth / Math.max(0.5, s.midRadius)) * (180 / Math.PI),
-      /**
-       * The threshold sits BELOW the floor, not at it.
-       *
-       * A doorway is an arc a couple of steps wide, so a sill cut at floor
-       * level hangs over the tread just short of the landing: measured, that
-       * left 0.16 m of headroom on the second-to-last step of a flight — you
-       * could not get from the stair onto the floor. Dropping it clear of the
-       * slab removes the lip; the room's own floor slab covers the notch.
-       */
-      bottomY: floorY - slabThickness - 0.15,
+      widthDeg,
+      bottomRake: rake,
+      bottomY: bedAtCentre,
       topY: Math.max(floorY, underfoot.treadY) + height,
       innerRadius: Math.max(0.05, inner),
       outerRadius: s.midRadius + doorwayWidth / 2 + 0.06,

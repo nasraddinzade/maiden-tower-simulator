@@ -1,9 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { BUTTRESS, ENTRANCE, FLOORS, TOWER, innerRadiusAt, wallThicknessAt } from '../config/tower'
+import {
+  BUTTRESS,
+  ENTRANCE,
+  FLOORS,
+  STAIR,
+  TOWER,
+  WALL_LIFTS,
+  innerRadiusAt,
+  wallThicknessAt,
+} from '../config/tower'
+import { PLAYER } from '../config/player'
+import {
+  planAllFlights,
+  stairDoorways,
+  stairPassageSections,
+  treadDepth,
+} from './staircase'
 import { azimuthToVector } from './geometry'
 import windowData from '../data/windows.json'
-import type { WindowSpec } from './windows'
+import { windowCentreY, type WindowSpec } from './windows'
 import {
   buildShellGeometry,
   innerRadiusProfileAt,
@@ -24,6 +40,22 @@ const PARAMS: ShellParams = {
   entranceHeight: ENTRANCE.height,
   entranceSillY: ENTRANCE.sillY,
 }
+
+/*
+ * The openings exactly as App.tsx builds them — from the photographic fraction,
+ * not from floorIndex + heightAboveFloor. This used to carry its own copy of the
+ * old formula, so it went on cutting windows at heights the app had stopped
+ * using, and any fault that depended on where a window actually lands could not
+ * show up here.
+ */
+const WINDOW_CUTS = (windowData.windows as WindowSpec[]).map((w) => ({
+  azimuthDeg: w.azimuthDeg,
+  centreY: windowCentreY(w, TOWER.groundY, TOWER.height),
+  outerWidth: w.outerWidth,
+  outerHeight: w.outerHeight,
+  innerWidth: w.innerWidth,
+  innerHeight: w.innerHeight,
+}))
 
 const built = buildShellGeometry(PARAMS)
 
@@ -300,18 +332,7 @@ describe('window openings pierce the wall (Phase 5)', () => {
   })
 
   it('cuts every opening in the shipped data without breaking the mesh', () => {
-    const all = (windowData.windows as WindowSpec[]).map((w) => {
-      const floor = FLOORS[w.floorIndex]
-      return {
-        azimuthDeg: w.azimuthDeg,
-        centreY: floor.floorY + w.heightAboveFloor + w.outerHeight / 2,
-        outerWidth: w.outerWidth,
-        outerHeight: w.outerHeight,
-        innerWidth: w.innerWidth,
-        innerHeight: w.innerHeight,
-      }
-    })
-    const full = buildShellGeometry({ ...PARAMS, windows: all })
+    const full = buildShellGeometry({ ...PARAMS, windows: WINDOW_CUTS })
     expect(full.stats.degenerateCount).toBe(0)
     expect(full.stats.triangleCount).toBeGreaterThan(built.stats.triangleCount * 0.5)
   })
@@ -445,5 +466,100 @@ describe('entrance opening', () => {
     const at = (deg: number) => p[((Math.round(deg) % 360) + 360) % 360]
     expect(at(ENTRANCE.azimuthDeg)).toBe(0) // escaped through the doorway
     expect(at(ENTRANCE.azimuthDeg + 90)).toBeGreaterThan(0) // solid wall
+  })
+})
+
+/**
+ * THE FLOOR UNDER THE STAIR.
+ *
+ * This is the test that was missing, and its absence cost three rounds of
+ * looking at the wrong thing. A "stair bed" solid was unioned back into the
+ * shell to protect the passage floor from window reveals; instead it deleted
+ * that floor under 112 of the 113 treads, and the stair hung over a shaft
+ * running down to the plinth. Nothing in the tread geometry was wrong, so
+ * nothing in the tread geometry explained it.
+ *
+ * Cast a ray UP from below the plinth, at five radii across the passage, under
+ * every tread. Up rather than down because a downward ray from inside the
+ * passage would find the treads first; from below, the first surface it meets
+ * is the floor it is standing on — and if the floor is gone the ray sails on to
+ * the vault above, which is exactly the signature this catches.
+ */
+describe('the shell carries a floor under every tread', () => {
+  const flights = planAllFlights(STAIR, WALL_LIFTS, innerRadiusAt)
+  const passage = stairPassageSections(flights, STAIR.width, PLAYER.stairHeadroom, innerRadiusAt)
+  const doorways = stairDoorways(
+    flights,
+    STAIR.width,
+    ENTRANCE.height,
+    innerRadiusAt,
+    (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+    WALL_LIFTS.map((l) => l.opensAtY),
+    STAIR.doorwayWidth,
+  )
+  const withStair = buildShellGeometry({
+    ...PARAMS,
+    windows: WINDOW_CUTS,
+    stairPassage: passage,
+    stairDoorways: doorways,
+  })
+  const mesh = new THREE.Mesh(
+    withStair.geometry,
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }),
+  )
+  mesh.updateMatrixWorld(true)
+
+  const firstSurfaceAbove = (azimuthDeg: number, radius: number): number[] => {
+    const d = azimuthToVector(azimuthDeg)
+    const rc = new THREE.Raycaster()
+    rc.far = 90
+    rc.set(
+      new THREE.Vector3(d.x * radius, TOWER.groundY - 0.4, d.z * radius),
+      new THREE.Vector3(0, 1, 0),
+    )
+    return rc.intersectObject(mesh, false).map((h) => h.point.y)
+  }
+
+  it('under all 113 treads, at every radius across the passage', () => {
+    /*
+     * The bound, and why it is not simply the passage floor.
+     *
+     * Most treads sit exactly one tread-depth above the cut floor. At the ends
+     * of a flight they do not: the doorway sill is deliberately dropped clear of
+     * the storey's slab (floorY − slabThickness − 0.15), because a sill cut at
+     * floor level hangs over the tread just short of the landing and leaves
+     * 0.16 m of headroom on the second-to-last step. So under a doorway the
+     * first stone below a tread is that sill, up to a slab-and-a-bit lower.
+     *
+     * The bound is therefore the deepest step-down the building legitimately
+     * has, and the property being asserted is the one that actually failed:
+     * NO TREAD HANGS OVER A VOID. The fault this catches measured 7 m, not
+     * 7 cm — tightening this number is not the point of it.
+     */
+    const maxDrop = treadDepth(0.205) + TOWER.floorSlab + 0.2
+    const offenders: string[] = []
+    let worst = 0
+    flights.forEach((steps, fi) => {
+      steps.forEach((s, si) => {
+        for (const dr of [-0.35, -0.18, 0, 0.18, 0.35]) {
+          const below = firstSurfaceAbove(s.azimuthDeg, s.midRadius + dr).filter(
+            (y) => y < s.treadY - 0.01,
+          )
+          const drop = below.length ? s.treadY - Math.max(...below) : Infinity
+          worst = Math.max(worst, Number.isFinite(drop) ? drop : 99)
+          if (drop > maxDrop) {
+            offenders.push(
+              `flight ${fi} step ${si} at y ${s.treadY.toFixed(2)}, r${dr >= 0 ? '+' : ''}${dr}: ` +
+                (Number.isFinite(drop) ? `${drop.toFixed(2)} m of nothing` : 'no floor at all'),
+            )
+          }
+        }
+      })
+    })
+    expect({ offenders, worstDropUnderAnyTread: +worst.toFixed(2) }).toEqual({
+      offenders: [],
+      worstDropUnderAnyTread: +worst.toFixed(2),
+    })
+    expect(worst).toBeLessThan(maxDrop)
   })
 })

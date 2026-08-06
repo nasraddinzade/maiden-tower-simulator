@@ -240,7 +240,6 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
       PLAYER.height + 0.35,
       innerRadiusAt,
       (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
-      TOWER.floorSlab,
       WALL_LIFTS.map((l) => l.opensAtY),
       STAIR.doorwayWidth,
     )

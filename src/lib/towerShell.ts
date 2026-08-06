@@ -287,6 +287,20 @@ export function doorwayCutter(d: StairDoorway): THREE.BufferGeometry {
   // archTunnel runs its axis along local Z; the doorway's axis is RADIAL, so
   // the tunnel's width becomes the tangential span and its depth the wall run.
   const geom = archTunnel(tangential, height, depth)
+  /*
+   * Rake the tool before it is turned: archTunnel's local X is the tangential
+   * span, so shearing Y against X tilts sill AND head together and the clear
+   * height stays what topY was computed to give. A stair doorway is raking in
+   * the real building for the same reason it has to be here — the floor on one
+   * side of it is a flight of steps.
+   */
+  if (d.bottomRake) {
+    const pos = geom.attributes.position as THREE.BufferAttribute
+    for (let i = 0; i < pos.count; i++) {
+      pos.setY(i, pos.getY(i) + d.bottomRake * pos.getX(i))
+    }
+    pos.needsUpdate = true
+  }
   geom.rotateY(-d.azimuthDeg * DEG)
   const dir = azimuthToVector(d.azimuthDeg)
   geom.translate(dir.x * midRadius, d.bottomY, dir.z * midRadius)
@@ -294,38 +308,88 @@ export function doorwayCutter(d: StairDoorway): THREE.BufferGeometry {
 }
 
 /**
- * The masonry bed the stair passage rests on: the same swept tube, dropped to
- * sit directly beneath the passage floor.
+ * The stone the stair stands on, as a CLIPPER FOR THE WINDOW TOOLS rather than
+ * a solid unioned into the building.
  *
- * One floor-slab thickness deep, so it uses no number that is not already in
- * config/tower.ts. Unioned back into the shell after the window cuts, since a
- * window reveal that crosses the flight would otherwise cut the floor out from
- * under the steps.
+ * A window reveal that crosses the flight really does eat the passage floor —
+ * measured on the built shell, storey 3's opening takes it out from under the
+ * top three treads of the first flight and the bottom tread of the second, up to
+ * 2.39 m deep. That clash is real and it is between two numbers neither of which
+ * is measured: STAIR.startAzimuthDeg is [PLACEHOLDER], and data/windows.json
+ * gives its own azimuths ±20° of systematic error. Moving either to make the
+ * picture tidy would be fitting geometry to a preference (CLAUDE.md rule 7).
+ *
+ * So the rule applied is structural instead, and it is true of any building: a
+ * window opening does not remove the stone a stair is carried on. The mason cuts
+ * the reveal until it meets the flight and stops. Expressed as geometry, that is
+ * this volume subtracted FROM EACH WINDOW CUTTER before the cutter touches the
+ * shell.
+ *
+ * Tool-on-tool is the whole point. The previous attempt put the same volume into
+ * the shell as a union, where its walls ran 0.02 m from the passage walls and
+ * exactly parallel to them for the length of the helix; three-bvh-csg resolved
+ * that by deleting the floor under 112 of the 113 treads. Here the near-parallel
+ * surfaces meet another tool, and the worst a stray face can do is leave a
+ * little more or less stone inside a wall.
  */
-export function stairBedGeometry(sections: PassageSection[]): THREE.BufferGeometry | null {
+export function stairBearingClip(sections: PassageSection[]): THREE.BufferGeometry | null {
   /*
-   * Inset from the passage walls, and lapped a centimetre up into it.
-   *
-   * The bed is only NEEDED where a window reveal has carved the passage floor
-   * away; everywhere else it is redundant, buried in stone that was never cut.
-   * Redundant or not, if its sides sit exactly ON the passage walls the two
-   * surfaces are coplanar, and a CSG evaluator that is not watertight leaves
-   * both — which shows in-game as bright vertical seams running the height of
-   * the passage. Pulling the sides in puts every leftover face inside solid
-   * rock; lapping the top up keeps the floor itself closed.
+   * Widened, not narrowed. It has to cover the passage's full footprint or a
+   * window could still nibble the edge of the bed, and every millimetre of the
+   * extra width is buried in masonry.
    */
-  const inset = 0.02
+  const spread = 0.2
   return stairPassageGeometry(
     sections.map((s) => ({
       ...s,
-      innerRadius: s.innerRadius + inset,
-      outerRadius: Math.max(s.innerRadius + inset + 0.05, s.outerRadius - inset),
-      topY: s.bottomY + 0.01,
+      innerRadius: Math.max(0.05, s.innerRadius - spread),
+      outerRadius: s.outerRadius + spread,
+      topY: s.bottomY,
       bottomY: s.bottomY - TOWER.floorSlab,
     })),
     { arched: false },
   )
 }
+
+/*
+ * THE STAIR BED IS GONE, AND ITS REMOVAL IS THE FIX, NOT A SIMPLIFICATION.
+ *
+ * There used to be a "bed" here: the passage tube copied, dropped one slab
+ * thickness below the passage floor, narrowed 0.02 m either side, lapped 0.01 m
+ * up into the passage, and UNIONED back into the shell after the windows were
+ * cut. Its purpose was to put back stone that a window reveal crossing the
+ * flight would otherwise have taken out from under the steps.
+ *
+ * It did the opposite. Measured on the built shell, by casting a ray up from
+ * below the plinth at five radii across the passage under every one of the 113
+ * treads:
+ *
+ *     bed union OFF   →   0 / 113 treads without a floor
+ *     bed union ON    → 112 / 113 treads without a floor
+ *
+ * The whole stair was hanging over a void running down to the plinth. That is
+ * what the owner kept photographing — black holes under every step — and what
+ * three rounds of looking at the tread geometry could never explain, because the
+ * treads were never the problem.
+ *
+ * The mechanism is the narrowing. Pulled IN by 0.02 m, the bed's side walls end
+ * up 2 cm from the passage walls and exactly parallel to them along the whole
+ * helix, and three-bvh-csg cannot reconcile two near-coincident lofted surfaces:
+ * it resolves the union by deleting the floor between them. Pushed OUT instead,
+ * so the sides are buried 0.15 m deep in stone, the count falls to 3 / 113 — the
+ * mechanism confirmed by reversing it. The comment that stood here argued the
+ * narrowing put "every leftover face inside solid rock", which is backwards: it
+ * put them a hair from the void.
+ *
+ * Widening would therefore have worked well enough. It is still deleted,
+ * because with the union simply gone the floor is intact under every tread at
+ * every radius, and the clash it defended against no longer exists: it was two
+ * storey-6 slits flaring into the passage, and the slits moved when window
+ * heights started coming from the photographs rather than from a filler sill.
+ * A union that must be tuned to avoid destroying the building is worse than no
+ * union, and there is now a test that fails the moment a window does eat the
+ * floor — see "the shell carries a floor under every tread".
+ */
 
 /**
  * Cross-section of the passage, as (radius, height) pairs running from the
@@ -518,37 +582,29 @@ export function buildShellGeometry(p: ShellParams): {
     result = evaluator.evaluate(result, tool, SUBTRACTION)
   }
 
-  // Window openings — each a truncated pyramid, narrow face outward, so the
-  // reveal flares into the room exactly as [ref] describes.
-  for (const w of p.windows ?? []) {
-    const tool = new Brush(prep(windowCutter(w)))
-    tool.updateMatrixWorld(true)
-    result = evaluator.evaluate(result, tool, SUBTRACTION)
-  }
-
-  /**
-   * Put back the masonry the stair is carried on — AFTER the windows.
+  /*
+   * Window openings — each a truncated pyramid, narrow face outward, so the
+   * reveal flares into the room exactly as [ref] describes.
    *
-   * Measured: the two storey-6 slits (az 141 and az 132, both centred at
-   * y 19.35) flare inward far enough that their reveals merge into one 25° pit
-   * through the stair passage floor, from az 149 down to az 124, between 1.07
-   * and 2.08 m deep. A stair in a wall is carried on stone; a window opening
-   * cannot take that stone away and leave the steps hanging.
-   *
-   * This deliberately leaves the conflict VISIBLE rather than tuning it away:
-   * the bed crosses those two slits, so the reveal reads as interrupted by the
-   * stair. That is the honest picture. The clash is between two unsourced
-   * numbers — STAIR.startAzimuthDeg, flagged [PLACEHOLDER], and the azimuths in
-   * data/windows.json, which that file itself gives ±20° of systematic error.
-   * Moving either to make the picture tidier would be fitting geometry to a
-   * preference (CLAUDE.md rule 7).
+   * Clipped first against the stone the stair is carried on, where there is a
+   * stair to carry — see stairBearingClip().
    */
-  for (const flight of p.stairPassage ?? []) {
-    const bed = stairBedGeometry(flight)
-    if (!bed) continue
-    const tool = new Brush(prep(bed))
+  const bearing = (p.stairPassage ?? [])
+    .map((flight) => stairBearingClip(flight))
+    .filter((g): g is THREE.BufferGeometry => g !== null)
+    .map((g) => {
+      const b = new Brush(prep(g))
+      b.updateMatrixWorld(true)
+      return b
+    })
+  for (const w of p.windows ?? []) {
+    let tool = new Brush(prep(windowCutter(w)))
     tool.updateMatrixWorld(true)
-    result = evaluator.evaluate(result, tool, ADDITION)
+    for (const clip of bearing) {
+      tool = evaluator.evaluate(tool, clip, SUBTRACTION)
+      tool.updateMatrixWorld(true)
+    }
+    result = evaluator.evaluate(result, tool, SUBTRACTION)
   }
 
   /**
