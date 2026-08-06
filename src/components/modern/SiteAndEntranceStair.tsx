@@ -1,7 +1,11 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
-import { entrancePassageBoxes, stairRampBoxes } from '../../lib/collision'
+import {
+  entrancePassageBoxes,
+  stairRampBoxes,
+  straightStairGuardBoxes,
+} from '../../lib/collision'
 import { ENTRANCE, TOWER, innerRadiusAt } from '../../config/tower'
 import { EXTERNAL_STAIR, EXTERNAL_STAIR_RISE, GROUND_Y, SITE } from '../../config/site'
 import { LIMESTONE_LIGHT } from '../../lib/masonry'
@@ -13,6 +17,20 @@ const RUN = EXTERNAL_STAIR.risers * EXTERNAL_STAIR.going
 
 /** Where the flight's foot stands, measured from the tower axis. */
 const FOOT_RADIUS = TOWER.outerRadius + RUN
+
+/**
+ * The flight's walking line, foot first: the two points everything the walker
+ * meets on this stair is hung off.
+ *
+ * Written once because the ramp and the guards beside it have to agree about
+ * where the flight is to within nothing at all — the guards' inner faces sit on
+ * the ramp's own edges, and a second copy of these numbers is the obvious way
+ * for that to stop being true.
+ */
+const WALKING_LINE = [
+  { azimuthDeg: ENTRANCE.azimuthDeg, treadY: GROUND_Y, midRadius: FOOT_RADIUS },
+  { azimuthDeg: ENTRANCE.azimuthDeg, treadY: ENTRANCE.thresholdY, midRadius: TOWER.outerRadius },
+]
 
 export interface SiteAndEntranceStairProps {
   visible: boolean
@@ -38,18 +56,39 @@ export interface SiteAndEntranceStairProps {
 export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntranceStairProps) {
   const az = ENTRANCE.azimuthDeg * DEG
 
-  /** The flight as two points on its walking line, for the ramp collider. */
+  /** The walking surface the walker actually climbs. */
   const ramp = useMemo(() => {
     if (!withColliders) return []
-    return stairRampBoxes(
-      [
-        { azimuthDeg: ENTRANCE.azimuthDeg, treadY: GROUND_Y, midRadius: FOOT_RADIUS },
-        { azimuthDeg: ENTRANCE.azimuthDeg, treadY: ENTRANCE.thresholdY, midRadius: TOWER.outerRadius },
-      ],
-      EXTERNAL_STAIR.width,
-      1,
-      0.3,
-    )
+    return stairRampBoxes(WALKING_LINE, EXTERNAL_STAIR.width, 1, 0.3)
+  }, [withColliders])
+
+  /**
+   * The balustrades in physics: a slab down each side of the flight.
+   *
+   * They are needed, and the sum is the stair's own. The ramp is one box
+   * EXTERNAL_STAIR.width across — 1.4 m — so a walker keeps a contact until
+   * their capsule centre is half that plus a capsule radius off the centreline,
+   * 1.0 m, and past it they leave the flight sideways and fall its whole rise
+   * onto the paving. Nothing else stood there: the site's ground cylinder is
+   * what they landed on, and it is 1.98 m down at the head. Drawing a balustrade
+   * and not building this is the worse half of that — a rail you can see and
+   * walk through is the same fault as a floor you can see and fall through, and
+   * this model keeps finding the second one.
+   *
+   * The height is the drawn guard plus a riser. The rail is a guard height above
+   * the NOSING line, while the walking line the ramp chain gives passes through
+   * the BACK edge of every tread's surface and so runs exactly one riser below
+   * the nosings. A slab measured off the walking line therefore has to be a
+   * riser taller to reach the top of what a visitor can see.
+   */
+  const guards = useMemo(() => {
+    if (!withColliders) return []
+    return straightStairGuardBoxes({
+      foot: WALKING_LINE[0],
+      head: WALKING_LINE[1],
+      width: EXTERNAL_STAIR.width,
+      height: EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser,
+    })
   }, [withColliders])
 
   /** The visible treads: plain boxes, since the flight is straight. */
@@ -66,6 +105,104 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     }
     return out
   }, [az])
+
+  /**
+   * The balustrades as drawn: a raking handrail either side on plumb standards.
+   *
+   * Hung off the NOSING line rather than off the ramp collider's walking line,
+   * because a guard height is measured from the surface a visitor's foot is on
+   * and that is the drawn tread. The two lines are a riser apart; see the note
+   * on `guards` above, which is where that difference has to be paid back.
+   *
+   * Standards and a top rail, and nothing between them. The footage records
+   * tubular balustrades either side and resolves no infill at all, so none is
+   * drawn — the same restraint OPENING_GUARD takes indoors, where the panes are
+   * frameless in the frames and so get no posts and no cap rail here either.
+   *
+   * A standard per tread per side is two dozen tubes at the current count, so
+   * they go in one InstancedMesh — one draw call however many, which is the
+   * addendum's argument for the treads of the stair inside.
+   */
+  const balustrade = useMemo(() => {
+    const { going, riser, risers, guardHeight, railRadius, width, postsPerTread } = EXTERNAL_STAIR
+    const perTread = Math.max(1, Math.round(postsPerTread))
+    const rake = riser / going
+    // set in from the tread's edge by the tube's own radius, so the balustrade
+    // stands ON the flight rather than half off it
+    const halfWidth = width / 2 - railRadius
+    // across the flight: perpendicular to the radius the stair runs out along
+    const lateralX = Math.cos(az)
+    const lateralZ = Math.sin(az)
+
+    /** A point on one side's nosing line, `d` in from the foot, lifted by `lift`. */
+    const online = (d: number, side: number, lift: number): THREE.Vector3 => {
+      const r = FOOT_RADIUS - d
+      return new THREE.Vector3(
+        Math.sin(az) * r + side * lateralX * halfWidth,
+        GROUND_Y + riser + d * rake + lift,
+        -Math.cos(az) * r + side * lateralZ * halfWidth,
+      )
+    }
+
+    const posts: Array<{ position: [number, number, number]; height: number }> = []
+    const rails: Array<{
+      position: [number, number, number]
+      quaternion: THREE.Quaternion
+      length: number
+    }> = []
+
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < risers; i++) {
+        for (let k = 0; k < perTread; k++) {
+          const d = going * (i + k / perTread)
+          const head = online(d, side, guardHeight)
+          // a standard is plumb, so it runs from the tread it stands on up to
+          // the raking rail: at a nosing that is exactly the guard height, and
+          // anywhere further into a tread it is longer by the rake
+          const footY = GROUND_Y + riser * (i + 1)
+          posts.push({
+            position: [head.x, (footY + head.y) / 2, head.z],
+            height: head.y - footY,
+          })
+        }
+      }
+      // one rail per side, first nosing to last. It stops a going short of the
+      // wall rather than being levelled off onto the landing: what happens at
+      // the top of this rail is not in any frame, and a return nobody has seen
+      // would be fabric invented to tidy up a corner.
+      const a = online(0, side, guardHeight)
+      const b = online(going * (risers - 1), side, guardHeight)
+      const dir = b.clone().sub(a)
+      rails.push({
+        position: [(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2],
+        quaternion: new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          dir.clone().normalize(),
+        ),
+        length: dir.length(),
+      })
+    }
+    return { posts, rails }
+  }, [az])
+
+  const postsRef = useRef<THREE.InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const mesh = postsRef.current
+    if (!mesh) return
+    const m = new THREE.Matrix4()
+    const pos = new THREE.Vector3()
+    const scale = new THREE.Vector3()
+    const spin = new THREE.Quaternion()
+    balustrade.posts.forEach((p, i) => {
+      // the geometry is a unit-length tube, so the standard's height is a scale
+      pos.set(p.position[0], p.position[1], p.position[2])
+      scale.set(1, p.height, 1)
+      m.compose(pos, spin, scale)
+      mesh.setMatrixAt(i, m)
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    mesh.computeBoundingSphere()
+  }, [balustrade, visible])
 
   /*
    * The entrance passage, from the outer face through to the room: the sill you
@@ -130,6 +267,32 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
             </mesh>
           ))}
 
+          {/* the balustrades: standards instanced, one rail per side */}
+          <instancedMesh
+            ref={postsRef}
+            args={[undefined, undefined, balustrade.posts.length]}
+            material={steel}
+            castShadow
+          >
+            <cylinderGeometry
+              args={[EXTERNAL_STAIR.railRadius, EXTERNAL_STAIR.railRadius, 1, 8]}
+            />
+          </instancedMesh>
+
+          {balustrade.rails.map((r, i) => (
+            <mesh
+              key={`erail-${i}`}
+              material={steel}
+              position={r.position}
+              quaternion={r.quaternion}
+              castShadow
+            >
+              <cylinderGeometry
+                args={[EXTERNAL_STAIR.railRadius, EXTERNAL_STAIR.railRadius, r.length, 8]}
+              />
+            </mesh>
+          ))}
+
           {/* the passage sill, so the threshold reads as a floor and not a hole.
               Only the sill is drawn: the cheeks beside it are already in the
               shell, as the stone the entrance arch was cut out of. */}
@@ -161,6 +324,14 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
           {ramp.map((b, i) => (
             <CuboidCollider
               key={`eramp-${i}`}
+              args={b.halfExtents}
+              position={b.position}
+              quaternion={b.quaternion}
+            />
+          ))}
+          {guards.map((b, i) => (
+            <CuboidCollider
+              key={`eguard-${i}`}
               args={b.halfExtents}
               position={b.position}
               quaternion={b.quaternion}

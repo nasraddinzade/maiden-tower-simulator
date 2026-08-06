@@ -48,6 +48,31 @@ export const EXTERNAL_STAIR = {
   width: ENTRANCE.width + 0.3,
   /** m — [ASSUMPTION] a normal public-stair guard, as the roof balustrade is. */
   guardHeight: 1.05,
+  /**
+   * m — radius of the balustrade tubes. [ASSUMPTION].
+   *
+   * The frames show tubes and give no way to scale them: they are two or three
+   * pixels across wherever they appear, and the same absence of any object of
+   * known size that defeated the stair's WIDTH defeats this. 40 mm is the
+   * ordinary section for a fabricated handrail. MODERN_SPIRAL.rodRadius assumes
+   * exactly that figure indoors for exactly that reason, and is deliberately NOT
+   * imported here: that the two were made to one section is a guess, and sharing
+   * a constant would write the guess down as a fact.
+   */
+  railRadius: 0.02,
+  /**
+   * Standards per tread, each side. [ASSUMPTION], and the weakest thing here.
+   *
+   * Nothing counts them. The footage records tubular balustrades either side and
+   * no frame resolves the uprights, so the flight's own spacing is the only one
+   * available — which is what the indoor spiral uses too, except that there the
+   * count WAS read off the video (MODERN_SPIRAL.rodsPerTread, a direct count
+   * needing no scale). One per tread puts them a going apart, so the thing reads
+   * as a balustrade rather than as a bare handrail, without drawing infill panels
+   * nobody has seen. The count is derived from `risers` rather than written down,
+   * so it follows the flight if the tread count is ever corrected.
+   */
+  postsPerTread: 1,
 } as const
 
 /** m — total rise of the external flight, 12 × 0.165. */

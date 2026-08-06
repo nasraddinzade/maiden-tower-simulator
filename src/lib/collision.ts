@@ -533,6 +533,83 @@ export function stairRampBoxes(
   return out
 }
 
+export interface StraightStairGuardParams {
+  /** Foot of the flight's walking line — the point the ramp chain starts at. */
+  foot: RampStep
+  /** Head of it. Must differ from the foot in plan. */
+  head: RampStep
+  /** Clear width between the two guards: the full width of the walking surface. */
+  width: number
+  /** How far the guard stands above the walking line. */
+  height: number
+  /** Lateral thickness of each slab; defaults to GUARD_BOX_THICKNESS. */
+  thickness?: number
+}
+
+/**
+ * A guard down each side of a STRAIGHT flight, as one upright slab per side.
+ *
+ * It is a wall, not a step, so guardRingBoxes' argument carries over whole: the
+ * inner face sits on the walking surface's own edge, at exactly ±width/2, which
+ * takes nothing off the width the ramp chain gives; it grows OUTWARD from that
+ * edge; and its only horizontal face is the top, a guard height up and far past
+ * anything the autostep will try to mount. Nothing here has to be climbed, so
+ * the rule that governs every walking surface in this model — ramps, never lips
+ * — does not apply. A guard the walker could get onto beside a flight would be
+ * a launch pad off it.
+ *
+ * UPRIGHT, and that is the whole of the shape's design. The obvious slab is one
+ * pitched to the rake, occupying exactly the band the drawn balustrade does. But
+ * pitching a cuboid leans its END faces back with it, and at the head of a
+ * flight that is fatal: a 1.2 m guard on a 29° rake carries its top edge 0.6 m
+ * further down the flight than its bottom edge, so from about knee height upward
+ * the slab stops short of the landing — and the landing is the one place on a
+ * flight where the drop beside the walker is its whole rise. An upright slab
+ * makes the opposite error, hanging below the walking line at the top of the
+ * flight and standing proud of the rail at the bottom, and both of those are in
+ * places nothing can reach: under the flight, where the clear height only
+ * becomes a walker's own within the last stride against the wall, and above a
+ * guard nobody's capsule can top.
+ *
+ * One slab, not a chain: the flight is straight, so a single box IS the shape,
+ * and a chain would only introduce seams to get wrong.
+ */
+export function straightStairGuardBoxes(p: StraightStairGuardParams): BoxSpec[] {
+  if (p.width <= 0 || p.height <= 0) return []
+  const thickness = p.thickness ?? GUARD_BOX_THICKNESS
+  const footRad = p.foot.azimuthDeg * DEG
+  const headRad = p.head.azimuthDeg * DEG
+  const fx = Math.sin(footRad) * p.foot.midRadius
+  const fz = -Math.cos(footRad) * p.foot.midRadius
+  const hx = Math.sin(headRad) * p.head.midRadius
+  const hz = -Math.cos(headRad) * p.head.midRadius
+
+  const run = Math.hypot(hx - fx, hz - fz)
+  if (run < 1e-6) return []
+
+  // local +Z along the travel, as stairRampBoxes builds it, so the two agree on
+  // which way is "across the flight" without either restating the other's maths
+  const quaternion = yawThenPitch(Math.atan2(hx - fx, hz - fz), 0)
+  const lateral = rotate(quaternion, [1, 0, 0])
+
+  const bottomY = Math.min(p.foot.treadY, p.head.treadY)
+  const topY = Math.max(p.foot.treadY, p.head.treadY) + p.height
+  const offset = p.width / 2 + thickness / 2
+
+  return [-1, 1].map(
+    (side): BoxSpec => ({
+      halfExtents: [thickness / 2, (topY - bottomY) / 2, run / 2],
+      position: [
+        (fx + hx) / 2 + side * lateral[0] * offset,
+        (bottomY + topY) / 2,
+        (fz + hz) / 2 + side * lateral[2] * offset,
+      ],
+      quaternion,
+      kind: 'guard',
+    }),
+  )
+}
+
 /**
  * Depth of the entrance sill slab, metres.
  *

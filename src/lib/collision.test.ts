@@ -5,12 +5,15 @@ import {
   guardRingBoxes,
   rotate,
   stairRampBoxes,
+  straightStairGuardBoxes,
   wallColliders,
   yawThenTilt,
   type BoxSpec,
   type PassageWindow,
 } from './collision'
 import { PLAYER } from '../config/player'
+import { EXTERNAL_STAIR } from '../config/site'
+import { ENTRANCE } from '../config/tower'
 
 /** World-space corners of a box, via its actual quaternion. */
 function corners(b: BoxSpec): Array<[number, number, number]> {
@@ -549,5 +552,109 @@ describe('stairRampBoxes', () => {
       const yAxis = rotate(b.quaternion, [0, 1, 0])
       expect(yAxis[1]).toBeGreaterThan(0.7)
     }
+  })
+})
+
+describe('straightStairGuardBoxes', () => {
+  // the external entrance flight: 3.6 m of run against 1.98 m of rise, due west
+  const flight = {
+    foot: { azimuthDeg: 270, treadY: 0, midRadius: 11.85 },
+    head: { azimuthDeg: 270, treadY: 1.98, midRadius: 8.25 },
+    width: 1.4,
+    height: 1.215,
+  }
+  const RUN = flight.foot.midRadius - flight.head.midRadius
+
+  it('leaves the walking surface its full width', () => {
+    const [a, b] = straightStairGuardBoxes(flight)
+    const across = Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2])
+    // the clear gap between the two inner faces IS the ramp's own width: the
+    // guards must not eat any of it, or the walker is stopped short of the edge
+    // they can see, and on this flight the doorway at the head is narrower still
+    expect(across - a.halfExtents[0] - b.halfExtents[0]).toBeCloseTo(flight.width, 9)
+    expect(a.kind).toBe('guard')
+    expect(b.kind).toBe('guard')
+  })
+
+  it('grows outward from those edges, never in over the flight', () => {
+    // due west, so the flight's centreline is the −x axis and z is across it
+    for (const b of straightStairGuardBoxes(flight)) {
+      const off = Math.abs(b.position[2])
+      expect(off).toBeCloseTo(flight.width / 2 + b.halfExtents[0], 9)
+      const inner = Math.min(...corners(b).map((c) => Math.abs(c[2])))
+      expect(inner).toBeCloseTo(flight.width / 2, 9)
+    }
+  })
+
+  it('stands upright, so it guards the head of the flight at every height', () => {
+    for (const b of straightStairGuardBoxes(flight)) {
+      const up = rotate(b.quaternion, [0, 1, 0])
+      expect(up[1]).toBeCloseTo(1, 9)
+      /*
+       * Which means the plan footprint at the top is the footprint at the
+       * bottom. A slab pitched to the rake would carry its top edge
+       * height * sin(29°) ≈ 0.6 m back DOWN the flight, so from about knee
+       * height upward it would stop short of the landing — the one place on a
+       * flight where the drop beside the walker is its whole rise.
+       */
+      const cs = corners(b)
+      const low = cs.filter((c) => c[1] < b.position[1])
+      const high = cs.filter((c) => c[1] > b.position[1])
+      for (const p of low) {
+        const matched = high.some((q) => Math.hypot(q[0] - p[0], q[2] - p[2]) < 1e-9)
+        expect(matched).toBe(true)
+      }
+    }
+  })
+
+  it('spans the flight end to end, foot surface to a guard height over the head', () => {
+    for (const b of straightStairGuardBoxes(flight)) {
+      expect(b.halfExtents[2] * 2).toBeCloseTo(RUN, 9)
+      const ys = corners(b).map((c) => c[1])
+      expect(Math.min(...ys)).toBeCloseTo(flight.foot.treadY, 9)
+      expect(Math.max(...ys)).toBeCloseTo(flight.head.treadY + flight.height, 9)
+      // along the flight, which runs due west: no stopping short at either end
+      const along = corners(b).map((c) => -c[0])
+      expect(Math.min(...along)).toBeCloseTo(flight.head.midRadius, 9)
+      expect(Math.max(...along)).toBeCloseTo(flight.foot.midRadius, 9)
+    }
+  })
+
+  it('is a wall rather than a step, at both ends of the flight', () => {
+    for (const b of straightStairGuardBoxes(flight)) {
+      const top = Math.max(...corners(b).map((c) => c[1]))
+      // measured from the HIGHEST walking point, which is the least favourable
+      expect(top - flight.head.treadY).toBeGreaterThan(PLAYER.autostepMaxHeight)
+    }
+  })
+
+  it('is thicker than the walker crosses between solver steps', () => {
+    // WALL_BOX_THICKNESS's sum, run the other way: at the run speed and 30 fps
+    const worstStep = PLAYER.runSpeed / 30
+    for (const b of straightStairGuardBoxes(flight)) {
+      expect(b.halfExtents[0] * 2).toBeGreaterThan(worstStep)
+    }
+  })
+
+  it('never pinches the doorway the flight leads to', () => {
+    // the config's own numbers, so that narrowing the stair to less than the
+    // sourced 1.1 m doorway [İçərişəhər] fails here instead of in the walk
+    const [a, b] = straightStairGuardBoxes({
+      ...flight,
+      width: EXTERNAL_STAIR.width,
+      height: EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser,
+    })
+    const across = Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2])
+    const clear = across - a.halfExtents[0] - b.halfExtents[0]
+    expect(clear).toBeGreaterThanOrEqual(ENTRANCE.width)
+    // and wide enough for the capsule to walk between them at all
+    expect(clear).toBeGreaterThan(PLAYER.radius * 2)
+  })
+
+  it('emits nothing for a flight with no plan run, or no width or height', () => {
+    expect(straightStairGuardBoxes({ ...flight, head: { ...flight.head, midRadius: 11.85 } }))
+      .toHaveLength(0)
+    expect(straightStairGuardBoxes({ ...flight, width: 0 })).toHaveLength(0)
+    expect(straightStairGuardBoxes({ ...flight, height: 0 })).toHaveLength(0)
   })
 })
