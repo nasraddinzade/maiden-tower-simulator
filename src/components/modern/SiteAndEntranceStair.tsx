@@ -8,7 +8,6 @@ import {
 } from '../../lib/collision'
 import { ENTRANCE, TOWER, innerRadiusAt } from '../../config/tower'
 import { EXTERNAL_STAIR, EXTERNAL_STAIR_RISE, GROUND_Y, SITE } from '../../config/site'
-import { LIMESTONE_LIGHT } from '../../lib/masonry'
 
 const DEG = Math.PI / 180
 
@@ -206,13 +205,25 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
 
   /*
    * The entrance passage, from the outer face through to the room: the sill you
-   * walk in on and the masonry either side of it.
+   * walk in on and the masonry either side of it. COLLIDER ONLY now.
    *
-   * Without the sill the doorway is an opening with nothing under it: the walker
-   * reaches the threshold and drops through the wall. wallColliders leaves the
-   * entrance open as a gap in the wall bands, which is right — but a gap needs a
-   * sill to walk on, and a sill on its own is a plank over a 2 m drop. The
-   * cheeks are why; entrancePassageBoxes argues it where the shapes are made.
+   * The sill used to be drawn here too, and it was a second opaque surface at
+   * the height of one the shell already has. The entrance is cut through the
+   * wall by an arched tunnel whose own sill sits at ENTRANCE.thresholdY, so the
+   * stone the arch came out of is left with an up-facing face at that Y right
+   * through the passage — continuous with the chamber floor inside, which is the
+   * same cut. The drawn box sat exactly on it and the two z-fought in the
+   * doorway, which is the first thing you look at walking up the stair. Dropping
+   * it also gives the note that used to hang on that mesh what it asked for: the
+   * sill is now literally the tower's own stone rather than a box wearing its
+   * colour.
+   *
+   * The COLLIDER is not redundant and stays. Without it the doorway is an
+   * opening with nothing under it: the walker reaches the threshold and drops
+   * through the wall. wallColliders leaves the entrance open as a gap in the
+   * wall bands, which is right — but a gap needs a sill to walk on, and a sill
+   * on its own is a plank over a 2 m drop. The cheeks are why;
+   * entrancePassageBoxes argues it where the shapes are made.
    */
   const passage = useMemo(
     () =>
@@ -231,15 +242,6 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     () => new THREE.MeshStandardMaterial({ color: '#8d8577', roughness: 0.95 }),
     [],
   )
-  /*
-   * The passage sill is the tower's own stone, not the museum's paving.
-   * Sharing the paving material made it read as a pale panel let into the wall,
-   * which is the first thing you look at walking up the stair.
-   */
-  const sillStone = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: LIMESTONE_LIGHT, roughness: 0.95 }),
-    [],
-  )
   const steel = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#4a4a4e', roughness: 0.6, metalness: 0.4 }),
     [],
@@ -247,10 +249,9 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
   useEffect(
     () => () => {
       paving.dispose()
-      sillStone.dispose()
       steel.dispose()
     },
-    [paving, sillStone, steel],
+    [paving, steel],
   )
 
   return (
@@ -293,23 +294,9 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
             </mesh>
           ))}
 
-          {/* the passage sill, so the threshold reads as a floor and not a hole.
-              Only the sill is drawn: the cheeks beside it are already in the
-              shell, as the stone the entrance arch was cut out of. */}
-          <mesh
-            material={sillStone}
-            position={passage.sill.position}
-            quaternion={passage.sill.quaternion}
-            receiveShadow
-          >
-            <boxGeometry
-              args={[
-                passage.sill.halfExtents[0] * 2,
-                passage.sill.halfExtents[1] * 2,
-                passage.sill.halfExtents[2] * 2,
-              ]}
-            />
-          </mesh>
+          {/* Nothing is drawn for the passage itself: sill and cheeks alike are
+              already in the shell, as the stone the entrance arch was cut out
+              of. See the note on `passage` above. */}
         </>
       )}
 

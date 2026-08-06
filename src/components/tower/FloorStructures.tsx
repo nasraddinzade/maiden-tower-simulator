@@ -285,21 +285,30 @@ function FloorSlab({
   const ring = useSlabGeometry(innerR, holeR, thickness, y, cut, segments)
   if (solid) {
     /*
-     * Storey 1 rests on the rock — no opening beneath it.
+     * Storey 1 rests on the rock, and the SHELL already draws that surface.
      *
-     * It still has to be bedded into the wall like every other floor. Built at
-     * innerR exactly, its edge and the wall face coincide, and since the drum
-     * starts at y = 0 with nothing below it, the polygonal mismatch opened a
-     * ring slit right round the room looking straight out under the tower —
-     * 3.5 mm at the full lathe, 111 mm at the coarsest LOD.
+     * buildShellGeometry() stops the inner cavity at this level and leaves the
+     * drum solid from here down past the street, so there is an up-facing stone
+     * face at exactly this Y across the whole chamber. This used to put a slab
+     * on top of it: two opaque surfaces at identical depth carrying DIFFERENT
+     * materials, which z-fought across the entry chamber floor.
+     *
+     * The argument that stood here died with its premise. It said the slab had
+     * to be bedded into the wall by WALL_EMBED, because built at innerR exactly
+     * the polygonal mismatch between a coarse lathe and the shell's 96-segment
+     * drum opened a ring slit round the room — 3.5 mm at the full lathe, 111 mm
+     * at the coarsest LOD — "since the drum starts at y = 0 with nothing below
+     * it". The drum stopped starting at y = 0 when BASE_Y went down to
+     * ENTRANCE.groundY − 0.5. And the slit cannot come back this way round: the
+     * cap and the wall face it runs out to are edges of ONE CSG surface, so
+     * there is no mismatch left to look through at any LOD.
+     *
+     * The price is the material — this floor reads in the shell's stone, not in
+     * the interior stone the upper floors are paved in. The chamber's walls are
+     * that same shell mesh and already read that way, so the room now comes out
+     * of one material instead of a dark disc in a light room.
      */
-    const outer = innerR + WALL_EMBED
-    return (
-      <mesh position={[0, y - thickness / 2, 0]} material={material} receiveShadow>
-        <cylinderGeometry args={[outer, outer, thickness, segments ?? RADIAL_SEGMENTS]} />
-        {!material && <meshStandardMaterial color="#a89f8c" roughness={0.95} />}
-      </mesh>
-    )
+    return null
   }
   if (material) return <mesh geometry={ring} material={material} receiveShadow />
   return (

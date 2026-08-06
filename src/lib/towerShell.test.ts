@@ -384,6 +384,58 @@ describe('inner cavity', () => {
   })
 })
 
+/**
+ * THE SHELL IS THE FLOOR OF STOREY 1, AND THE SILL OF THE DOORWAY.
+ *
+ * Both of those surfaces used to be drawn a second time — a solid cylinder in
+ * FloorStructures and a stone box in SiteAndEntranceStair — and both duplicates
+ * were coplanar with the shell's own cut faces and carried different materials,
+ * so they z-fought. The duplicates are gone, which means the shell is now the
+ * only thing holding those two surfaces up visually, and nothing was asserting
+ * that it has them.
+ *
+ * What it rests on is that the cavity stops at the storey-1 floor and the drum
+ * carries on solid below it, and that the entrance tunnel's own sill sits at the
+ * same level. Extend the cavity downward, or drop the tunnel's sill, and the
+ * entry chamber loses its floor with no other test noticing.
+ *
+ * Built with entranceSillY = ENTRANCE.thresholdY because that is what App.tsx
+ * passes; the module-level PARAMS above deliberately use the raw sill height.
+ */
+describe('the shell carries the storey-1 floor and the threshold', () => {
+  const atThreshold = buildShellGeometry({ ...PARAMS, entranceSillY: ENTRANCE.thresholdY })
+  const mesh = new THREE.Mesh(atThreshold.geometry)
+  mesh.updateMatrixWorld(true)
+
+  /** Y of the first surface met looking straight down from inside the chamber. */
+  const floorUnder = (x: number, z: number, fromY: number): number | null => {
+    const rc = new THREE.Raycaster(new THREE.Vector3(x, fromY, z), new THREE.Vector3(0, -1, 0))
+    const hits = rc.intersectObject(mesh, false)
+    return hits.length > 0 ? hits[0].point.y : null
+  }
+
+  it('caps the cavity at the storey-1 floor, all round the room', () => {
+    const r = innerRadiusAt(FLOORS[0].floorY) * 0.6
+    for (const azDeg of [0, 72, 144, 216, 288]) {
+      const d = azimuthToVector(azDeg)
+      expect(floorUnder(d.x * r, d.z * r, FLOORS[0].floorY + 1.5)).toBeCloseTo(FLOORS[0].floorY, 3)
+    }
+  })
+
+  it('leaves stone under the doorway at the same level, right through the wall', () => {
+    const d = azimuthToVector(ENTRANCE.azimuthDeg)
+    const inner = innerRadiusAt(ENTRANCE.thresholdY)
+    // 10%, 50% and 90% of the way through the passage
+    for (const t of [0.1, 0.5, 0.9]) {
+      const r = inner + t * (TOWER.outerRadius - inner)
+      expect(floorUnder(d.x * r, d.z * r, ENTRANCE.thresholdY + 1.2)).toBeCloseTo(
+        ENTRANCE.thresholdY,
+        3,
+      )
+    }
+  })
+})
+
 describe('entrance opening', () => {
   it('pierces the wall at the entrance azimuth', () => {
     // A ray fired outward from the axis at sill height along the entrance
