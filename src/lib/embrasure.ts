@@ -52,6 +52,28 @@ export function planEmbrasure(
   }
 }
 
+/**
+ * A small, repeatable offset for one tread, from its index alone.
+ *
+ * The steps in the photographs are not machined: the nosings are wavy, worn
+ * hollow in the middle, and no two share an angle — visible in the embrasure and
+ * on both the straight and the curved masonry flights, three independent frames
+ * with the same character. Drawn as identical boxes with sharp arrises they read
+ * as new concrete.
+ *
+ * Deterministic, because the config has to stay the single source of truth: the
+ * same index always gives the same wear, so nothing here is random between
+ * reloads or between the drawn stone and anything measured off it.
+ */
+export function treadWear(index: number, amplitude: number): { nose: number; tilt: number } {
+  const a = Math.sin(index * 12.9898) * 43758.5453
+  const b = Math.sin(index * 78.233) * 12345.6789
+  return {
+    nose: (a - Math.floor(a) - 0.5) * 2 * amplitude,
+    tilt: (b - Math.floor(b) - 0.5) * 2 * amplitude * 0.5,
+  }
+}
+
 /** One tread of an embrasure: a straight block, not an annular sector. */
 export interface EmbrasureTread {
   /** Radius of the tread's near edge — the flight climbs OUTWARD into the wall. */

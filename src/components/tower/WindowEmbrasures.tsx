@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import { azimuthToVector } from '../../lib/geometry'
-import { embrasureTreads, type EmbrasurePlan } from '../../lib/embrasure'
+import { embrasureTreads, treadWear, type EmbrasurePlan } from '../../lib/embrasure'
 import { stairRampBoxes } from '../../lib/collision'
 import { WINDOW_EMBRASURE, innerRadiusAt } from '../../config/tower'
 import { PLAYER } from '../../config/player'
@@ -49,8 +49,15 @@ export function WindowEmbrasures({
     for (const e of embrasures) {
       const face = innerRadiusAt(e.plan.platformY)
       const d = azimuthToVector(e.azimuthDeg)
-      for (const t of embrasureTreads(e.plan, face, going, platformDepth)) {
-        const depth = t.outerRadius - t.innerRadius
+      embrasureTreads(e.plan, face, going, platformDepth).forEach((t, i) => {
+        /*
+         * The nosing wanders and the block sits a little off level — see
+         * treadWear(). Applied to the DRAWN stone only: the walking surface is
+         * the ramp chain, which is deliberately smooth, so wear can never make a
+         * step unclimbable.
+         */
+        const wear = treadWear(i, WINDOW_EMBRASURE.wear)
+        const depth = t.outerRadius - t.innerRadius + wear.nose
         /*
          * Each block runs from its own surface down to the chamber floor, not
          * one riser. A tread a riser thick is a plank on nothing — the same
@@ -58,14 +65,15 @@ export function WindowEmbrasures({
          * stone below is simply solid, so a block down to the floor is both
          * cheaper and truer.
          */
-        const height = Math.max(0.05, t.treadY - e.floorY)
+        const height = Math.max(0.05, t.treadY - e.floorY + wear.tilt)
         const g = new THREE.BoxGeometry(width, height, depth)
         g.translate(0, height / 2, 0)
+        g.rotateZ(wear.tilt * 0.6)
         g.rotateY(-e.azimuthDeg * (Math.PI / 180))
-        const mid = (t.innerRadius + t.outerRadius) / 2
+        const mid = (t.innerRadius + t.outerRadius) / 2 + wear.nose / 2
         g.translate(d.x * mid, e.floorY, d.z * mid)
         parts.push(g)
-      }
+      })
     }
     if (parts.length === 0) return null
     const merged = mergeGeometries(parts, false)

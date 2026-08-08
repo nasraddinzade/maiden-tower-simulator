@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { embrasureTreads, planEmbrasure } from './embrasure'
+import { embrasureTreads, planEmbrasure, treadWear } from './embrasure'
 import {
   ENTRANCE,
   FLOORS,
@@ -233,5 +233,31 @@ describe('an embrasure and a stair passage cannot share the wall', () => {
       })
     }
     expect(clashes).toEqual([])
+  })
+})
+
+describe('worn treads', () => {
+  it('is deterministic — the same step always wears the same way', () => {
+    for (const i of [0, 1, 5, 12]) {
+      expect(treadWear(i, 0.035)).toEqual(treadWear(i, 0.035))
+    }
+  })
+
+  it('stays inside its amplitude, so wear can never trip anyone', () => {
+    /*
+     * The walking surface is the ramp chain and is unaffected, but the drawn
+     * stone still has to stay close to nominal or the steps read as broken
+     * rather than worn.
+     */
+    for (let i = 0; i < 40; i += 1) {
+      const w = treadWear(i, 0.035)
+      expect(Math.abs(w.nose)).toBeLessThanOrEqual(0.035 + 1e-9)
+      expect(Math.abs(w.tilt)).toBeLessThanOrEqual(0.035 / 2 + 1e-9)
+    }
+  })
+
+  it('actually varies between steps, or it is not wear at all', () => {
+    const noses = Array.from({ length: 12 }, (_, i) => treadWear(i, 0.035).nose)
+    expect(new Set(noses.map((n) => n.toFixed(4))).size).toBeGreaterThan(8)
   })
 })

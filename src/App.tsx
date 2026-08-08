@@ -33,6 +33,7 @@ import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
 import { windowCentreY, windowStoreyIndex, type WindowSpec } from './lib/windows'
 import { WindowGrilles } from './components/tower/WindowGrilles'
+import { WindowSurrounds } from './components/tower/WindowSurrounds'
 import { WindowEmbrasures, type PlacedEmbrasure } from './components/tower/WindowEmbrasures'
 import { planEmbrasure } from './lib/embrasure'
 import windowData from './data/windows.json'
@@ -400,6 +401,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         innerWidth: outerWidth + (w.innerWidth - w.outerWidth) * windowCtl.flareScale,
         innerHeight: w.innerHeight,
         head: w.head,
+        barrierAt: w.barrierAt,
       }
     })
   }, [windowCtl.cutWindows, windowCtl.azimuthNudgeDeg, windowCtl.widthScale, windowCtl.flareScale])
@@ -539,6 +541,9 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         without the shell there are no openings to cover.
       */}
       {showShell && !cutaway && windows && <WindowGrilles windows={windows} />}
+      {showShell && !cutaway && windows && (
+        <WindowSurrounds windows={windows} material={shellMat} />
+      )}
       {showShell && !cutaway && (
         <WindowEmbrasures embrasures={EMBRASURES} material={innerMat} withColliders={firstPerson} />
       )}

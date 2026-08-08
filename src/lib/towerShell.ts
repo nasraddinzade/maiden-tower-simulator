@@ -124,6 +124,8 @@ export interface WindowCut {
   innerHeight: number
   /** Shape of the opening's head. Defaults to 'flat'. */
   head?: WindowHead
+  /** Which end of the reveal a grille hangs at. Defaults to 'outer'. */
+  barrierAt?: 'outer' | 'room'
 }
 
 /**

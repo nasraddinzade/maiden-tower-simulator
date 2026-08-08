@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { grilleBars } from '../../lib/grille'
 import { azimuthToVector } from '../../lib/geometry'
-import { TOWER, WINDOW_GRILLE } from '../../config/tower'
+import { TOWER, WINDOW_GRILLE, innerRadiusAt } from '../../config/tower'
 import type { WindowCut } from '../../lib/towerShell'
 
 /**
@@ -41,8 +41,24 @@ export function WindowGrilles({
       const bars = grilleBars(w.outerWidth, w.outerHeight, barSide, uprights, rails, embed)
       if (bars.length === 0) continue
       const d = azimuthToVector(w.azimuthDeg)
-      // set back from the outer face, inside the reveal
-      const radius = TOWER.outerRadius - inset
+      /*
+       * WHICH END OF THE REVEAL, and it is not the same for both kinds.
+       *
+       * In a slit's embrasure the wrought gate stands at the TOP of the steps,
+       * at the outer end just short of the slit, with the whole flight between it
+       * and the room. In the later arched window the grille is at the ROOM face,
+       * lock plate and keeper on the right jamb, glazed casement behind it. One
+       * rule for both would be wrong on one of them.
+       *
+       * Two of the four blind readings placed the slit gate at the inner end and
+       * criticised the model for having it outside. The re-check found the model
+       * right and the readings wrong, which is the only reason this ends up as a
+       * per-opening field rather than a global flip.
+       */
+      const radius =
+        w.barrierAt === 'room'
+          ? innerRadiusAt(w.centreY) + inset
+          : TOWER.outerRadius - inset
 
       for (const bar of bars) {
         const g =

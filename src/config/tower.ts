@@ -856,6 +856,48 @@ export const WINDOW_EMBRASURE = {
   width: 0.9,
   /** m — the standing place at the top, deep enough for both feet. [ESTIMATE] */
   platformDepth: 0.7,
+  /**
+   * m — how far a tread's nosing and level wander from nominal. [ESTIMATE]
+   *
+   * The steps in the photographs are worn: wavy nosings, hollowed middles, no
+   * two at the same angle, in three independent frames. Identical boxes with
+   * sharp arrises read as new concrete. Small enough not to trip anyone — the
+   * walking surface is the ramp chain, which is unaffected — and large enough to
+   * break the machined look.
+   */
+  wear: 0.035,
+} as const
+
+/**
+ * The dressed surround every opening has, and the model had none.
+ *
+ * From outside, the model drew a bare slot in flush rubble — the owner's "окна
+ * фигово получились" is half this. The photographs show each opening framed in
+ * worked stone distinct from the rubble around it: a lintel or hood above, a
+ * PROJECTING sill below with a rounded weathered edge (on the lower slit it
+ * visibly tilts outward, i.e. it throws water), and dressed blocks up the jambs.
+ *
+ * Not every opening has the full set — upper-3 reads as lintel and sill only —
+ * but the presence is not in doubt across the set. The SIZE is: one reading put
+ * the surround at three to four slit-widths, the re-check nearer two to two and
+ * a half. Everything here is therefore [ESTIMATE], chosen at the lower end of
+ * that disagreement, because a surround that is too big is a worse mistake than
+ * one that is too small — it stops reading as a frame and starts reading as a
+ * panel.
+ */
+export const WINDOW_SURROUND = {
+  /** m — how far the sill stands proud of the wall face. [ESTIMATE] */
+  sillProjection: 0.09,
+  /** m — thickness of the sill slab. [ESTIMATE] */
+  sillThickness: 0.12,
+  /** m — height of the lintel or hood above the opening. [ESTIMATE] */
+  headHeight: 0.22,
+  /** m — how far the frame reaches past the opening on each side. [ESTIMATE] */
+  sideMargin: 0.16,
+  /** m — how far the dressed frame is set into the wall. [ESTIMATE] */
+  depth: 0.14,
+  /** The fall on the sill's top, so it throws water. [ESTIMATE] */
+  sillFall: 0.06,
 } as const
 
 export const WELL = {

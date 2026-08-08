@@ -32,6 +32,8 @@ export interface WindowSpec {
   innerHeight: number
   /** Shape of the head: 'flat' | 'round' | 'pointed'. See WindowHead. */
   head?: 'flat' | 'round' | 'pointed'
+  /** Which end of the reveal the grille hangs at. Defaults to 'outer'. */
+  barrierAt?: 'outer' | 'room'
   /**
    * Whether this is the aperture Islamov's winter-solstice claim refers to.
    * No source identifies it; see the note in windows.json before setting any
