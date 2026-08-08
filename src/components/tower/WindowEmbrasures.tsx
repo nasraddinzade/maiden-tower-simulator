@@ -4,7 +4,12 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import { azimuthToVector } from '../../lib/geometry'
 import { embrasureTreads, type EmbrasurePlan } from '../../lib/embrasure'
+import { stairRampBoxes } from '../../lib/collision'
 import { WINDOW_EMBRASURE, innerRadiusAt } from '../../config/tower'
+import { PLAYER } from '../../config/player'
+
+/** Head clearance kept above the platform inside a recess. */
+const PLAYER_HEAD = PLAYER.eyeHeight + 0.2
 
 export interface PlacedEmbrasure {
   id: string
@@ -70,33 +75,93 @@ export function WindowEmbrasures({
 
   useEffect(() => () => geometry?.dispose(), [geometry])
 
+  /*
+   * The walking surface comes from stairRampBoxes, the same builder the flights
+   * use, and NOT from hand-rolled Euler angles.
+   *
+   * It was hand-rolled first: a box yawed to the azimuth and pitched about X.
+   * Euler order made that a different rotation from the one intended, the slab
+   * ended up tilted across the recess instead of along it, and the walker
+   * stepping in fell 3.4 m through the floor and finished inside the wall.
+   * stairRampBoxes takes two points on the walking line and works out the
+   * orientation itself, which is exactly the problem here — a radial run is just
+   * a two-point run at one azimuth.
+   */
   const ramps = useMemo(() => {
     const { going, width, platformDepth } = WINDOW_EMBRASURE
-    return embrasures.map((e) => {
+    return embrasures.flatMap((e) => {
       const face = innerRadiusAt(e.plan.platformY)
       const run = e.plan.stepCount * going
-      const rise = e.plan.platformY - e.floorY
-      const slopeLength = Math.hypot(run, rise)
-      const d = azimuthToVector(e.azimuthDeg)
-      const midR = face + run / 2
-      const pitch = Math.atan2(rise, run)
-      return {
-        slope: {
-          position: [d.x * midR, e.floorY + rise / 2, d.z * midR] as [number, number, number],
-          half: [width / 2, 0.05, slopeLength / 2] as [number, number, number],
-          rotation: [-pitch, -e.azimuthDeg * (Math.PI / 180), 0] as [number, number, number],
-        },
-        platform: {
-          position: [
-            d.x * (face + run + platformDepth / 2),
-            e.plan.platformY,
-            d.z * (face + run + platformDepth / 2),
-          ] as [number, number, number],
-          half: [width / 2, 0.05, platformDepth / 2] as [number, number, number],
-          rotation: [0, -e.azimuthDeg * (Math.PI / 180), 0] as [number, number, number],
-        },
-      }
+      return [
+        ...stairRampBoxes(
+          [
+            { azimuthDeg: e.azimuthDeg, treadY: e.floorY, midRadius: face - 0.35 },
+            { azimuthDeg: e.azimuthDeg, treadY: e.plan.platformY, midRadius: face + run },
+          ],
+          width,
+          1,
+          0.12,
+        ),
+        ...stairRampBoxes(
+          [
+            { azimuthDeg: e.azimuthDeg, treadY: e.plan.platformY, midRadius: face + run },
+            {
+              azimuthDeg: e.azimuthDeg,
+              treadY: e.plan.platformY,
+              midRadius: face + run + platformDepth,
+            },
+          ],
+          width,
+          1,
+          0.12,
+        ),
+      ]
     })
+  }, [embrasures])
+
+  /*
+   * THE RECESS NEEDS ITS OWN WALLS, because opening the wall band opens the
+   * whole wall.
+   *
+   * TowerColliders only ever builds a 0.8 m band of boxes at the room-side face
+   * — beyond that the masonry carries no collider at all, on the argument that
+   * only the inner face is ever touched. Cutting the band at an embrasure
+   * therefore does not open a recess, it opens the drum: walked, the visitor
+   * stepped towards the window at storey 5 and came out of the tower at ground
+   * level, 11.4 m from the axis.
+   *
+   * So the recess is given back its own back wall and two cheeks. Measured
+   * against the same fault at the entrance passage, which was fixed the same way
+   * and for the same reason.
+   */
+  const shell = useMemo(() => {
+    const { width, platformDepth, going } = WINDOW_EMBRASURE
+    const out: Array<{
+      position: [number, number, number]
+      args: [number, number, number]
+      rotationY: number
+    }> = []
+    for (const e of embrasures) {
+      const face = innerRadiusAt(e.plan.platformY)
+      const depth = e.plan.stepCount * going + platformDepth
+      const top = e.plan.platformY + PLAYER_HEAD
+      const midY = (e.floorY + top) / 2
+      const halfH = (top - e.floorY) / 2
+      const rotationY = -e.azimuthDeg * (Math.PI / 180)
+      const d = azimuthToVector(e.azimuthDeg)
+      const at = (r: number): [number, number, number] => [d.x * r, midY, d.z * r]
+      // the back of the recess
+      out.push({ position: at(face + depth + 0.15), args: [width / 2 + 0.4, halfH, 0.15], rotationY })
+      // and its two cheeks
+      for (const side of [-1, 1]) {
+        const off = side * (width / 2 + 0.15)
+        const mid = face + depth / 2
+        const px = d.x * mid + Math.cos(e.azimuthDeg * (Math.PI / 180)) * off
+        const pz = d.z * mid + Math.sin(e.azimuthDeg * (Math.PI / 180)) * off
+        out.push({ position: [px, midY, pz], args: [0.15, halfH, depth / 2], rotationY })
+      }
+    }
+    return out
   }, [embrasures])
 
   if (!visible && !withColliders) return null
@@ -111,14 +176,20 @@ export function WindowEmbrasures({
       {withColliders && ramps.length > 0 && (
         <RigidBody type="fixed" colliders={false}>
           {ramps.map((r, i) => (
-            <group key={`emb-${i}`}>
-              <CuboidCollider args={r.slope.half} position={r.slope.position} rotation={r.slope.rotation} />
-              <CuboidCollider
-                args={r.platform.half}
-                position={r.platform.position}
-                rotation={r.platform.rotation}
-              />
-            </group>
+            <CuboidCollider
+              key={`emb-${i}`}
+              args={r.halfExtents}
+              position={r.position}
+              quaternion={r.quaternion}
+            />
+          ))}
+          {shell.map((b, i) => (
+            <CuboidCollider
+              key={`emb-wall-${i}`}
+              args={b.args}
+              position={b.position}
+              rotation={[0, b.rotationY, 0]}
+            />
           ))}
         </RigidBody>
       )}

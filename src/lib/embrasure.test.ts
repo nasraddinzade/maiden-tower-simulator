@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { embrasureTreads, planEmbrasure } from './embrasure'
-import { ENTRANCE, FLOORS, TOWER, WINDOW_EMBRASURE, innerRadiusAt } from '../config/tower'
+import {
+  ENTRANCE,
+  FLOORS,
+  STAIR,
+  TOWER,
+  WALL_LIFTS,
+  WINDOW_EMBRASURE,
+  innerRadiusAt,
+} from '../config/tower'
+import { flightRiser, planAllFlights, treadDepth } from './staircase'
 import { wallColliders, type WallColliderParams } from './collision'
 import { PLAYER } from '../config/player'
 import windowData from '../data/windows.json'
@@ -163,5 +172,66 @@ describe('the wall lets you into the embrasure', () => {
         `${w.id}: wall still stands across the recess at y ${midY.toFixed(2)}`,
       ).toBe(0)
     }
+  })
+})
+
+describe('an embrasure and a stair passage cannot share the wall', () => {
+  /*
+   * THE FAULT THIS EXISTS FOR, measured by walking the model.
+   *
+   * With the recesses built and the stair starting at azimuth 200, the climb
+   * stopped dead: 14 treads of 22 on the 2→3 flight, at azimuth 153, and 17 of
+   * 39 on 4→6, at azimuth 131. Every flight completed the moment the recesses
+   * were taken out. The flights stack in one sector and the widest sweeps 160°,
+   * so from 200 they covered the arc from 213 down to about 40 — and the whole
+   * slit column sits between azimuth 123 and 143.
+   *
+   * Two numbers in conflict, and the tie breaks the way it did for the window
+   * bearing: STAIR.startAzimuthDeg is a [PLACEHOLDER] and the window azimuths are
+   * photographs, so the placeholder moved. This test is what stops it moving
+   * back, or a window drifting into the stair, without anyone noticing until they
+   * try to walk up.
+   */
+  const flights = planAllFlights(STAIR, WALL_LIFTS, innerRadiusAt)
+
+  const embrasures = (windowData.windows as WindowSpec[])
+    .map((w) => {
+      const { above, floorY } = innerSillAbove(w)
+      const plan = planEmbrasure(
+        above,
+        floorY,
+        PLAYER.eyeHeight,
+        E.riserTarget,
+        E.going,
+        E.platformDepth,
+      )
+      return plan ? { w, plan, floorY } : null
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+
+  it('leaves no tread of any flight inside a recess', () => {
+    const clashes: string[] = []
+    for (const { w, plan, floorY } of embrasures) {
+      const halfDeg = ((E.width + 0.12) / 2 / innerRadiusAt(plan.platformY)) * (180 / Math.PI)
+      const top = plan.platformY + PLAYER.eyeHeight
+      const face = innerRadiusAt(plan.platformY)
+      flights.forEach((steps, fi) => {
+        for (const s of steps) {
+          const dAz = Math.abs(((s.azimuthDeg - w.azimuthDeg + 540) % 360) - 180)
+          if (dAz > halfDeg + STAIR.width / 2) continue
+          // the passage runs from a tread-depth under the tread to the vault
+          const bed = s.treadY - treadDepth(flightRiser(steps))
+          const crown = s.treadY + PLAYER.stairHeadroom
+          if (crown < floorY || bed > top) continue
+          if (s.midRadius + STAIR.width / 2 < face) continue
+          if (s.midRadius - STAIR.width / 2 > face + plan.depth) continue
+          clashes.push(
+            `${w.id} (az ${w.azimuthDeg}, ${floorY.toFixed(2)}–${top.toFixed(2)}) meets flight ${fi} ` +
+              `at az ${s.azimuthDeg.toFixed(1)}, y ${s.treadY.toFixed(2)}`,
+          )
+        }
+      })
+    }
+    expect(clashes).toEqual([])
   })
 })

@@ -509,7 +509,28 @@ export const STAIR: {
    * the masonry, not flush with the room. So: a real jamb.
    */
   wallClearance: 0.25,
-  startAzimuthDeg: 200, // ° — [PLACEHOLDER] where the first flight begins; no source fixes it
+  /**
+   * ° — where every flight begins. Still [PLACEHOLDER]: no source fixes it.
+   *
+   * It was 200, and 200 put the stair through the windows. The flights stack in
+   * one sector and the widest sweeps 160°, so from 200 they cover the whole arc
+   * from 213 down to about 40 — and data/windows.json puts the entire slit
+   * column between 123 and 143. Walked, that is not a near miss: with the
+   * stepped embrasures built, the climb stopped dead at azimuth 153 on the 2→3
+   * flight and at 131 on 4→6, and every flight completed the moment the recesses
+   * were taken out.
+   *
+   * Two unsourced-against-measured numbers again, and the tie breaks the same way
+   * it did for the window bearing: the stair's azimuth is a PLACEHOLDER and the
+   * windows' azimuths are photographs. So the placeholder moves. 100° keeps the
+   * whole sweep — down through 0 to about −60 on the long flight — clear of the
+   * slit column without ever reaching the entrance sector at 270.
+   *
+   * It runs through the buttress instead, which is not a problem but a slightly
+   * better place for a stair: there is more masonry there than anywhere else on
+   * the drum.
+   */
+  startAzimuthDeg: 100,
   /**
    * m — clear width of the doorway between a chamber and the stair passage.
    * [ESTIMATE] 1.1, taken from the SOURCED main entrance, which [İçərişəhər]
