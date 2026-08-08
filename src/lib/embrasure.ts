@@ -115,3 +115,71 @@ export function embrasureTreads(
   })
   return out
 }
+
+/** What an embrasure occupies, for testing it against its neighbours. */
+export interface EmbrasureExtent {
+  id: string
+  azimuthDeg: number
+  halfWidthDeg: number
+  bottomY: number
+  topY: number
+}
+
+/** What an opening's reveal occupies, in the same terms. */
+export interface RevealExtent {
+  id: string
+  azimuthDeg: number
+  halfWidthDeg: number
+  bottomY: number
+  topY: number
+}
+
+/**
+ * Whether a recess would cut across another opening's reveal.
+ *
+ * IT CAN, and it did. The upper column's four slits are 3–4° apart, and a recess
+ * a metre and a half wide subtends about 14° at the radius it sits at — so a
+ * recess belonging to one slit runs straight through the next slit's reveal.
+ * Measured on the built scene: upper-2's step blocks stood at radius 6.63 and
+ * 7.08 on the line of sight through upper-1's opening, inside its reveal, where
+ * that opening should show nothing but the splay and daylight.
+ *
+ * A NOTE ON WHAT WAS NOT TRUE. Chasing this I also reported the reveal itself as
+ * blind — a ray fired inward stopping 1.3 m into the masonry. That was a bad
+ * measurement, not a fault: the ray crossed the whole tower and the hit was the
+ * far wall, 178° away. Fired from inside the chamber outward, every one of the
+ * nine openings leaves the tower cleanly. The intruding stone is real; the blind
+ * reveal never was.
+ *
+ * The cause is upstream of anything here: those 3–4° come from photographs the
+ * file itself gives ±20° of systematic error, and four openings inside 11° of
+ * arc is close enough that their REVEALS alone very nearly meet inside the wall.
+ * Rather than guess at new azimuths, an embrasure that would foul a neighbour is
+ * not built, and which one was dropped is recorded — the same way the stair and
+ * the window column were resolved when they wanted the same stone.
+ */
+export function embrasureFoulsReveal(
+  e: EmbrasureExtent,
+  reveals: RevealExtent[],
+  /**
+   * How much of a reveal a recess may cross before it counts as fouling it.
+   *
+   * Not zero, and the reason is the lower column: its four slits are stacked at
+   * ONE azimuth 2.95 m apart, with reveals 2.4 m tall, so a recess standing on a
+   * floor inevitably clips the top of the reveal below it — by 0.40 m, 17% of
+   * its height, at the very bottom of the recess where the storey's own slab is
+   * anyway. That is a corner clipped, not an opening blocked. What upper-2 did
+   * to upper-1 was 2.06 m, 86%, straight across the middle.
+   */
+  tolerance = 0.25,
+): string | null {
+  for (const r of reveals) {
+    if (r.id === e.id) continue
+    const dAz = Math.abs(((r.azimuthDeg - e.azimuthDeg + 540) % 360) - 180)
+    if (dAz > e.halfWidthDeg + r.halfWidthDeg) continue
+    const overlap = Math.min(e.topY, r.topY) - Math.max(e.bottomY, r.bottomY)
+    if (overlap <= 0) continue
+    if (overlap / Math.max(0.1, r.topY - r.bottomY) > tolerance) return r.id
+  }
+  return null
+}

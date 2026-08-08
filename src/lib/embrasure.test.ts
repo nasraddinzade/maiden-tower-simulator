@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { embrasureTreads, planEmbrasure, treadWear } from './embrasure'
+import { embrasureFoulsReveal, embrasureTreads, planEmbrasure, treadWear } from './embrasure'
 import {
   ENTRANCE,
   FLOORS,
@@ -259,5 +259,65 @@ describe('worn treads', () => {
   it('actually varies between steps, or it is not wear at all', () => {
     const noses = Array.from({ length: 12 }, (_, i) => treadWear(i, 0.035).nose)
     expect(new Set(noses.map((n) => n.toFixed(4))).size).toBeGreaterThan(8)
+  })
+})
+
+describe('a recess may not cut across a neighbour reveal', () => {
+  const reveals = (windowData.windows as WindowSpec[]).map((w) => {
+    const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
+    const face = innerRadiusAt(centre)
+    return {
+      id: w.id,
+      azimuthDeg: w.azimuthDeg,
+      halfWidthDeg: (w.innerWidth / 2 / Math.max(0.5, face)) * (180 / Math.PI),
+      bottomY: centre - w.innerHeight / 2,
+      topY: centre + w.innerHeight / 2,
+    }
+  })
+
+  it('catches the clash that was in the built model', () => {
+    /*
+     * upper-2's step blocks stood inside upper-1's reveal — measured at radius
+     * 6.63 and 7.08 on the line of sight through that opening. The two slits are
+     * 4° apart and a recess subtends about 14°, so one cannot help crossing the
+     * other.
+     */
+    const w = (windowData.windows as WindowSpec[]).find((x) => x.id === 'upper-2')!
+    const { above, floorY } = innerSillAbove(w)
+    const plan = planEmbrasure(above, floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)!
+    const face = innerRadiusAt(plan.platformY)
+    const mouth = w.innerWidth + 0.24
+    expect(
+      embrasureFoulsReveal(
+        {
+          id: w.id,
+          azimuthDeg: w.azimuthDeg,
+          halfWidthDeg: (mouth / 2 / face) * (180 / Math.PI),
+          bottomY: floorY,
+          topY: plan.platformY + PLAYER.eyeHeight + 0.45,
+        },
+        reveals,
+      ),
+    ).not.toBeNull()
+  })
+
+  it('lets an isolated recess through', () => {
+    const w = (windowData.windows as WindowSpec[]).find((x) => x.id === 'lower-2')!
+    const { above, floorY } = innerSillAbove(w)
+    const plan = planEmbrasure(above, floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)!
+    const face = innerRadiusAt(plan.platformY)
+    const mouth = w.innerWidth + 0.24
+    expect(
+      embrasureFoulsReveal(
+        {
+          id: w.id,
+          azimuthDeg: w.azimuthDeg,
+          halfWidthDeg: (mouth / 2 / face) * (180 / Math.PI),
+          bottomY: floorY,
+          topY: plan.platformY + PLAYER.eyeHeight + 0.45,
+        },
+        reveals,
+      ),
+    ).toBeNull()
   })
 })

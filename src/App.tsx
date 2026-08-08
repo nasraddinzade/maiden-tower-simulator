@@ -35,7 +35,7 @@ import { windowCentreY, windowStoreyIndex, type WindowSpec } from './lib/windows
 import { WindowGrilles } from './components/tower/WindowGrilles'
 import { WindowSurrounds } from './components/tower/WindowSurrounds'
 import { WindowEmbrasures, type PlacedEmbrasure } from './components/tower/WindowEmbrasures'
-import { planEmbrasure } from './lib/embrasure'
+import { embrasureFoulsReveal, planEmbrasure } from './lib/embrasure'
 import windowData from './data/windows.json'
 import { TowerWireframe } from './components/tower/TowerWireframe'
 import { TowerShell, type ShellStats } from './components/tower/TowerShell'
@@ -100,6 +100,25 @@ const EMBRASURE_HEAD_RISE = 0.45
  * Module level, not a hook: it depends on nothing the panel can change, and both
  * the chases and the drawn steps have to agree on it exactly.
  */
+/**
+ * Where every opening's reveal sits, so a recess can be tested against them.
+ *
+ * The inner mouth is what matters: the reveal flares to innerWidth at the room
+ * face and that is the widest it ever is, so a recess that clears it there
+ * clears it everywhere.
+ */
+const REVEALS = (windowData.windows as WindowSpec[]).map((w) => {
+  const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
+  const face = innerRadiusAt(centre)
+  return {
+    id: w.id,
+    azimuthDeg: w.azimuthDeg,
+    halfWidthDeg: (w.innerWidth / 2 / Math.max(0.5, face)) * (180 / Math.PI),
+    bottomY: centre - w.innerHeight / 2,
+    topY: centre + w.innerHeight / 2,
+  }
+})
+
 const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
   .map((w) => {
     const floorYs = FLOORS.map((f) => f.floorY)
@@ -119,7 +138,7 @@ const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
     const wall = TOWER.outerRadius - face
     const mouthWidth = w.innerWidth + 2 * EMBRASURE_MARGIN
     const backAtFullWall = w.outerWidth + 2 * EMBRASURE_MARGIN
-    return {
+    const placed = {
       id: w.id,
       azimuthDeg: w.azimuthDeg,
       floorY,
@@ -129,6 +148,25 @@ const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
         mouthWidth +
         (backAtFullWall - mouthWidth) * Math.min(1, plan.depth / Math.max(0.5, wall)),
     }
+    /*
+     * Not built if it would cut across a neighbour's reveal — see
+     * embrasureFoulsReveal(). Measured before this guard: upper-2's step blocks
+     * stood at radius 6.63 and 7.08 on the line of sight through upper-1's
+     * opening, inside its reveal, where there should be nothing but splay and
+     * daylight.
+     */
+    const fouled = embrasureFoulsReveal(
+      {
+        id: w.id,
+        azimuthDeg: w.azimuthDeg,
+        halfWidthDeg: (placed.mouthWidth / 2 / Math.max(0.5, face)) * (180 / Math.PI),
+        bottomY: floorY,
+        topY: plan.platformY + PLAYER.eyeHeight + EMBRASURE_HEAD_RISE,
+      },
+      REVEALS,
+    )
+    if (fouled) return null
+    return placed
   })
   .filter((e): e is PlacedEmbrasure => e !== null)
 
