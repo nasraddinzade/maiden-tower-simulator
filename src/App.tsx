@@ -6,6 +6,7 @@ import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
 import {
   stairSettings,
+  WINDOW_EMBRASURE,
   BUTTRESS,
   ENTRANCE,
   FLOORS,
@@ -30,8 +31,10 @@ import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
-import { windowCentreY, type WindowSpec } from './lib/windows'
+import { windowCentreY, windowStoreyIndex, type WindowSpec } from './lib/windows'
 import { WindowGrilles } from './components/tower/WindowGrilles'
+import { WindowEmbrasures, type PlacedEmbrasure } from './components/tower/WindowEmbrasures'
+import { planEmbrasure } from './lib/embrasure'
 import windowData from './data/windows.json'
 import { TowerWireframe } from './components/tower/TowerWireframe'
 import { TowerShell, type ShellStats } from './components/tower/TowerShell'
@@ -70,6 +73,38 @@ interface SceneProps {
   touchInput: React.RefObject<MoveInput | null>
   touchLook: React.RefObject<{ dx: number; dy: number }>
 }
+
+/**
+ * The openings that need steps up to them, worked out rather than chosen.
+ *
+ * Module level, not a hook: it depends on nothing the panel can change, and both
+ * the chases and the drawn steps have to agree on it exactly.
+ */
+const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
+  .map((w) => {
+    const floorYs = FLOORS.map((f) => f.floorY)
+    const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
+    const floorY = floorYs[windowStoreyIndex(w, floorYs, TOWER.groundY, TOWER.height)]
+    const plan = planEmbrasure(
+      centre - w.innerHeight / 2 - floorY,
+      floorY,
+      PLAYER.eyeHeight,
+      WINDOW_EMBRASURE.riserTarget,
+      WINDOW_EMBRASURE.going,
+      WINDOW_EMBRASURE.platformDepth,
+    )
+    return plan ? { id: w.id, azimuthDeg: w.azimuthDeg, floorY, plan } : null
+  })
+  .filter((e): e is PlacedEmbrasure => e !== null)
+
+/** The same recesses as arcs, so the wall colliders open where the stone does. */
+const EMBRASURE_OPENINGS = EMBRASURES.map((e) => ({
+  azimuthDeg: e.azimuthDeg,
+  widthDeg:
+    ((WINDOW_EMBRASURE.width + 0.12) / innerRadiusAt(e.plan.platformY)) * (180 / Math.PI),
+  sillY: e.floorY,
+  headY: e.plan.platformY + PLAYER.eyeHeight,
+}))
 
 function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook }: SceneProps) {
   const { showShell, showWireframe, showScaleRef, cutaway } = useControls('View', {
@@ -284,6 +319,24 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         depth: WATER.downpipeDiameter * 1.6,
       })
     }
+    /*
+     * And the recesses the window steps stand in.
+     *
+     * Cut as chases rather than as anything new: a chase is exactly what an
+     * embrasure is — a blind bite into the room-side face that does not go
+     * through. Doing it here also means the steps themselves cut nothing, so a
+     * change to them can never open a hole in the wall.
+     */
+    for (const e of EMBRASURES) {
+      out.push({
+        azimuthDeg: e.azimuthDeg,
+        width: WINDOW_EMBRASURE.width + 0.12,
+        bottomY: e.floorY,
+        // up to the reveal's inner mouth, so the recess and the window are one void
+        topY: e.plan.platformY + PLAYER.eyeHeight,
+        depth: e.plan.depth,
+      })
+    }
     return out
   }, [])
 
@@ -449,6 +502,9 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         without the shell there are no openings to cover.
       */}
       {showShell && !cutaway && windows && <WindowGrilles windows={windows} />}
+      {showShell && !cutaway && (
+        <WindowEmbrasures embrasures={EMBRASURES} material={innerMat} withColliders={firstPerson} />
+      )}
       {showWireframe && (
         <TowerWireframe showInner showFloors showScaleRef={false} showFeatures={false} />
       )}
@@ -466,6 +522,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
           stairPassage={stairPassage}
           stairwells={stairwells}
           doorways={doorways}
+          embrasures={EMBRASURE_OPENINGS}
         />
       )}
 

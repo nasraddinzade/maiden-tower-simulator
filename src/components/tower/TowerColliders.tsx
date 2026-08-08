@@ -19,6 +19,13 @@ export interface TowerCollidersProps {
   stairwells?: Array<StairwellCut | undefined>
   /** Arched doorways between the rooms and the stair passage. */
   doorways?: StairDoorway[]
+  /**
+   * The stepped recesses at the high windows. They are cut out of the SHELL as
+   * chases, and the shell carries no collider — so without listing them here the
+   * wall boxes stand solid across a recess you can see into and not walk into,
+   * which is exactly how they behaved when first built.
+   */
+  embrasures?: Array<{ azimuthDeg: number; widthDeg: number; sillY: number; headY: number }>
   /** Boxes around the circumference. The addendum asks for 24–32 per storey. */
   sectors?: number
   onCount?: (n: number) => void
@@ -42,6 +49,7 @@ export function TowerColliders({
   stairPassage,
   stairwells,
   doorways,
+  embrasures,
   sectors = 32,
   onCount,
 }: TowerCollidersProps) {
@@ -111,12 +119,15 @@ export function TowerColliders({
         sillY: ENTRANCE.thresholdY,
         headY: ENTRANCE.thresholdY + ENTRANCE.height,
       },
-      openings: (doorways ?? []).map((d) => ({
-        azimuthDeg: d.azimuthDeg,
-        widthDeg: d.widthDeg,
-        sillY: d.bottomY,
-        headY: d.topY,
-      })),
+      openings: [
+        ...(doorways ?? []).map((d) => ({
+          azimuthDeg: d.azimuthDeg,
+          widthDeg: d.widthDeg,
+          sillY: d.bottomY,
+          headY: d.topY,
+        })),
+        ...(embrasures ?? []),
+      ],
       passageAt,
     })
 
@@ -220,7 +231,7 @@ export function TowerColliders({
     }
 
     return [...walls, ...floors, ...guards]
-  }, [stairPassage, stairwells, doorways, sectors])
+  }, [stairPassage, stairwells, doorways, embrasures, sectors])
 
   onCount?.(boxes.length)
 

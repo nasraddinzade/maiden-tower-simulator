@@ -777,6 +777,33 @@ export const WINDOW_GRILLE = {
   embed: 0.05,
 } as const
 
+/**
+ * The stepped embrasures at the windows whose sills are out of reach.
+ *
+ * "к некоторым окнам в настоящей башне ведут ступени" [OWNER]. Which ones is not
+ * chosen here — planEmbrasure() derives it from the openings' own heights, and
+ * comes out at three of the nine: lower-2, upper-1 and upper-2, whose inner
+ * sills stand 1.83, 2.95 and 2.60 m above the floors they light. The other six
+ * sit between 1.06 and 1.61 m, which is a window you simply look out of.
+ *
+ * A CONFLICT worth writing down: an earlier reading of the walkthrough footage
+ * counted three barred branches off the stair with 6, 3 and 3 steps. The COUNT
+ * of branches matches this derivation exactly; the steps do not — the rule below
+ * gives 6, 5 and 1. The 6 agrees. Nothing here is tuned to make the other two
+ * agree, because the footage note is a recollection of frames, not a measurement,
+ * and bending the geometry to it would be fitting the model to a memory.
+ */
+export const WINDOW_EMBRASURE = {
+  /** m — target riser, matched to the stair's own so the two read as one mason's work. [ESTIMATE] */
+  riserTarget: 0.2,
+  /** m — tread depth going into the wall. [ESTIMATE] */
+  going: 0.28,
+  /** m — clear width of the recess, a little under the reveal's inner mouth. [ESTIMATE] */
+  width: 1.2,
+  /** m — the standing place at the top, deep enough for both feet. [ESTIMATE] */
+  platformDepth: 0.7,
+} as const
+
 export const WELL = {
   diameter: 0.7, // m — [ref]; see the note above on bore vs mouth
   /**
