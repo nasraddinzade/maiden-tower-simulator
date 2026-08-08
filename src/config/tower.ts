@@ -514,11 +514,18 @@ export const STAIR: {
    *
    * It was 200, and 200 put the stair through the windows. The flights stack in
    * one sector and the widest sweeps 160°, so from 200 they cover the whole arc
-   * from 213 down to about 40 — and data/windows.json puts the entire slit
-   * column between 123 and 143. Walked, that is not a near miss: with the
-   * stepped embrasures built, the climb stopped dead at azimuth 153 on the 2→3
-   * flight and at 131 on 4→6, and every flight completed the moment the recesses
-   * were taken out.
+   * from 213 down to about 40 — and the openings run from about 123 to 174 once
+   * the lower column is where the photographs put it. Walked, that is not a near
+   * miss: with the stepped embrasures built, the climb stopped dead at azimuth
+   * 153 on the 2→3 flight and at 131 on 4→6, and every flight completed the
+   * moment the recesses were taken out.
+   *
+   * The arc in that argument was 123–143 when it was written, because the lower
+   * column was then filed at 141, inside the upper column instead of 29° round
+   * from it. Correcting the windows widened the arc to about 50°, and 100° still
+   * clears it — the sweep runs down through 0 to about −60 and never reaches
+   * 123. The conclusion survived, but it survived the correction rather than
+   * following from the figure quoted, which is worth saying out loud.
    *
    * Two unsourced-against-measured numbers again, and the tie breaks the same way
    * it did for the window bearing: the stair's azimuth is a PLACEHOLDER and the
@@ -817,10 +824,26 @@ export const WINDOW_GRILLE = {
 export const WINDOW_EMBRASURE = {
   /** m — target riser, matched to the stair's own so the two read as one mason's work. [ESTIMATE] */
   riserTarget: 0.2,
-  /** m — tread depth going into the wall. [ESTIMATE] */
-  going: 0.28,
-  /** m — clear width of the recess, a little under the reveal's inner mouth. [ESTIMATE] */
-  width: 1.2,
+  /**
+   * m — tread depth going into the wall. [ESTIMATE]
+   *
+   * WIDE AND DEEP, not a stepladder. The first version had 0.28 m treads in a
+   * 1.2 m recess — a width-to-going ratio of 4.3 — and the owner called the
+   * result crude. The one photograph that shows an embrasure from inside
+   * (interior/flickr_adamharvey_inside_maiden_tower_passage.jpg) gives no metres,
+   * because nothing of known size is in frame, but the RATIO is dimensionless
+   * and survives the projection: 0.9–1.9 over the physically possible camera
+   * positions. So the building has a few deep broad steps where the model had a
+   * fine ladder, and at any absolute size that reads as cheap.
+   *
+   * 0.5 and 0.9 give 1.8, inside that band. Most of the correction is taken out
+   * of the width rather than the going, because the going is bounded by the wall:
+   * upper-1 climbs six steps, and at 0.5 m each plus the platform the recess is
+   * 3.7 m into a wall 4.26 m thick there. A 1.0 m going would not fit.
+   */
+  going: 0.5,
+  /** m — clear width of the recess. [ESTIMATE]; see the note on `going`. */
+  width: 0.9,
   /** m — the standing place at the top, deep enough for both feet. [ESTIMATE] */
   platformDepth: 0.7,
 } as const

@@ -229,6 +229,21 @@ export interface WallChase {
   topY: number
   /** How far it bites into the masonry. */
   depth: number
+  /**
+   * Width at the far end, if the chase is to taper. Omit for a parallel-sided
+   * one — the downpipe's chase is parallel-sided and should stay so.
+   *
+   * An embrasure MUST taper, and must taper the same way as the window above it.
+   * Cut as a parallel box it crosses the window's splayed reveal: the reveal
+   * narrows from 1.50 m at the room face to 0.40 m outside, a 1.02 m box sits
+   * INSIDE it near the room and OUTSIDE it from about 0.7 m deep, and the two
+   * sets of side faces meet at a glancing angle right where they cross. That is
+   * a near-coincident CSG pair, and it shows as a lip you catch on and a surface
+   * you can see through — at eye level, because the chase's flat top is built to
+   * meet the window's inner sill. Tapered a fixed margin wider than the reveal
+   * at every depth, the two never come near each other.
+   */
+  outerWidth?: number
 }
 
 /** Cutting tool for one chase: a box sunk into the face at its azimuth. */
@@ -237,7 +252,22 @@ export function chaseCutter(c: WallChase): THREE.BufferGeometry {
   const height = Math.max(0.2, c.topY - c.bottomY)
   // reach back into the room so the mouth is fully open, not a slot
   const depth = c.depth + 0.3
-  const geom = new THREE.BoxGeometry(depth, height, Math.max(0.2, c.width))
+  const geom = new THREE.BoxGeometry(depth, height, Math.max(0.2, c.width), 1, 1, 1)
+  if (c.outerWidth !== undefined && Math.abs(c.outerWidth - c.width) > 1e-6) {
+    /*
+     * Taper along the local X, which is the radial run before the rotation
+     * below. The near end keeps `width`; the far end is scaled to `outerWidth`.
+     * Only the far half of the box is at the far end, so a single pass over the
+     * vertices is enough — a BoxGeometry has exactly two rings in X.
+     */
+    const pos = geom.attributes.position as THREE.BufferAttribute
+    const scale = Math.max(0.2, c.outerWidth) / Math.max(0.2, c.width)
+    const halfX = depth / 2
+    for (let i = 0; i < pos.count; i += 1) {
+      if (pos.getX(i) > halfX - 1e-6) pos.setZ(i, pos.getZ(i) * scale)
+    }
+    pos.needsUpdate = true
+  }
   geom.rotateY(Math.PI / 2 - c.azimuthDeg * DEG)
   const dir = azimuthToVector(c.azimuthDeg)
   // centre it so the box spans from 0.3 m inside the room to `depth` into the wall

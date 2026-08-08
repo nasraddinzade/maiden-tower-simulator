@@ -97,6 +97,20 @@ const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
   })
   .filter((e): e is PlacedEmbrasure => e !== null)
 
+/**
+ * How far the recess is cut outside the reveal on each side, metres.
+ *
+ * Only enough that the two cuts are never near-coincident; see the note where
+ * the chases are built. [ESTIMATE] — the photographs show a recess a little
+ * wider than the opening above it but give no figure.
+ */
+const EMBRASURE_MARGIN = 0.12
+
+/** The window each embrasure belongs to, for its reveal's taper. */
+const WINDOWS_BY_ID = new Map(
+  (windowData.windows as WindowSpec[]).map((w) => [w.id, w]),
+)
+
 /** The same recesses as arcs, so the wall colliders open where the stone does. */
 const EMBRASURE_OPENINGS = EMBRASURES.map((e) => ({
   azimuthDeg: e.azimuthDeg,
@@ -328,13 +342,35 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
      * change to them can never open a hole in the wall.
      */
     for (const e of EMBRASURES) {
+      /*
+       * THE RECESS FOLLOWS THE REVEAL ABOVE IT, a fixed margin wider all the way.
+       *
+       * It was a parallel-sided box 1.32 m across. The reveal it runs under
+       * narrows from 1.50 m at the room face to 0.40 m outside, so the box sat
+       * INSIDE the reveal near the room and OUTSIDE it from about 0.7 m deep,
+       * and the two sets of side faces crossed at a glancing angle in between.
+       * Near-coincident CSG faces are what the owner was seeing as holes you can
+       * look through and a lip you catch on — at eye level, because the box's
+       * flat top is built to meet the window's inner sill.
+       *
+       * Given the same taper plus EMBRASURE_MARGIN on each side, the recess is
+       * strictly outside the reveal at every depth and the two surfaces never
+       * come near each other.
+       */
+      const w = WINDOWS_BY_ID.get(e.id)
+      const face = innerRadiusAt(e.plan.platformY)
+      const wall = TOWER.outerRadius - face
+      const inner = (w?.innerWidth ?? WINDOW_EMBRASURE.width) + 2 * EMBRASURE_MARGIN
+      const outer = (w?.outerWidth ?? WINDOW_EMBRASURE.width) + 2 * EMBRASURE_MARGIN
       out.push({
         azimuthDeg: e.azimuthDeg,
-        width: WINDOW_EMBRASURE.width + 0.12,
+        width: inner,
         bottomY: e.floorY,
         // up to the reveal's inner mouth, so the recess and the window are one void
         topY: e.plan.platformY + PLAYER.eyeHeight,
         depth: e.plan.depth,
+        // the reveal's own width where the recess ends
+        outerWidth: inner + ((outer - inner) * Math.min(1, e.plan.depth / Math.max(0.5, wall))),
       })
     }
     return out

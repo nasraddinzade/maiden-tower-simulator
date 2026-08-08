@@ -91,12 +91,25 @@ describe('the shipped window data', () => {
     expect(az.size).toBe(1) // a true vertical generator, as measured
   })
 
-  it('cannot separate the columns by bearing alone — the drifting one crosses it', () => {
-    // worth asserting: the upper column sweeps THROUGH the lower column's azimuth,
-    // so azimuth clustering merges them. Column identity comes from height, not bearing.
-    const slits = WINDOWS.filter((w) => w.kind === 'slit')
-    const merged = groupByAzimuth(slits, 2).filter((g) => g.length > 4)
-    expect(merged.length).toBeGreaterThan(0)
+  it('keeps the two columns well apart in bearing', () => {
+    /*
+     * THIS TEST USED TO ASSERT THE OPPOSITE, and it was asserting a mistake.
+     *
+     * It said azimuth clustering merges the two columns because the drifting
+     * upper one sweeps through the lower one's bearing — true of the data as it
+     * then stood, where the lower column sat at 141 and the upper at 132–143,
+     * threaded through each other. Re-reading the exterior photographs put the
+     * two columns about 35° apart, and the lower one moved to 170. On the drum
+     * they are two separate lines with a broad band of blank masonry between,
+     * which is what the photographs show and what the old data denied.
+     */
+    const lower = WINDOWS.filter((w) => w.id.startsWith('lower-'))
+    const upper = WINDOWS.filter((w) => w.id.startsWith('upper-'))
+    const gap = Math.min(
+      ...lower.flatMap((l) => upper.map((u) => Math.abs(l.azimuthDeg - u.azimuthDeg))),
+    )
+    // 35 ± 6 across four blind readings; assert only that they do not overlap
+    expect(gap).toBeGreaterThan(20)
   })
 
   it('spreads the upper column across a few degrees, not one bearing', () => {
