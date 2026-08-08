@@ -388,6 +388,11 @@ export function stairPassageSections(
   innerFaceRadiusAt: (y: number) => number,
   sideClearance = PASSAGE_SIDE_CLEARANCE,
   /**
+   * Clear width of the doorway at each end, so the tube can be carried out far
+   * enough to contain it. See the lead-out note below.
+   */
+  doorwayWidth = width,
+  /**
    * Tolerance between the underside of a tread block and the floor of the cut,
    * metres. Only a tolerance — the depth itself is the flight's own riser, so
    * the stone below the passage rises with the stair and meets each tread.
@@ -472,11 +477,37 @@ export function stairPassageSections(
     const stepAngle = flight[1].azimuthDeg - flight[0].azimuthDeg
     const last = flight[flight.length - 1]
     const lastAngle = last.azimuthDeg - flight[flight.length - 2].azimuthDeg
-    tubes.push([
-      sectionAt(flight[0], riser, flight[0].azimuthDeg - stepAngle),
-      ...body,
-      sectionAt(last, riser, last.azimuthDeg + lastAngle),
-    ])
+
+    /*
+     * THE TUBE HAS TO REACH PAST THE DOORWAY, not one step past the last tread.
+     *
+     * A doorway is not centred on the end tread: approachAzimuthDeg pushes it
+     * half a flight-width ALONG the climb so it stops straddling the treads
+     * below, and then it spreads its own half-width either side. Measured, that
+     * puts its far edge 13.3° beyond the last tread while a one-step lead-out
+     * reached 4.1°. The 9° in between is doorway cut into masonry the passage
+     * never reached — a blind rectangular pocket, 1.36 m deep and 2.4 m tall,
+     * standing in the wall beside every stair exit. That is what the owner has
+     * been calling unhewn.
+     *
+     * So each end runs out in whole steps until it covers the opening, and the
+     * end section repeats the end tread's height, which keeps the lead flat and
+     * makes it read as the landing continuing to the door.
+     */
+    const overrunDeg =
+      ((width / 2 + doorwayWidth / 2) / Math.max(0.5, last.midRadius)) * (180 / Math.PI) +
+      Math.abs(stepAngle)
+    const leadSteps = Math.max(1, Math.ceil(overrunDeg / Math.abs(stepAngle)))
+
+    const leadIn: PassageSection[] = []
+    for (let k = leadSteps; k >= 1; k--) {
+      leadIn.push(sectionAt(flight[0], riser, flight[0].azimuthDeg - stepAngle * k))
+    }
+    const leadOut: PassageSection[] = []
+    for (let k = 1; k <= leadSteps; k++) {
+      leadOut.push(sectionAt(last, riser, last.azimuthDeg + lastAngle * k))
+    }
+    tubes.push([...leadIn, ...body, ...leadOut])
   }
   return tubes
 }

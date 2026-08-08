@@ -488,7 +488,14 @@ describe('entrance opening', () => {
  */
 describe('the shell carries a floor under every tread', () => {
   const flights = planAllFlights(STAIR, WALL_LIFTS, innerRadiusAt)
-  const passage = stairPassageSections(flights, STAIR.width, PLAYER.stairHeadroom, innerRadiusAt)
+  const passage = stairPassageSections(
+    flights,
+    STAIR.width,
+    PLAYER.stairHeadroom,
+    innerRadiusAt,
+    undefined,
+    STAIR.doorwayWidth,
+  )
   const doorways = stairDoorways(
     flights,
     STAIR.width,

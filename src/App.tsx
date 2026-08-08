@@ -206,7 +206,14 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
     // was the first guess and proved unwalkable: it left 0.14 m over a 1.75 m
     // head, and the character controller has to lift the capsule a full riser
     // to mount the next step, so it hit the vault and refused every time.
-    return stairPassageSections(flights, stair.stairWidth, PLAYER.stairHeadroom, innerRadiusAt)
+    return stairPassageSections(
+      flights,
+      stair.stairWidth,
+      PLAYER.stairHeadroom,
+      innerRadiusAt,
+      undefined,
+      STAIR.doorwayWidth,
+    )
   }, [
     stair.cutStairwells,
     winding,

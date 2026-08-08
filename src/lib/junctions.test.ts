@@ -15,13 +15,14 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt } from '../config/tower'
+import { ENTRANCE, FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt } from '../config/tower'
 import { PLAYER } from '../config/player'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from './cupola'
 import {
   PASSAGE_SIDE_CLEARANCE,
   flightRiser,
   planAllFlights,
+  stairDoorways,
   stairApproaches,
   stairPassageSections,
   stairTreadVertices,
@@ -174,7 +175,14 @@ describe('the stair leaves no slot that looks through', () => {
    * a tread on storey 2 with a section on storey 7. The flat list is still right
    * for questions about the passage as a whole.
    */
-  const tubes = stairPassageSections(flights, STAIR.width, PLAYER.stairHeadroom, innerRadiusAt)
+  const tubes = stairPassageSections(
+    flights,
+    STAIR.width,
+    PLAYER.stairHeadroom,
+    innerRadiusAt,
+    undefined,
+    STAIR.doorwayWidth,
+  )
   const sections = tubes.flat()
 
   it('keeps the passage in the masonry, so the flight is not a niche onto the room', () => {
@@ -294,6 +302,50 @@ describe('the stair leaves no slot that looks through', () => {
           `steps ${i}/${i + 1}: tread edges at ${aEdge.toFixed(4)} and ${bEdge.toFixed(4)}`,
         ).toBeLessThan(0.02)
       }
+    }
+  })
+
+  it('contains every doorway inside the passage it opens onto', () => {
+    /*
+     * The blind pocket. A doorway is not centred on the end tread —
+     * approachAzimuthDeg pushes it half a flight-width along the climb so it
+     * stops straddling the treads below — and then it spreads its own half-width
+     * either side. Measured before the fix: the far edge stood 13.3° past the
+     * last tread while the passage tube ran out only 4.1°, so nine degrees of
+     * doorway were cut into masonry the passage never reached. That is a blind
+     * rectangular pocket 1.36 m deep and 2.4 m tall standing in the wall beside
+     * every stair exit, and it is what the owner kept calling unhewn.
+     */
+    const doors = stairDoorways(
+      flights,
+      STAIR.width,
+      ENTRANCE.height,
+      innerRadiusAt,
+      (i: number, end: 'foot' | 'head') =>
+        end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY,
+      WALL_LIFTS.map((l) => l.opensAtY),
+      STAIR.doorwayWidth,
+    )
+    // a doorway belongs to the flight whose tube spans its height
+    for (const d of doors) {
+      const fi = tubes.findIndex((t) => {
+        const lo = Math.min(...t.map((x) => x.bottomY))
+        const hi = Math.max(...t.map((x) => x.topY))
+        return d.bottomY >= lo - 0.5 && d.bottomY <= hi
+      })
+      expect(fi, `no passage spans the doorway at az ${d.azimuthDeg.toFixed(1)}`).toBeGreaterThan(-1)
+      const az = tubes[fi].map((x) => x.azimuthDeg)
+      const lo = Math.min(...az)
+      const hi = Math.max(...az)
+      const half = d.widthDeg / 2
+      expect(
+        d.azimuthDeg - half,
+        `doorway at az ${d.azimuthDeg.toFixed(1)} runs off the near end of its passage (${lo.toFixed(1)}–${hi.toFixed(1)})`,
+      ).toBeGreaterThanOrEqual(lo - 1e-6)
+      expect(
+        d.azimuthDeg + half,
+        `doorway at az ${d.azimuthDeg.toFixed(1)} runs off the far end of its passage (${lo.toFixed(1)}–${hi.toFixed(1)})`,
+      ).toBeLessThanOrEqual(hi + 1e-6)
     }
   })
 
