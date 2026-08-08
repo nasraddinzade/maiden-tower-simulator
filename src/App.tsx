@@ -76,6 +76,25 @@ interface SceneProps {
 }
 
 /**
+ * How far the recess is cut outside the reveal on each side, metres.
+ *
+ * Only enough that the two cuts are never near-coincident; see the note where
+ * the chases are built. [ESTIMATE] — the photographs show a recess a little
+ * wider than the opening above it but give no figure.
+ */
+const EMBRASURE_MARGIN = 0.12
+
+/**
+ * How far the recess's crown stands above the reveal's inner sill, metres.
+ *
+ * [ESTIMATE], and its job is structural rather than architectural: it is what
+ * keeps the recess's ceiling off the window's floor, which were the same plane
+ * before. Half the recess's own width is what a round head rises anyway, so this
+ * is the smallest value that does not flatten it.
+ */
+const EMBRASURE_HEAD_RISE = 0.45
+
+/**
  * The openings that need steps up to them, worked out rather than chosen.
  *
  * Module level, not a hook: it depends on nothing the panel can change, and both
@@ -113,24 +132,7 @@ const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
   })
   .filter((e): e is PlacedEmbrasure => e !== null)
 
-/**
- * How far the recess is cut outside the reveal on each side, metres.
- *
- * Only enough that the two cuts are never near-coincident; see the note where
- * the chases are built. [ESTIMATE] — the photographs show a recess a little
- * wider than the opening above it but give no figure.
- */
-const EMBRASURE_MARGIN = 0.12
 
-/**
- * How far the recess's crown stands above the reveal's inner sill, metres.
- *
- * [ESTIMATE], and its job is structural rather than architectural: it is what
- * keeps the recess's ceiling off the window's floor, which were the same plane
- * before. Half the recess's own width is what a round head rises anyway, so this
- * is the smallest value that does not flatten it.
- */
-const EMBRASURE_HEAD_RISE = 0.45
 
 
 /** The same recesses as arcs, so the wall colliders open where the stone does. */
