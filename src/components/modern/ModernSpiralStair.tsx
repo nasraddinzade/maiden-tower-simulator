@@ -98,14 +98,35 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
      * on it. The ramp runs radially OUTWARD from the flight into the room, since
      * for a free-standing stair the room is outside it, not inside.
      */
-    const approach = [
+    /*
+     * ACROSS THE WHOLE BOTTOM TREAD, not on one line of it.
+     *
+     * One ramp at the first tread's own azimuth is a needle: walked, the visitor
+     * crossing the chamber missed it, circled the stair at floor level and never
+     * got on — I took that for a broken stair before noticing it was a broken
+     * approach. On the real thing you step onto the bottom step anywhere along
+     * its open edge, so the ramps are spread across that edge and one step-angle
+     * either side of it, which is about the width of a doorway.
+     *
+     * They still all rise to the FIRST tread. The ones beyond its wedge sit under
+     * the treads above and are simply buried — a ramp under stone costs nothing,
+     * and pretending otherwise would mean a separate approach per tread, which is
+     * a spiral staircase with a ramp round it.
+     */
+    const floorY = MODERN_SPIRAL_LIFT ? MODERN_SPIRAL_LIFT.fromY : 0
+    const stepAngle = steps.length > 1 ? steps[1].azimuthDeg - steps[0].azimuthDeg : 30
+    const approaches = [-1, -0.5, 0, 0.5, 1].map((k) => [
       {
-        azimuthDeg: first.azimuthDeg,
-        treadY: MODERN_SPIRAL_LIFT ? MODERN_SPIRAL_LIFT.fromY : 0,
+        azimuthDeg: first.azimuthDeg + stepAngle * k,
+        treadY: floorY,
         midRadius: MODERN_SPIRAL.outerRadius + 0.5,
       },
-      { azimuthDeg: first.azimuthDeg, treadY: first.treadY, midRadius: first.midRadius },
-    ]
+      {
+        azimuthDeg: first.azimuthDeg + stepAngle * k,
+        treadY: first.treadY,
+        midRadius: first.midRadius,
+      },
+    ])
     /*
      * ONE box per step, and the collider NARROWER than the treads.
      *
@@ -125,7 +146,7 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
      */
     return [
       ...stairRampBoxes(steps, COLLIDER_BAND, 1, COLLIDER_THICKNESS),
-      ...stairRampBoxes(approach, width, 1, COLLIDER_THICKNESS),
+      ...approaches.flatMap((a) => stairRampBoxes(a, width, 1, COLLIDER_THICKNESS)),
     ]
   }, [steps])
 
