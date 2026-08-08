@@ -12,27 +12,29 @@ export interface GrilleBar {
 }
 
 /**
- * Bars evenly spaced across a span, laid out from the CENTRE outward.
+ * `count` bars evenly spaced across a span, symmetric about its centre.
  *
- * Centre-out rather than edge-in, because a slit is narrow and a grid laid from
- * one edge puts its last gap wherever the arithmetic lands — which reads as a
- * mistake even when the spacing is right. Laid from the middle the pattern is
- * symmetric about the opening, and any odd remainder is split between the two
- * jambs where a mason would put it.
- *
- * Returns [] when the span cannot hold a bar with a gap either side, which is
- * the honest answer for an opening narrower than the spacing rather than a bar
- * jammed against both jambs.
+ * Symmetric because a slit is narrow and a grid laid from one jamb puts its last
+ * gap wherever the arithmetic lands, which reads as a mistake even when the
+ * spacing is right. Spaced from the centre, any remainder is split between the
+ * two jambs, where a mason would put it.
  */
-export function barOffsets(span: number, barSide: number, gap: number): number[] {
-  const pitch = barSide + gap
-  if (span <= pitch) return []
-  // bars strictly inside the opening, with a gap between the outermost and each jamb
-  const count = Math.max(0, Math.floor((span - gap) / pitch) - 1)
-  if (count <= 0) return []
+export function barOffsets(span: number, barSide: number, count: number): number[] {
+  if (count <= 0 || span <= barSide) return []
+  /*
+   * COUNTED, NOT SPACED. This used to take a gap and fit as many bars as would
+   * go, and on a 0.40 m slit with a 0.12 m gap that came out at ONE vertical bar
+   * and eleven horizontals — a ladder lying on its side, not a grille. The
+   * photographs show the opposite proportion: a hung gate of eight to eleven
+   * uprights with two or three rails across.
+   *
+   * A count also survives the openings being different sizes, which a gap does
+   * not: the arched window is more than twice the width of a slit, and a fixed
+   * gap silently gives it a different character.
+   */
+  const pitch = (span - barSide) / (count + 1)
   const out: number[] = []
-  const first = -((count - 1) / 2) * pitch
-  for (let i = 0; i < count; i += 1) out.push(first + i * pitch)
+  for (let i = 1; i <= count; i += 1) out.push(-((span - barSide) / 2) + i * pitch)
   return out
 }
 
@@ -47,14 +49,15 @@ export function grilleBars(
   width: number,
   height: number,
   barSide: number,
-  gap: number,
+  uprights: number,
+  rails: number,
   embed: number,
 ): GrilleBar[] {
   const bars: GrilleBar[] = []
-  for (const offset of barOffsets(width, barSide, gap)) {
+  for (const offset of barOffsets(width, barSide, uprights)) {
     bars.push({ offset, length: height + 2 * embed, orientation: 'vertical' })
   }
-  for (const offset of barOffsets(height, barSide, gap)) {
+  for (const offset of barOffsets(height, barSide, rails)) {
     bars.push({ offset, length: width + 2 * embed, orientation: 'horizontal' })
   }
   return bars

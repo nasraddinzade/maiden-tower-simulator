@@ -34,7 +34,17 @@
     "recovered from the buttress silhouette. Relative order and spacing are far more reliable",
     "than the absolute values. Retune in leva against the photographs.",
     "",
-    "OUTER SIZES: the 1:4.8 height-to-width ratio was measured off a slit at 5x zoom and is",
+    "HEADS. Not all flat, which is how they were modelled until 2026-08-09. Reading one frame",
+  "with one light and one camera (exterior/Qız qalası yaxından.jpg): the two topmost slits",
+  "have flat heads with a separate lintel stone over them, the ones below have clean",
+  "semicircular heads cut straight through the courses rather than built up out of voussoirs,",
+  "and the later window is a true two-centred pointed arch with a dressed voussoir surround.",
+  "Two blind readings disagreed about where flat stops — 'all round except the topmost'",
+  "against 'the top two flat, round below' — and a montage of that one frame supports the",
+  "second, which is what is recorded here. upper-2 sits on the boundary and is the value to",
+  "question first. [PHOTO], and only from one frame.",
+  "",
+  "OUTER SIZES: the 1:4.8 height-to-width ratio was measured off a slit at 5x zoom and is",
     "solid, because both dimensions come from the same place in the frame so the scale cancels.",
     "The absolute width is calibrated against the documented 16.5 m diameter and is good to",
     "maybe 40 percent. INNER sizes are NOT measured at all: only one interior photograph of a",
@@ -49,6 +59,7 @@
   "windows": [
     {
       "id": "lower-1",
+      "head": "round",
       "kind": "slit",
       "floorIndex": 2,
       "azimuthDeg": 170,
@@ -63,6 +74,7 @@
     },
     {
       "id": "lower-2",
+      "head": "round",
       "kind": "slit",
       "floorIndex": 3,
       "azimuthDeg": 170,
@@ -77,6 +89,7 @@
     },
     {
       "id": "lower-3",
+      "head": "round",
       "kind": "slit",
       "floorIndex": 4,
       "azimuthDeg": 170,
@@ -91,6 +104,7 @@
     },
     {
       "id": "lower-4",
+      "head": "round",
       "kind": "slit",
       "floorIndex": 5,
       "azimuthDeg": 170,
@@ -105,6 +119,7 @@
     },
     {
       "id": "upper-1",
+      "head": "round",
       "kind": "slit",
       "floorIndex": 5,
       "azimuthDeg": 132,
@@ -119,6 +134,7 @@
     },
     {
       "id": "upper-2",
+      "head": "flat",
       "kind": "slit",
       "floorIndex": 6,
       "azimuthDeg": 136,
@@ -133,6 +149,7 @@
     },
     {
       "id": "upper-3",
+      "head": "flat",
       "kind": "slit",
       "floorIndex": 7,
       "azimuthDeg": 140,
@@ -147,6 +164,7 @@
     },
     {
       "id": "upper-4",
+      "head": "flat",
       "kind": "slit",
       "floorIndex": 7,
       "azimuthDeg": 143,
@@ -161,6 +179,7 @@
     },
     {
       "id": "arched-later",
+      "head": "pointed",
       "kind": "arched",
       "floorIndex": 4,
       "azimuthDeg": 123,

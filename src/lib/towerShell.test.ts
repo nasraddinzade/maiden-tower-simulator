@@ -26,6 +26,7 @@ import {
   innerRadiusProfileAt,
   outerRadiusProfileAt,
   windowCutter,
+  windowProfile,
   type ShellParams,
 } from './towerShell'
 
@@ -56,6 +57,7 @@ const WINDOW_CUTS = (windowData.windows as WindowSpec[]).map((w) => ({
   outerHeight: w.outerHeight,
   innerWidth: w.innerWidth,
   innerHeight: w.innerHeight,
+  head: w.head,
 }))
 
 const built = buildShellGeometry(PARAMS)
@@ -586,5 +588,60 @@ describe('the shell carries a floor under every tread', () => {
       worstDropUnderAnyTread: +worst.toFixed(2),
     })
     expect(worst).toBeLessThan(maxDrop)
+  })
+})
+
+describe('an opening is finished at the top the way its data says', () => {
+  /*
+   * Every opening used to be cut square, because the cutter was a BoxGeometry
+   * with its vertices pushed about, and a box can only ever make a square hole.
+   * The photographs show flat heads on the two topmost slits, semicircular ones
+   * below, and a two-centred pointed arch on the later window.
+   */
+  it('closes every profile and gives them all the same point count', () => {
+    const flat = windowProfile(0.2, 0.95, 'flat')
+    const round = windowProfile(0.2, 0.95, 'round')
+    const pointed = windowProfile(0.45, 0.8, 'pointed')
+    expect(round.length).toBe(flat.length)
+    expect(pointed.length).toBe(flat.length)
+    for (const p of [flat, round, pointed]) {
+      for (const [x, y] of p) {
+        expect(Number.isFinite(x)).toBe(true)
+        expect(Number.isFinite(y)).toBe(true)
+      }
+    }
+  })
+
+  it('puts the crown of every head at the opening full height', () => {
+    for (const head of ['flat', 'round', 'pointed'] as const) {
+      const p = windowProfile(0.2, 0.95, head)
+      expect(Math.max(...p.map(([, y]) => y)), head).toBeCloseTo(0.95, 6)
+      expect(Math.min(...p.map(([, y]) => y)), head).toBeCloseTo(-0.95, 6)
+    }
+  })
+
+  it('keeps a round head round and a pointed head pointed', () => {
+    /*
+     * The distinction that matters from the ground: a semicircular head is
+     * widest at its springing and curves away symmetrically; a two-centred one
+     * meets itself at a corner on the axis, so just below the crown it is
+     * NARROWER than the circle through the same three points would be.
+     */
+    const a = 0.45
+    const round = windowProfile(a, 0.8, 'round')
+    const pointed = windowProfile(a, 0.8, 'pointed')
+    const widthAt = (p: Array<[number, number]>, y: number) => {
+      const near = p.filter(([, py]) => Math.abs(py - y) < 0.06)
+      return near.length ? Math.max(...near.map(([x]) => Math.abs(x))) * 2 : 0
+    }
+    const y = 0.8 - a * 0.35
+    expect(widthAt(pointed, y)).toBeLessThan(widthAt(round, y))
+  })
+
+  it('cuts all nine shipped openings without breaking the mesh', () => {
+    const full = buildShellGeometry({ ...PARAMS, windows: WINDOW_CUTS })
+    expect(full.stats.degenerateCount).toBe(0)
+    expect(WINDOW_CUTS.filter((w) => w.head === 'round').length).toBeGreaterThan(0)
+    expect(WINDOW_CUTS.filter((w) => w.head === 'pointed').length).toBe(1)
   })
 })

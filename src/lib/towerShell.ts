@@ -122,6 +122,81 @@ export interface WindowCut {
   outerHeight: number
   innerWidth: number
   innerHeight: number
+  /** Shape of the opening's head. Defaults to 'flat'. */
+  head?: WindowHead
+}
+
+/**
+ * How an opening is finished at the top.
+ *
+ * Every opening used to be cut square, because the cutter was a BoxGeometry. The
+ * photographs disagree, and not uniformly: reading one frame with one light and
+ * one camera (exterior/Qız qalası yaxından.jpg), the two topmost slits have flat
+ * heads with a separate lintel stone over them, the ones below have clean
+ * semicircular heads cut straight through the courses rather than built up out
+ * of voussoirs, and the later window is a true two-centred pointed arch with a
+ * dressed voussoir surround.
+ *
+ * Two of the four blind readings disagreed about where the flat ones stop —
+ * "all round except the topmost" against "the top two flat, round below" — and
+ * the re-check on a montage of one frame supports the second. That is why this
+ * is per-opening data rather than one rule.
+ */
+export type WindowHead = 'flat' | 'round' | 'pointed'
+
+/**
+ * The outline of an opening at one depth, as (x, y) about its centre.
+ *
+ * x across the opening, y up. Every ring of the cutter uses the same number of
+ * points so the loft between them is a simple quad strip.
+ */
+export function windowProfile(
+  halfWidth: number,
+  halfHeight: number,
+  head: WindowHead,
+  arcSegments = 8,
+): Array<[number, number]> {
+  const a = Math.max(1e-4, halfWidth)
+  const b = Math.max(1e-4, halfHeight)
+  const pts: Array<[number, number]> = [
+    [-a, -b],
+    [a, -b],
+  ]
+  if (head === 'flat') {
+    // a flat head still needs the same point count, so the head is sampled too
+    for (let i = 0; i <= arcSegments; i += 1) pts.push([a - 2 * a * (i / arcSegments), b])
+    return pts
+  }
+  if (head === 'round') {
+    // springing where a semicircle of radius `a` would put it, crown at b
+    const springY = b - a
+    pts.push([a, springY])
+    for (let i = 0; i < arcSegments; i += 1) {
+      const t = ((i + 1) / arcSegments) * Math.PI
+      pts.push([a * Math.cos(t), springY + a * Math.sin(t)])
+    }
+    return pts
+  }
+  /*
+   * Two-centred: each centre at the OPPOSITE springing, radius equal to the
+   * span, so the crown stands √3/2 of the span above the springing — the same
+   * construction the stair passage's vault uses, and the reason the later
+   * window's head is visibly pointed rather than round in the photographs.
+   */
+  const span = 2 * a
+  const springY = b - (Math.sqrt(3) / 2) * span
+  pts.push([a, springY])
+  const half = Math.max(1, Math.floor(arcSegments / 2))
+  for (let i = 1; i <= half; i += 1) {
+    const t = (i / half) * (Math.PI / 3)
+    pts.push([-a + span * Math.cos(t), springY + span * Math.sin(t)])
+  }
+  for (let i = half - 1; i >= 0; i -= 1) {
+    const t = (i / half) * (Math.PI / 3)
+    pts.push([a - span * Math.cos(t), springY + span * Math.sin(t)])
+  }
+  while (pts.length < 3 + arcSegments) pts.push(pts[pts.length - 1])
+  return pts
 }
 
 /**
@@ -161,19 +236,18 @@ export function windowCutter(w: WindowCut): THREE.BufferGeometry {
   const inner = innerRadiusAt(w.centreY)
   const wall = R - inner // masonry actually crossed at this height
   const depth = wall + 2 * WINDOW_CUT_OVERSHOOT
-
-  // A box spanning the wall and both overshoots, then tapered: the rings from
-  // the outer face inward are pushed out to the room-side section.
-  const geom = new THREE.BoxGeometry(w.outerWidth, w.outerHeight, depth, 1, 1, 3)
-  const pos = geom.attributes.position as THREE.BufferAttribute
   const halfDepth = depth / 2
-  const wScale = w.innerWidth / w.outerWidth
-  const hScale = w.innerHeight / w.outerHeight
+
   /*
-   * Where the four rings go (local +Z is the inward end after the rotation
-   * below) and how far each is through the splay. BoxGeometry spaces them
-   * evenly, so the middle two get pulled onto the wall faces; a ring boundary
-   * is the only place a linear interpolation across a quad can change slope.
+   * Four rings, lofted — not a BoxGeometry with its vertices pushed about.
+   *
+   * The four positions and the reason for them are unchanged: the taper must run
+   * from outerWidth exactly at the outer face to innerWidth exactly at the room
+   * face, with the two overshoot rings repeating their neighbour's section, or
+   * the widths land nowhere real. What changed is that a ring is now an OUTLINE
+   * rather than a rectangle, so the head can be round or pointed. A box could
+   * only ever cut a square hole, and the photographs show square heads on just
+   * the two topmost slits.
    */
   const ringZ = [
     -halfDepth, // WINDOW_CUT_OVERSHOOT out in front of the outer face
@@ -182,16 +256,50 @@ export function windowCutter(w: WindowCut): THREE.BufferGeometry {
     halfDepth, // and past it into the room
   ]
   const ringT = [0, 0, 1, 1]
-  for (let i = 0; i < pos.count; i++) {
-    const ring = Math.round(((pos.getZ(i) + halfDepth) / depth) * 3)
-    const t = ringT[ring]
-    const k = 1 + (wScale - 1) * t
-    const kh = 1 + (hScale - 1) * t
-    pos.setX(i, pos.getX(i) * k)
-    pos.setY(i, pos.getY(i) * kh)
-    pos.setZ(i, ringZ[ring])
+  const head = w.head ?? 'flat'
+  const rings = ringT.map((t) =>
+    windowProfile(
+      (w.outerWidth + (w.innerWidth - w.outerWidth) * t) / 2,
+      (w.outerHeight + (w.innerHeight - w.outerHeight) * t) / 2,
+      head,
+    ),
+  )
+  const K = rings[0].length
+
+  const positions: number[] = []
+  rings.forEach((ring, i) => {
+    for (const [x, y] of ring) positions.push(x, y, ringZ[i])
+  })
+  const indices: number[] = []
+  for (let i = 0; i < rings.length - 1; i += 1) {
+    const a = i * K
+    const b = (i + 1) * K
+    for (let k = 0; k < K; k += 1) {
+      const k2 = (k + 1) % K
+      /*
+       * Wound so the faces point OUT of the tool. Reversed, three-bvh-csg stops
+       * treating it as a solid and the subtraction runs away — measured, the
+       * floor vanished from under a whole flight of the stair, which is what the
+       * shell's own floor test caught the first time this was lofted.
+       */
+      indices.push(a + k, b + k2, b + k)
+      indices.push(a + k, a + k2, b + k2)
+    }
   }
-  pos.needsUpdate = true
+  // caps, so the tool is a closed solid
+  const last = (rings.length - 1) * K
+  for (let k = 1; k < K - 1; k += 1) {
+    indices.push(0, k + 1, k)
+    indices.push(last, last + k, last + k + 1)
+  }
+
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geom.setIndex(indices)
+  geom.computeVertexNormals()
+  const uv: number[] = []
+  for (let i = 0; i < positions.length / 3; i += 1) uv.push(0, 0)
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
 
   // Aim it so local +Z (the widened end) points INWARD. rotateY(θ) sends local
   // +Z to (sin θ, 0, cos θ); the inward direction is −dir = (−sin az, 0, cos az),
@@ -203,6 +311,7 @@ export function windowCutter(w: WindowCut): THREE.BufferGeometry {
   geom.translate(dir.x * centreRadius, w.centreY, dir.z * centreRadius)
   return mergeVertices(geom)
 }
+
 
 /**
  * Sweep the stair passage into a solid, ready to be subtracted from the shell.

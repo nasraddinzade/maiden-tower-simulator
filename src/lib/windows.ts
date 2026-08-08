@@ -30,6 +30,8 @@ export interface WindowSpec {
   outerHeight: number
   innerWidth: number
   innerHeight: number
+  /** Shape of the head: 'flat' | 'round' | 'pointed'. See WindowHead. */
+  head?: 'flat' | 'round' | 'pointed'
   /**
    * Whether this is the aperture Islamov's winter-solstice claim refers to.
    * No source identifies it; see the note in windows.json before setting any

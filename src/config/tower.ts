@@ -797,8 +797,18 @@ export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair
 export const WINDOW_GRILLE = {
   /** Square bar, side in metres. [ESTIMATE] */
   barSide: 0.02,
-  /** Clear gap between bars, both ways. [ESTIMATE] */
-  gap: 0.12,
+  /**
+   * Uprights across the opening, and rails across them. [ESTIMATE]
+   *
+   * Counts, not a gap. A gap of 0.12 m fitted ONE upright and eleven rails into
+   * a 0.40 m slit — a ladder on its side. The photographs of a slit's gate show
+   * the opposite proportion: eight to eleven uprights with two or three rails,
+   * which is what a smith makes. Nine and three sit in the middle of both
+   * ranges. The counts also keep the character constant across openings of
+   * different size, which a fixed gap does not.
+   */
+  uprights: 9,
+  rails: 3,
   /** Set back from the outer face, so the grid sits inside the reveal. [ESTIMATE] */
   inset: 0.1,
   /** How far each bar runs past the opening into the jamb. [ESTIMATE] */

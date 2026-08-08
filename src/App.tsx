@@ -399,6 +399,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         outerHeight: w.outerHeight,
         innerWidth: outerWidth + (w.innerWidth - w.outerWidth) * windowCtl.flareScale,
         innerHeight: w.innerHeight,
+        head: w.head,
       }
     })
   }, [windowCtl.cutWindows, windowCtl.azimuthNudgeDeg, windowCtl.widthScale, windowCtl.flareScale])

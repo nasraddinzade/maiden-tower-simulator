@@ -35,10 +35,10 @@ export function WindowGrilles({
 }) {
   const geometry = useMemo(() => {
     const parts: THREE.BufferGeometry[] = []
-    const { barSide, gap, inset, embed } = WINDOW_GRILLE
+    const { barSide, uprights, rails, inset, embed } = WINDOW_GRILLE
 
     for (const w of windows) {
-      const bars = grilleBars(w.outerWidth, w.outerHeight, barSide, gap, embed)
+      const bars = grilleBars(w.outerWidth, w.outerHeight, barSide, uprights, rails, embed)
       if (bars.length === 0) continue
       const d = azimuthToVector(w.azimuthDeg)
       // set back from the outer face, inside the reveal
