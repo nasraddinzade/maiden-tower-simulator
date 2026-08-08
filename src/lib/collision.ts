@@ -15,6 +15,8 @@
  * clockwise from north.
  */
 
+import type { PassageSection } from './staircase'
+
 const DEG = Math.PI / 180
 
 /** One cuboid collider. Local +X is radial (outward), +Z tangential, +Y up. */
@@ -153,6 +155,69 @@ export function subtractRanges(
  * rather than chording it — otherwise a 3.6 m band would stop the walker up to
  * 0.16 m short of the wall they can see.
  */
+/**
+ * The thinnest jamb that may be built beside a passage, metres.
+ *
+ * Not a measurement — a floor. Anything thinner is a modelling accident, and the
+ * alternative to a thin jamb is no jamb, which is a hole in the room wall.
+ */
+export const MIN_JAMB_THICKNESS = 0.15
+
+/** A passage section that knows which flight it belongs to. */
+export type FlightSection = PassageSection & { flight: number }
+
+/**
+ * The passage crossings at one azimuth, ONE OPENING PER FLIGHT.
+ *
+ * This used to live in TowerColliders and merge any two crossings less than
+ * 0.5 m apart vertically. That was right while the stair was a single helix
+ * wrapping 1.4 turns: the two crossings at an azimuth were then some 17 m apart
+ * and could not be confused. Stacking the flights killed that premise, and this
+ * was not touched.
+ *
+ * What it cost, measured on the built model: the flights run one above another
+ * at every azimuth with 0.654 m of stone between them, while a sector samples
+ * ±8.625° of arc, over which the stair rises 0.865 m. The sampled crossings
+ * therefore OVERLAP before the tolerance is consulted, and three storeys'
+ * passages merged into one opening — 9.97 m tall, 14 sections, at azimuth
+ * 73.125. A merged opening takes the innerRadius of the LOWEST flight, the wall
+ * thins going up, so the jamb came out zero or negative thickness and was
+ * dropped: 7 m tall open slots in the room wall at seven of the 32 sectors, and
+ * falls of up to 12.3 m for anyone stepping off a slab at the wall.
+ *
+ * Keyed on the flight, two passages cannot be confused however close they run.
+ * That is the real invariant and it survives whatever the flights do next.
+ */
+export function passageWindowsAt(
+  sections: FlightSection[],
+  azimuthDeg: number,
+  sectorDeg: number,
+  marginDeg = 3,
+): PassageWindow[] {
+  const byFlight = new Map<number, PassageWindow>()
+  for (const s of sections) {
+    const d = Math.abs(((((s.azimuthDeg - azimuthDeg) % 360) + 540) % 360) - 180)
+    if (d > sectorDeg / 2 + marginDeg) continue
+    const w = byFlight.get(s.flight)
+    if (!w) {
+      byFlight.set(s.flight, {
+        bottomY: s.bottomY,
+        topY: s.topY,
+        innerRadius: s.innerRadius,
+        outerRadius: s.outerRadius,
+      })
+      continue
+    }
+    w.bottomY = Math.min(w.bottomY, s.bottomY)
+    w.topY = Math.max(w.topY, s.topY)
+    w.outerRadius = Math.max(w.outerRadius, s.outerRadius)
+    // within ONE flight the jamb is still only as thick as its thinnest crossing
+    w.innerRadius = Math.min(w.innerRadius, s.innerRadius)
+  }
+  return [...byFlight.values()].sort((a, b) => a.bottomY - b.bottomY)
+}
+
+
 export function wallColliders(p: WallColliderParams): BoxSpec[] {
   const out: BoxSpec[] = []
   const sectorDeg = 360 / p.sectors
@@ -255,11 +320,29 @@ export function wallColliders(p: WallColliderParams): BoxSpec[] {
             for (const [jb, jt] of subtractRanges([cBottom, cTop], openRanges)) {
               const jMid = (jb + jt) / 2
               const face = p.innerRadiusAt(jMid)
-              if (jt - jb > 0.02 && c.jambTo - face > 0.02) {
-                out.push(
-                  boxAt(azimuthDeg, face, c.jambTo, jMid, (jt - jb) / 2, halfChord, tilt, 'wall', sectorDeg),
-                )
-              }
+              if (jt - jb <= 0.02) continue
+              /*
+               * A JAMB TOO THIN TO BUILD IS STILL A JAMB. It used to be skipped.
+               *
+               * The thickness is jambTo − face, and the wall thins going up, so
+               * whenever a passage opening spans more height than the section it
+               * was measured from, the face outruns jambTo and the difference
+               * goes to zero or negative. The old guard read that as "nothing to
+               * build" and emitted nothing — which does not leave a thin wall, it
+               * leaves NO wall, and a walker stepping off the storey slab at that
+               * azimuth falls. Measured before the fix: 25 jambs dropped, the
+               * worst leaving a 6.97 m tall open slot, and falls of up to 12.3 m.
+               *
+               * The cause was upstream — passages from different flights being
+               * merged into one opening — and that is fixed. This is the second
+               * lock: a degenerate thickness now yields a minimum jamb instead of
+               * a hole, so the same class of upstream mistake can never again
+               * express itself as somewhere to fall.
+               */
+              const jambTo = Math.max(c.jambTo, face + MIN_JAMB_THICKNESS)
+              out.push(
+                boxAt(azimuthDeg, face, jambTo, jMid, (jt - jb) / 2, halfChord, tilt, 'wall', sectorDeg),
+              )
             }
           }
         }

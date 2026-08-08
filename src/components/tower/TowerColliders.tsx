@@ -5,9 +5,9 @@ import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import {
   floorColliders,
   guardRingBoxes,
+  passageWindowsAt,
   wallColliders,
   type BoxSpec,
-  type PassageWindow,
 } from '../../lib/collision'
 import type { PassageSection, StairDoorway } from '../../lib/staircase'
 import type { StairwellCut } from './FloorStructures'
@@ -54,44 +54,19 @@ export function TowerColliders({
   onCount,
 }: TowerCollidersProps) {
   const boxes = useMemo(() => {
-    const sections = (stairPassage ?? []).flat()
-
-    /**
-     * The passage crossings at one azimuth.
+    /*
+     * TAGGED WITH THE FLIGHT THEY BELONG TO, and flattened only after that.
      *
-     * The helix wraps about 1.4 turns, so a single azimuth can be crossed twice
-     * at different heights; sections within the sector are merged into as many
-     * windows as there are separate crossings, never one tall window spanning
-     * the gap between them.
+     * See passageAt: two flights' passages at one azimuth must never be merged
+     * into one opening, and once the arrays are flattened there is nothing left
+     * to tell them apart by.
      */
-    const sectorDeg = 360 / sectors
-    const passageAt = (azimuthDeg: number): PassageWindow[] => {
-      const hits = sections.filter((s) => {
-        const d = Math.abs(((((s.azimuthDeg - azimuthDeg) % 360) + 540) % 360) - 180)
-        return d <= sectorDeg / 2 + 3
-      })
-      if (hits.length === 0) return []
+    const sections = (stairPassage ?? []).flatMap((tube, flight) =>
+      tube.map((s) => ({ ...s, flight })),
+    )
 
-      const sorted = [...hits].sort((a, b) => a.bottomY - b.bottomY)
-      const windows: PassageWindow[] = []
-      for (const s of sorted) {
-        const last = windows[windows.length - 1]
-        if (last && s.bottomY <= last.topY + 0.5) {
-          last.topY = Math.max(last.topY, s.topY)
-          last.outerRadius = Math.max(last.outerRadius, s.outerRadius)
-          // the jamb is only as thick as the THINNEST crossing allows
-          last.innerRadius = Math.min(last.innerRadius, s.innerRadius)
-        } else {
-          windows.push({
-            bottomY: s.bottomY,
-            topY: s.topY,
-            innerRadius: s.innerRadius,
-            outerRadius: s.outerRadius,
-          })
-        }
-      }
-      return windows
-    }
+    const sectorDeg = 360 / sectors
+    const passageAt = (azimuthDeg: number) => passageWindowsAt(sections, azimuthDeg, sectorDeg)
 
     // one band per storey, plus the parapet above the top floor
     const bands = [
