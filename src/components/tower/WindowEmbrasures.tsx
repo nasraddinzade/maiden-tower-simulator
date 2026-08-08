@@ -11,11 +11,23 @@ import { PLAYER } from '../../config/player'
 /** Head clearance kept above the platform inside a recess. */
 const PLAYER_HEAD = PLAYER.eyeHeight + 0.2
 
+/**
+ * How far the tread stone stops short of each cheek, metres. [ESTIMATE]
+ *
+ * Not zero: a tread that meets the cheek exactly gives the CSG two coplanar
+ * surfaces to reconcile, and this model has paid for that twice. Not much
+ * either — the photographs show the steps running cheek to cheek.
+ */
+const CHEEK_INSET = 0.04
+
 export interface PlacedEmbrasure {
   id: string
   azimuthDeg: number
   floorY: number
   plan: EmbrasurePlan
+  /** Clear width of the recess at the room face and at its far end. */
+  mouthWidth: number
+  backWidth: number
 }
 
 /**
@@ -44,11 +56,24 @@ export function WindowEmbrasures({
 }) {
   const geometry = useMemo(() => {
     const parts: THREE.BufferGeometry[] = []
-    const { going, width, platformDepth } = WINDOW_EMBRASURE
+    const { going, platformDepth } = WINDOW_EMBRASURE
 
     for (const e of embrasures) {
       const face = innerRadiusAt(e.plan.platformY)
       const d = azimuthToVector(e.azimuthDeg)
+      /*
+       * THE TREADS FILL THE RECESS, and taper with it.
+       *
+       * They were a constant 0.9 m in a recess that splays from about 1.7 m at
+       * the room face down to the reveal's own width — so the flight sat in the
+       * middle of a wide hole with a hand's breadth of nothing either side. The
+       * photographs show the steps running from cheek to cheek: an embrasure is a
+       * passage, and its floor is as wide as the passage.
+       *
+       * The GOING is untouched by this. Its proportion to the width is the thing
+       * the photographs actually settle, and it is set in the config.
+       */
+      const run = Math.max(0.1, e.plan.depth)
       embrasureTreads(e.plan, face, going, platformDepth).forEach((t, i) => {
         /*
          * The nosing wanders and the block sits a little off level — see
@@ -66,7 +91,12 @@ export function WindowEmbrasures({
          * cheaper and truer.
          */
         const height = Math.max(0.05, t.treadY - e.floorY + wear.tilt)
-        const g = new THREE.BoxGeometry(width, height, depth)
+        const at = Math.min(1, Math.max(0, (t.innerRadius - face) / run))
+        const treadWidth = Math.max(
+          0.3,
+          (e.mouthWidth + (e.backWidth - e.mouthWidth) * at) - 2 * CHEEK_INSET,
+        )
+        const g = new THREE.BoxGeometry(treadWidth, height, depth)
         g.translate(0, height / 2, 0)
         g.rotateZ(wear.tilt * 0.6)
         g.rotateY(-e.azimuthDeg * (Math.PI / 180))

@@ -94,7 +94,22 @@ const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
       WINDOW_EMBRASURE.going,
       WINDOW_EMBRASURE.platformDepth,
     )
-    return plan ? { id: w.id, azimuthDeg: w.azimuthDeg, floorY, plan } : null
+    if (!plan) return null
+    // the same taper the chase is cut with, so the stone fills the hole exactly
+    const face = innerRadiusAt(plan.platformY)
+    const wall = TOWER.outerRadius - face
+    const mouthWidth = w.innerWidth + 2 * EMBRASURE_MARGIN
+    const backAtFullWall = w.outerWidth + 2 * EMBRASURE_MARGIN
+    return {
+      id: w.id,
+      azimuthDeg: w.azimuthDeg,
+      floorY,
+      plan,
+      mouthWidth,
+      backWidth:
+        mouthWidth +
+        (backAtFullWall - mouthWidth) * Math.min(1, plan.depth / Math.max(0.5, wall)),
+    }
   })
   .filter((e): e is PlacedEmbrasure => e !== null)
 
@@ -107,10 +122,16 @@ const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
  */
 const EMBRASURE_MARGIN = 0.12
 
-/** The window each embrasure belongs to, for its reveal's taper. */
-const WINDOWS_BY_ID = new Map(
-  (windowData.windows as WindowSpec[]).map((w) => [w.id, w]),
-)
+/**
+ * How far the recess's crown stands above the reveal's inner sill, metres.
+ *
+ * [ESTIMATE], and its job is structural rather than architectural: it is what
+ * keeps the recess's ceiling off the window's floor, which were the same plane
+ * before. Half the recess's own width is what a round head rises anyway, so this
+ * is the smallest value that does not flatten it.
+ */
+const EMBRASURE_HEAD_RISE = 0.45
+
 
 /** The same recesses as arcs, so the wall colliders open where the stone does. */
 const EMBRASURE_OPENINGS = EMBRASURES.map((e) => ({
@@ -358,20 +379,28 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
        * strictly outside the reveal at every depth and the two surfaces never
        * come near each other.
        */
-      const w = WINDOWS_BY_ID.get(e.id)
-      const face = innerRadiusAt(e.plan.platformY)
-      const wall = TOWER.outerRadius - face
-      const inner = (w?.innerWidth ?? WINDOW_EMBRASURE.width) + 2 * EMBRASURE_MARGIN
-      const outer = (w?.outerWidth ?? WINDOW_EMBRASURE.width) + 2 * EMBRASURE_MARGIN
       out.push({
         azimuthDeg: e.azimuthDeg,
-        width: inner,
+        // the placed embrasure already carries both, so the cut and the stone
+        // that fills it can never be computed two different ways
+        width: e.mouthWidth,
         bottomY: e.floorY,
-        // up to the reveal's inner mouth, so the recess and the window are one void
-        topY: e.plan.platformY + PLAYER.eyeHeight,
+        /*
+         * PAST the reveal's inner sill, not level with it.
+         *
+         * platformY + eyeHeight IS that sill by construction — the platform is
+         * placed to bring the eye to it — so a flat lid there made the recess's
+         * ceiling and the window's floor the same plane. Two coincident CSG
+         * surfaces, at eye level, which is exactly where the owner was looking
+         * when they called the surfaces holey. Carried a head's rise higher, the
+         * recess opens INTO the window instead of butting against it, and the
+         * round head has somewhere to go.
+         */
+        topY: e.plan.platformY + PLAYER.eyeHeight + EMBRASURE_HEAD_RISE,
         depth: e.plan.depth,
+        arched: true,
         // the reveal's own width where the recess ends
-        outerWidth: inner + ((outer - inner) * Math.min(1, e.plan.depth / Math.max(0.5, wall))),
+        outerWidth: e.backWidth,
       })
     }
     return out

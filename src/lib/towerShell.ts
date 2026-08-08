@@ -355,6 +355,11 @@ export interface WallChase {
    * at every depth, the two never come near each other.
    */
   outerWidth?: number
+  /**
+   * Cut with a round head instead of a flat lid. An embrasure is vaulted; the
+   * downpipe's chase is a square-cut groove and stays one.
+   */
+  arched?: boolean
 }
 
 /** Cutting tool for one chase: a box sunk into the face at its azimuth. */
@@ -363,29 +368,87 @@ export function chaseCutter(c: WallChase): THREE.BufferGeometry {
   const height = Math.max(0.2, c.topY - c.bottomY)
   // reach back into the room so the mouth is fully open, not a slot
   const depth = c.depth + 0.3
-  const geom = new THREE.BoxGeometry(depth, height, Math.max(0.2, c.width), 1, 1, 1)
-  if (c.outerWidth !== undefined && Math.abs(c.outerWidth - c.width) > 1e-6) {
-    /*
-     * Taper along the local X, which is the radial run before the rotation
-     * below. The near end keeps `width`; the far end is scaled to `outerWidth`.
-     * Only the far half of the box is at the far end, so a single pass over the
-     * vertices is enough — a BoxGeometry has exactly two rings in X.
-     */
-    const pos = geom.attributes.position as THREE.BufferAttribute
-    const scale = Math.max(0.2, c.outerWidth) / Math.max(0.2, c.width)
-    const halfX = depth / 2
-    for (let i = 0; i < pos.count; i += 1) {
-      if (pos.getX(i) > halfX - 1e-6) pos.setZ(i, pos.getZ(i) * scale)
+
+  if (!c.arched) {
+    // the downpipe's chase: a plain box, and it should stay one
+    const geom = new THREE.BoxGeometry(depth, height, Math.max(0.2, c.width), 1, 1, 1)
+    if (c.outerWidth !== undefined && Math.abs(c.outerWidth - c.width) > 1e-6) {
+      const pos = geom.attributes.position as THREE.BufferAttribute
+      const scale = Math.max(0.2, c.outerWidth) / Math.max(0.2, c.width)
+      const halfX = depth / 2
+      for (let i = 0; i < pos.count; i += 1) {
+        if (pos.getX(i) > halfX - 1e-6) pos.setZ(i, pos.getZ(i) * scale)
+      }
+      pos.needsUpdate = true
     }
-    pos.needsUpdate = true
+    geom.rotateY(Math.PI / 2 - c.azimuthDeg * DEG)
+    const dir = azimuthToVector(c.azimuthDeg)
+    const mid = face - 0.3 + depth / 2
+    geom.translate(dir.x * mid, (c.bottomY + c.topY) / 2, dir.z * mid)
+    return mergeVertices(geom)
   }
-  geom.rotateY(Math.PI / 2 - c.azimuthDeg * DEG)
+
+  /*
+   * AN EMBRASURE IS VAULTED, and its crown must stand ABOVE the reveal it opens
+   * into.
+   *
+   * Two faults in one box. The first is the shape: a rectangular prism with a
+   * flat lid, where the photographs show a roughly hewn tunnel whose head dies
+   * down to both cheeks along its whole length. The second is worse and was not
+   * in the report — the flat lid sat exactly at the reveal's inner sill, so the
+   * recess's ceiling and the window's floor were the SAME PLANE. Two coincident
+   * CSG surfaces at eye level, which is where the owner was looking when they
+   * called the surfaces holey.
+   *
+   * Lofted from two round-headed outlines instead, tapering with the reveal like
+   * the box did, and carried a head's rise past the sill so the recess opens
+   * INTO the window rather than butting against it.
+   */
+  const rings = [
+    { r: face - 0.3, halfW: Math.max(0.1, c.width / 2) },
+    { r: face - 0.3 + depth, halfW: Math.max(0.1, (c.outerWidth ?? c.width) / 2) },
+  ]
+  const ARC = 8
   const dir = azimuthToVector(c.azimuthDeg)
-  // centre it so the box spans from 0.3 m inside the room to `depth` into the wall
-  const mid = face - 0.3 + depth / 2
-  geom.translate(dir.x * mid, (c.bottomY + c.topY) / 2, dir.z * mid)
+  const positions: number[] = []
+  const bottom = c.bottomY
+  for (const ring of rings) {
+    const prof = windowProfile(ring.halfW, height / 2, 'round', ARC)
+    for (const [x, y] of prof) {
+      // x runs across the opening (tangential), y up, and the ring sits at its radius
+      const tx = Math.cos(c.azimuthDeg * DEG) * x
+      const tz = Math.sin(c.azimuthDeg * DEG) * x
+      positions.push(dir.x * ring.r + tx, bottom + height / 2 + y, dir.z * ring.r + tz)
+    }
+  }
+  const K = positions.length / 3 / rings.length
+  const indices: number[] = []
+  /*
+   * Wound the opposite way round from windowCutter's, and that is not an
+   * oversight: there, ring 0 is the OUTER end and the loft runs inward; here
+   * ring 0 is the ROOM end and it runs outward. Reversing the sweep reverses
+   * which winding faces out, and a tool whose faces face inward stops being a
+   * solid to three-bvh-csg and quietly cuts nothing at all.
+   */
+  for (let k = 0; k < K; k += 1) {
+    const k2 = (k + 1) % K
+    indices.push(k, K + k, K + k2)
+    indices.push(k, K + k2, k2)
+  }
+  for (let k = 1; k < K - 1; k += 1) {
+    indices.push(0, k, k + 1)
+    indices.push(K, K + k + 1, K + k)
+  }
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geom.setIndex(indices)
+  geom.computeVertexNormals()
+  const uv: number[] = []
+  for (let i = 0; i < positions.length / 3; i += 1) uv.push(0, 0)
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
   return mergeVertices(geom)
 }
+
 
 /**
  * A tunnel with a round-arched section, built about the origin: sill at y = 0,
