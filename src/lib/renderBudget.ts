@@ -100,14 +100,7 @@ export function interiorRenderBudget(options: BudgetOptions = {}): RenderBudget 
 
   // The stair is one InstancedMesh: one draw call however many treads.
   const flights = planAllFlights(
-    {
-      winding: STAIR.winding,
-      riserTarget: STAIR.riserTarget,
-      goingTarget: STAIR.goingTarget,
-      width: STAIR.width,
-      wallClearance: STAIR.wallClearance,
-      startAzimuthDeg: STAIR.startAzimuthDeg,
-    },
+    STAIR,
     WALL_LIFTS,
     innerRadiusAt,
   )

@@ -5,6 +5,7 @@ import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from '@react-three/dr
 import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
 import {
+  stairSettings,
   BUTTRESS,
   ENTRANCE,
   FLOORS,
@@ -122,14 +123,14 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   const stairwells = useMemo<Array<StairwellCut | undefined>>(() => {
     if (!stair.cutStairwells) return []
     const flights = planAllFlights(
-      {
+      stairSettings({
         winding,
         riserTarget: stair.riserTarget,
         goingTarget: stair.goingTarget,
         width: stair.stairWidth,
         wallClearance: stair.wallClearance,
         startAzimuthDeg: stair.startAzimuthDeg,
-      },
+      }),
       WALL_LIFTS,
       innerRadiusAt,
     )
@@ -190,14 +191,14 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   const stairPassage = useMemo(() => {
     if (!stair.cutStairwells) return undefined
     const flights = planAllFlights(
-      {
+      stairSettings({
         winding,
         riserTarget: stair.riserTarget,
         goingTarget: stair.goingTarget,
         width: stair.stairWidth,
         wallClearance: stair.wallClearance,
         startAzimuthDeg: stair.startAzimuthDeg,
-      },
+      }),
       WALL_LIFTS,
       innerRadiusAt,
     )
@@ -224,14 +225,14 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   const doorways = useMemo(() => {
     if (!stair.cutStairwells) return undefined
     const flights = planAllFlights(
-      {
+      stairSettings({
         winding,
         riserTarget: stair.riserTarget,
         goingTarget: stair.goingTarget,
         width: stair.stairWidth,
         wallClearance: stair.wallClearance,
         startAzimuthDeg: stair.startAzimuthDeg,
-      },
+      }),
       WALL_LIFTS,
       innerRadiusAt,
     )

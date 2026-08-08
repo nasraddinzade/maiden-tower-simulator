@@ -163,14 +163,7 @@ describe('the oculus shaft is lined without a break', () => {
 
 describe('the stair leaves no slot that looks through', () => {
   const flights = planAllFlights(
-    {
-      winding: STAIR.winding,
-      riserTarget: STAIR.riserTarget,
-      goingTarget: STAIR.goingTarget,
-      width: STAIR.width,
-      wallClearance: STAIR.wallClearance,
-      startAzimuthDeg: STAIR.startAzimuthDeg,
-    },
+    STAIR,
     WALL_LIFTS,
     innerRadiusAt,
   )
@@ -358,7 +351,13 @@ describe('the stair leaves no slot that looks through', () => {
   it('overlaps consecutive treads vertically, so the flight is one mass', () => {
     for (const flight of flights) {
       if (flight.length < 2) continue
-      const riser = Math.abs(flight[1].treadY - flight[0].treadY)
+      /*
+       * flightRiser, not the gap between the first two treads: those are both on
+       * the landing now and a riser of zero shrinks treadDepth to its floor,
+       * which makes the first real step look like it fails to reach the one
+       * below it.
+       */
+      const riser = flightRiser(flight)
       const depth = treadDepth(riser)
       for (let i = 0; i < flight.length - 1; i++) {
         const overlap = flight[i].treadY - (flight[i + 1].treadY - depth)

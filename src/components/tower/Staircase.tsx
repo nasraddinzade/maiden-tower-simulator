@@ -12,7 +12,7 @@ import {
   type Winding,
 } from '../../lib/staircase'
 import { stairRampBoxes } from '../../lib/collision'
-import { WALL_LIFTS, innerRadiusAt } from '../../config/tower'
+import { WALL_LIFTS, innerRadiusAt, stairSettings } from '../../config/tower'
 
 export interface StaircaseProps {
   winding: Winding
@@ -44,14 +44,14 @@ interface PlacedStep extends StepPlacement {
 function useFlights(p: StaircaseProps): PlacedStep[] {
   return useMemo(() => {
     const flights = planAllFlights(
-      {
+      stairSettings({
         winding: p.winding,
         riserTarget: p.riserTarget,
         goingTarget: p.goingTarget,
         width: p.width,
         wallClearance: p.wallClearance,
         startAzimuthDeg: p.startAzimuthDeg,
-      },
+      }),
       WALL_LIFTS,
       innerRadiusAt,
     )
@@ -103,14 +103,14 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
 function useRampBoxes(p: StaircaseProps) {
   return useMemo(() => {
     const flights = planAllFlights(
-      {
+      stairSettings({
         winding: p.winding,
         riserTarget: p.riserTarget,
         goingTarget: p.goingTarget,
         width: p.width,
         wallClearance: p.wallClearance,
         startAzimuthDeg: p.startAzimuthDeg,
-      },
+      }),
       WALL_LIFTS,
       innerRadiusAt,
     )

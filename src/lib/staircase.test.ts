@@ -157,14 +157,9 @@ describe('fitting inside the masonry', () => {
 })
 
 describe('planAllFlights — one flight per lift', () => {
-  const settings = {
-    winding: STAIR.winding,
-    riserTarget: STAIR.riserTarget,
-    goingTarget: STAIR.goingTarget,
-    width: STAIR.width,
-    wallClearance: STAIR.wallClearance,
-    startAzimuthDeg: STAIR.startAzimuthDeg,
-  }
+  // STAIR itself, not a copy of six of its fields: a copy is how the landings
+  // came to be in the tests and not in the tower — see stairSettings().
+  const settings = STAIR
   const flights = planAllFlights(settings, WALL_LIFTS, innerRadiusAt)
 
   it('produces a flight per masonry lift, not per storey gap', () => {
@@ -249,17 +244,37 @@ describe('planAllFlights — one flight per lift', () => {
     }
   })
 
-  it('runs level exactly where a landing is declared, and nowhere else', () => {
+  it('runs level at both ends of every flight, and mid-climb only where declared', () => {
+    /*
+     * Two kinds of level tread now, and they mean different things. Every flight
+     * has a PLATFORM at each end — that is what the doorway opens onto, and
+     * without it the opening is a raw pocket in the wall. Level treads in the
+     * MIDDLE of a climb are a landing between two flights, and only the roof
+     * lift declares one.
+     */
     WALL_LIFTS.forEach((lift, i) => {
-      const level = flights[i].filter((s, k) => k > 0 && s.treadY === flights[i][k - 1].treadY)
+      const f = flights[i]
+      const level = f.map((s, k) => k > 0 && s.treadY === f[k - 1].treadY)
+      const firstRise = f.findIndex((s, k) => k > 0 && s.treadY > f[k - 1].treadY)
+      let lastRise = 0
+      f.forEach((s, k) => {
+        if (k > 0 && s.treadY > f[k - 1].treadY) lastRise = k
+      })
+
+      // platforms at both ends
+      expect(level[1], `flight ${i} has no landing at its foot`).toBe(true)
+      expect(level[f.length - 1], `flight ${i} has no landing at its head`).toBe(true)
+      expect(f[0].treadY).toBeCloseTo(lift.fromY, 9)
+      expect(f[f.length - 1].treadY).toBeCloseTo(lift.toY, 9)
+
+      // and interior landings only where the lift declares them
+      const interior = f.filter((_, k) => k > firstRise && k < lastRise && level[k])
       if (lift.landingsAtY.length === 0) {
-        expect(level).toEqual([])
+        expect(interior, `flight ${i} has a landing nobody asked for`).toEqual([])
         return
       }
-      expect(level.length).toBeGreaterThan(0)
-      for (const s of level) {
-        // within a riser of the declared height: the landing sits on the tread
-        // that first reaches it, not at the exact fraction
+      expect(interior.length).toBeGreaterThan(0)
+      for (const s of interior) {
         expect(Math.min(...lift.landingsAtY.map((y) => Math.abs(s.treadY - y)))).toBeLessThan(0.25)
       }
     })

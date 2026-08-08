@@ -833,11 +833,28 @@ export function stairDoorways(
     const sillTop = bedAtCentre + Math.abs(rakeCapped) * halfTangential
     const headClamp = atHead ? Math.max(0, sillTop - (floorY - 0.02)) : 0
 
+    /*
+     * ON A LANDING THE SILL IS THE FLOOR, not the bed under it.
+     *
+     * The bed rule exists so a threshold never hangs over a tread passing under
+     * the arch. On a level platform the surface of every tread under the arch IS
+     * the floor, so there is nothing to clear, and dropping to the bed cuts a
+     * clean 0.33 m below floor level for no reason at all — twelve times, once
+     * per end doorway. At the foot that slot reaches 0.03 m past the underside of
+     * the storey's slab; on the roof it opens the deck.
+     *
+     * So: level under the arch, sill at the floor. Sloping under it — which now
+     * means only the opening onto storey 5, halfway along the 4→6 run — keeps the
+     * bed rule and the rake, because there the treads really do pass by at
+     * different heights.
+     */
+    const onLanding = localRise < 1e-6
+
     return {
       azimuthDeg,
       widthDeg,
       bottomRake: rakeCapped,
-      bottomY: bedAtCentre - headClamp,
+      bottomY: onLanding ? floorY : bedAtCentre - headClamp,
       topY: Math.max(floorY, underfoot.treadY) + height,
       innerRadius: Math.max(0.05, inner),
       outerRadius: s.midRadius + doorwayWidth / 2 + 0.06,

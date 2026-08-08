@@ -42,7 +42,7 @@
  */
 
 import { azimuthToVector, taperedWallThickness } from '../lib/geometry'
-import type { Winding } from '../lib/staircase'
+import type { StairSettings, Winding } from '../lib/staircase'
 
 // ————————————————————————— measured shell —————————————————————————
 
@@ -569,6 +569,24 @@ export const STAIR: {
    * flights' worth) do not push the stack round the drum. No source gives it.
    */
   endLandingLength: 0.9,
+}
+
+/**
+ * The stair settings as ONE object, with the leva panel's overrides folded in.
+ *
+ * Not a convenience. STAIR grew two fields — landingLength and endLandingLength
+ * — and every caller of planAllFlights was building its own six-field literal
+ * from the leva controls, so both were silently undefined and the landings were
+ * simply not in the tower. Worse, they were not missing everywhere: hotspots.ts
+ * and two test files pass STAIR itself, so the tests were asserting a stair the
+ * application did not build.
+ *
+ * Threading the whole object through is CLAUDE.md rule 2 applied properly —
+ * change a number in the config and the model changes. A literal that has to be
+ * kept in sync by hand is a place where that stops being true.
+ */
+export function stairSettings(overrides: Partial<StairSettings> = {}): StairSettings {
+  return { ...STAIR, ...overrides }
 }
 
 // ———————————————————— vertical circulation, 2026 ————————————————————
