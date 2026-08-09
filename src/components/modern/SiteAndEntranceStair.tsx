@@ -90,7 +90,21 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     })
   }, [withColliders])
 
-  /** The visible treads: plain boxes, since the flight is straight. */
+  /**
+   * The visible treads: plain boxes, since the flight is straight — but TURNED
+   * to the azimuth, which they were not.
+   *
+   * The box is built width × riser × going in its own axes, and it was dropped
+   * into the world unrotated. The flight runs out along the entrance's azimuth,
+   * so the two horizontal axes were swapped: every tread came out 1.4 m deep
+   * along the climb and 0.30 m across it, a 0.30 m ribbon of steps standing
+   * between balustrades set 1.36 m apart. Consecutive treads are 0.30 m apart
+   * along the run and were 1.4 m long, so they overlapped four deep and read as
+   * one narrow column rather than as steps at all.
+   *
+   * A yaw of π − az sends the box's local +Z along the outward radius and its
+   * local +X across the flight, which is the frame the sizes were written for.
+   */
   const treads = useMemo(() => {
     const out: Array<{ position: [number, number, number]; size: [number, number, number] }> = []
     for (let i = 0; i < EXTERNAL_STAIR.risers; i++) {
@@ -104,6 +118,9 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     }
     return out
   }, [az])
+
+  /** The yaw that puts a tread's width across the flight. See treads above. */
+  const treadYaw = Math.PI - az
 
   /**
    * The balustrades as drawn: a raking handrail either side on plumb standards.
@@ -263,7 +280,14 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
           </mesh>
 
           {treads.map((t, i) => (
-            <mesh key={`etread-${i}`} material={steel} position={t.position} castShadow receiveShadow>
+            <mesh
+              key={`etread-${i}`}
+              material={steel}
+              position={t.position}
+              rotation={[0, treadYaw, 0]}
+              castShadow
+              receiveShadow
+            >
               <boxGeometry args={t.size} />
             </mesh>
           ))}
