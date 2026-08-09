@@ -1011,8 +1011,25 @@ export const WELL = {
    * it in today — and if the two are genuinely different, both are right.
    */
   startsAtFloorIndex: 2,
-  /** Azimuth of the wellhead within the room. [PLACEHOLDER] — no source fixes it. */
-  azimuthDeg: 20,
+  /**
+   * Azimuth of the wellhead within the room. [PLACEHOLDER] — no source fixes it.
+   *
+   * It was 20, and at 20 the downpipe stood IN A DOORWAY. The chase the pipe
+   * runs in is cut down the room-side face, and the stair's head doorways come
+   * out at about az 15 since the flights moved to start at 100 — so a visitor
+   * leaving the stair on storey 3 walked into a 0.30 m pipe across the opening.
+   * The owner photographed it and called it, exactly, pipes in the entrances.
+   *
+   * 230 is chosen to be clear of everything that is not a placeholder: the stair
+   * sweeps 100 down through 0 to about 300, the slit columns stand between 123
+   * and 170, and the entrance is at 270. That leaves the arc between the windows
+   * and the entrance, and 230 sits in the middle of it.
+   *
+   * Two placeholders were in conflict and this is the one that moved, because
+   * nothing depends on it: the stair's azimuth had already been moved once to
+   * clear the windows, and moving it again would have put those back at risk.
+   */
+  azimuthDeg: 230,
   /** Distance of the wellhead from the tower axis. [PLACEHOLDER]. */
   offsetFromAxis: 2.4,
 }
