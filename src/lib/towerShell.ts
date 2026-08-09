@@ -774,12 +774,35 @@ export function buildShellGeometry(p: ShellParams): {
   )
   cavity.translate(0, cavityHeight / 2, 0)
 
-  // Buttress — extrude the beak plan upward, then aim it at its azimuth.
+  /*
+   * Buttress — extruded from the DRUM'S OWN BASE, not from y = 0.
+   *
+   * It was laid off from y = 0, which is the floor of storey 1 and the level the
+   * doorway opens onto — the same mistake the drum itself had and the comment
+   * above records fixing. The pier therefore floated: its underside stood 1.98 m
+   * above the paving, so a 10.7 m projection had daylight under it right round
+   * its foot, and at the other end it finished at 29.5 m against a parapet at
+   * 27.5, standing two metres proud of the tower it leans on. In every
+   * photograph that shows its foot the pier runs straight down past the coarse
+   * ashlar into the rock.
+   *
+   * WHERE ITS HEAD BELONGS IS NOT SETTLED. One reading of the exterior set puts
+   * it level with the parapet, finished with the same coping running unbroken
+   * round the re-entrant; another puts it at 18.3 ± 0.5 m, about 0.62 of the
+   * height, with a rounded head curving in to meet the drum, and calls that the
+   * largest single silhouette error in the model. They cannot both be right and
+   * the verification pass that would have settled it never ran. The parapet is
+   * kept because it is what the config already said; a survey, or a fifth
+   * reading, decides. Only the clamp is new — whatever the height, the pier may
+   * not overshoot the drum.
+   */
+  const beakTopY = Math.min(BASE_Y + p.buttressHeight, TOWER.topY)
   const beak = new THREE.ExtrudeGeometry(
     beakShape(p.buttressProjection, p.buttressTipWidth, p.buttressRootArcDeg, p.buttressSkewDeg),
-    { depth: p.buttressHeight, bevelEnabled: false, steps: 1 },
+    { depth: beakTopY - BASE_Y, bevelEnabled: false, steps: 1 },
   )
   beak.rotateX(-Math.PI / 2) // extrude axis Z → up (+Y); plan now faces north (-Z)
+  beak.translate(0, BASE_Y, 0) // and down onto the same footing as the drum
   beak.rotateY(-p.buttressAzimuthDeg * DEG) // north → requested azimuth (clockwise)
   const beakIndexed = mergeVertices(beak) // ExtrudeGeometry is non-indexed; weld to match the primitives
 

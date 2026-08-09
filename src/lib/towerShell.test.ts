@@ -89,7 +89,27 @@ describe('shell bounding box', () => {
      * foundation goes some 15 m below ground.
      */
     expect(bb.min.y).toBeLessThan(ENTRANCE.groundY + 1e-6)
-    expect(bb.max.y).toBeCloseTo(TOWER.height, 5)
+    /*
+     * TOWER.topY, not TOWER.height — and the gap between them was a two-metre
+     * error this assertion was holding in place.
+     *
+     * height is the tower's height ABOVE THE OUTSIDE GROUND; topY is where its
+     * top sits in world Y, and they differ by the 2 m the entrance is raised. The
+     * drum has always finished at topY, correctly. The BUTTRESS was extruded a
+     * `height` from y = 0, so it finished at 29.5 — two metres proud of the
+     * parapet it leans on — and floated 1.98 m above the paving at the other end.
+     * The box matched, because the test compared it to the same wrong number.
+     */
+    expect(bb.max.y).toBeCloseTo(TOWER.topY, 5)
+  })
+
+  it('stands the buttress on the same footing as the drum', () => {
+    // it floated: the pier's underside was at y = 0 while the paving is at
+    // −1.98, so a 10.7 m projection had daylight under it right round its foot
+    const beak = buildShellGeometry({ ...PARAMS, buttressProjection: 20 })
+    beak.geometry.computeBoundingBox()
+    const box = beak.geometry.boundingBox!
+    expect(box.min.y).toBeLessThan(ENTRANCE.groundY)
   })
 
   it('keeps the plain drum radius on the side away from the buttress', () => {

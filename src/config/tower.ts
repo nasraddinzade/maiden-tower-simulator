@@ -900,6 +900,56 @@ export const WINDOW_SURROUND = {
   sillFall: 0.06,
 } as const
 
+/**
+ * The banded coursing of the outer face — the thing that makes the drum read as
+ * this building and not as a cylinder.
+ *
+ * The model drew a smooth cylinder and put the banding entirely in the shader,
+ * as tone. Two independent readings of the exterior set say the stripes are
+ * RELIEF: each band's stones oversail the course below, every bed is a small
+ * ledge with a hard shadow under it, and the silhouette is visibly serrated. An
+ * albedo-only band cannot do that at any contrast.
+ *
+ * Both readings also agree the wall is in TWO zones with a sharp horizontal
+ * boundary: plain, flush, large-block work below, regular ribbed courses above.
+ * Their numbers, given independently:
+ *   boundary   11 ± 1 m above the outside ground   /   11.3 ± 1.0 m
+ *   band pitch 0.52 m (0.27 proud + 0.24 recessed) /   0.50 ± 0.04 m
+ *   projection 0.08 m (range 0.05–0.13)            /   0.03–0.05 m
+ * The pitch agrees closely; the projection does not, and the values below take
+ * the middle of the disagreement rather than either end. Everything here is
+ * [PHOTO] with that spread, not a measurement.
+ *
+ * The verification pass that would have tested these against the images died on
+ * a session limit, so nothing here has been through the adversarial check the
+ * rest of the window work had.
+ *
+ * NOT YET BUILT. Turning this into relief means making the drum a lathe of a
+ * stepped profile instead of a cylinder. That was tried and backed out: the
+ * banded profile changes the outer radius by up to the coping's oversail, and
+ * four tests are written against a constant 8.25 — the bounding box, the window
+ * overshoot, the through-hole ray and the floor under the treads. Every one of
+ * them is answerable, but not in the same pass as the buttress, and a half-done
+ * lathe is worse than a cylinder. The numbers are recorded here so the reading is
+ * not lost.
+ */
+export const COURSING = {
+  /** m above the outside ground where the plain zone gives way to the ribbed one. [PHOTO] ±1 */
+  bandStartAboveGround: 11,
+  /** m — one projecting course plus one recessed course. [PHOTO] ±0.04 */
+  bandPitch: 0.51,
+  /** m — how far a projecting course stands proud of the recessed one. [PHOTO], readings differ 0.03–0.13 */
+  bandProjection: 0.055,
+  /** Fraction of the pitch taken by the projecting course. [PHOTO] */
+  proudFraction: 0.53,
+  /** m — plain, unribbed courses under the coping. [PHOTO] ±0.2 */
+  plainUnderCoping: 0.7,
+  /** m — the rounded coping roll oversails the drum by this. [PHOTO], readings 0.05–0.30 */
+  copingProjection: 0.16,
+  /** m — how deep that coping band is. [PHOTO] */
+  copingDepth: 0.55,
+} as const
+
 export const WELL = {
   diameter: 0.7, // m — [ref]; see the note above on bore vs mouth
   /**
