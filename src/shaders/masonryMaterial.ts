@@ -70,7 +70,25 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
      */
     uJointThickness: { value: opts.jointThickness ?? 0.022 },
     uBandContrast: { value: opts.bandContrast ?? 1 },
-    uDiamondStrength: { value: opts.diamondStrength ?? (interior ? 0.25 : 0.6) },
+    /*
+     * NO DIAMOND TOOLING ON THE OUTSIDE, and this contradicts a source.
+     *
+     * [ref] describes a diamond dressing growing decorative toward the top, and
+     * the shader has faded one in with height ever since. A reading of the
+     * exterior set says flatly that no lozenge field exists on the building:
+     * what the photographs show is per-block variation and weathering, and the
+     * effect reached 17% darkening at the crown — the strongest thing on the
+     * wall after the coursing, and invented.
+     *
+     * The photographs win, because the model's target is the tower AS IT STANDS
+     * and they are of that. But the source is not deleted: [ref] may be
+     * describing the INTERIOR, where the dressing is kept at its old strength,
+     * or a state before restoration, or a detail too fine for a photograph taken
+     * from the ground. The conflict is recorded rather than resolved, and the
+     * verification pass that would have tested the reading against the images
+     * died on a session limit — so this is one reading, unchecked.
+     */
+    uDiamondStrength: { value: opts.diamondStrength ?? (interior ? 0.25 : 0) },
     uDiamondScale: { value: opts.diamondScale ?? 2.2 },
     uColourNoise: { value: opts.colourNoise ?? 0.12 },
     uTowerHeight: { value: TOWER.height },

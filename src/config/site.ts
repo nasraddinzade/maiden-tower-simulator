@@ -49,30 +49,36 @@ export const EXTERNAL_STAIR = {
   /** m — [ASSUMPTION] a normal public-stair guard, as the roof balustrade is. */
   guardHeight: 1.05,
   /**
-   * m — radius of the balustrade tubes. [ASSUMPTION].
+   * m — the standards are flat STRAPS, not tubes. [PHOTO], section [ESTIMATE].
    *
-   * The frames show tubes and give no way to scale them: they are two or three
-   * pixels across wherever they appear, and the same absence of any object of
-   * known size that defeated the stair's WIDTH defeats this. 40 mm is the
-   * ordinary section for a fabricated handrail. MODERN_SPIRAL.rodRadius assumes
-   * exactly that figure indoors for exactly that reason, and is deliberately NOT
-   * imported here: that the two were made to one section is a guess, and sharing
-   * a constant would write the guess down as a fact.
+   * A later reading of the exterior set calls the balustrade the stair's most
+   * characteristic feature and says the model had the wrong object: what the
+   * photographs show is a dense fan of closely-spaced flat steel straps, not a
+   * dozen round tubes. So the section is a strap of about 50 × 12 mm — the
+   * ordinary flat for this kind of fabricated guard — and the count goes from
+   * twelve a side to about forty.
+   *
+   * The section is still unmeasurable for the same reason the tube's was: the
+   * straps are two or three pixels across wherever they appear and there is no
+   * object of known size in frame. What changed is the KIND of thing, which the
+   * photographs do settle, not its size, which they do not.
    */
+  strapWidth: 0.05,
+  strapThickness: 0.012,
+  /** m — radius of the handrail itself, which IS a tube. [ASSUMPTION] */
   railRadius: 0.02,
   /**
-   * Standards per tread, each side. [ASSUMPTION], and the weakest thing here.
+   * Standards per tread, each side. [PHOTO] for the density, [ESTIMATE] for the
+   * exact number.
    *
-   * Nothing counts them. The footage records tubular balustrades either side and
-   * no frame resolves the uprights, so the flight's own spacing is the only one
-   * available — which is what the indoor spiral uses too, except that there the
-   * count WAS read off the video (MODERN_SPIRAL.rodsPerTread, a direct count
-   * needing no scale). One per tread puts them a going apart, so the thing reads
-   * as a balustrade rather than as a bare handrail, without drawing infill panels
-   * nobody has seen. The count is derived from `risers` rather than written down,
-   * so it follows the flight if the tread count is ever corrected.
+   * One per tread was the old value, and it was written down as the weakest
+   * thing in this file because nothing counted them. Something does now: the
+   * reading puts roughly forty to forty-five a side against the twelve one-per-
+   * tread gives. Over twelve treads that is between three and four each, and 3.5
+   * is not a thing you can build, so it is 4 — forty-eight a side, at the top of
+   * the read range rather than the middle, because a fan reads as a fan.
    */
-  postsPerTread: 1,
+  postsPerTread: 4,
 } as const
 
 /** m — total rise of the external flight, 12 × 0.165. */

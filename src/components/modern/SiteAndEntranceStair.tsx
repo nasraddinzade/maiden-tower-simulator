@@ -208,7 +208,9 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     const m = new THREE.Matrix4()
     const pos = new THREE.Vector3()
     const scale = new THREE.Vector3()
-    const spin = new THREE.Quaternion()
+    // a strap is flat, so unlike a tube it has to be turned to face along the
+    // flight — broadside to the climb it would read as a solid screen
+    const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI - az, 0))
     balustrade.posts.forEach((p, i) => {
       // the geometry is a unit-length tube, so the standard's height is a scale
       pos.set(p.position[0], p.position[1], p.position[2])
@@ -299,8 +301,15 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
             material={steel}
             castShadow
           >
-            <cylinderGeometry
-              args={[EXTERNAL_STAIR.railRadius, EXTERNAL_STAIR.railRadius, 1, 8]}
+            {/*
+              A FLAT STRAP on edge, not a tube. The photographs show the guard as
+              a dense fan of closely-spaced steel straps and the model had round
+              tubes at a twelfth of the count — the reading calls it the stair's
+              most characteristic feature and says the wrong object was drawn.
+              Unit height, so a standard's length is still just a Y scale.
+            */}
+            <boxGeometry
+              args={[EXTERNAL_STAIR.strapThickness, 1, EXTERNAL_STAIR.strapWidth]}
             />
           </instancedMesh>
 

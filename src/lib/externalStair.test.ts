@@ -61,3 +61,28 @@ describe('the stair up to the doorway', () => {
     expect(half * 2).toBeLessThanOrEqual(EXTERNAL_STAIR.width)
   })
 })
+
+describe('the balustrade the photographs show', () => {
+  it('is a dense fan, not a dozen posts', () => {
+    /*
+     * The reading calls the balustrade the stair's most characteristic feature
+     * and says the model had the wrong object: a dense fan of closely-spaced
+     * flat straps, roughly forty to forty-five a side, against twelve round
+     * tubes at one per tread.
+     */
+    const perSide = EXTERNAL_STAIR.risers * EXTERNAL_STAIR.postsPerTread
+    expect(perSide).toBeGreaterThanOrEqual(35)
+    expect(perSide).toBeLessThanOrEqual(55)
+  })
+
+  it('spaces the straps closer than a tread', () => {
+    const spacing = EXTERNAL_STAIR.going / EXTERNAL_STAIR.postsPerTread
+    expect(spacing).toBeLessThan(EXTERNAL_STAIR.going)
+    // and not so close that the guard reads as a solid screen
+    expect(spacing).toBeGreaterThan(EXTERNAL_STAIR.strapWidth)
+  })
+
+  it('is a strap on edge, deeper than it is thick', () => {
+    expect(EXTERNAL_STAIR.strapWidth).toBeGreaterThan(EXTERNAL_STAIR.strapThickness * 2)
+  })
+})

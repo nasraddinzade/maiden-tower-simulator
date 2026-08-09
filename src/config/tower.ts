@@ -885,6 +885,32 @@ export const WINDOW_EMBRASURE = {
  * one that is too small — it stops reading as a frame and starts reading as a
  * panel.
  */
+/**
+ * The archivolt round the doorway — a ring of dressed voussoirs standing proud
+ * of the wall.
+ *
+ * The model drew the entrance as a plain arched hole. The reading of the
+ * exterior set is firm that it is not: a full ring of worked stone round a
+ * semicircular head, the ring standing distinctly proud of the rubble, with a
+ * recess between its outer face and the door leaf behind. It is the one opening
+ * everyone photographs, and a bare hole is the wrong reading of the whole
+ * façade.
+ *
+ * [PHOTO] for the ring's existence and rough proportion, [ESTIMATE] for the
+ * figures: about 0.2–0.25 m radial by 0.2 m along the arc, standing 0.03–0.06 m
+ * proud. The middle of each range is taken.
+ */
+export const ENTRANCE_ARCHIVOLT = {
+  /** m — how far the ring reaches out from the opening's edge. [ESTIMATE] */
+  ringDepth: 0.22,
+  /** m — how far it stands proud of the wall face. [ESTIMATE] */
+  projection: 0.045,
+  /** m — the depth of one voussoir along the wall. [ESTIMATE] */
+  stoneDepth: 0.2,
+  /** How many stones make the ring. [ESTIMATE] — enough to read as voussoirs. */
+  stones: 15,
+} as const
+
 export const WINDOW_SURROUND = {
   /** m — how far the sill stands proud of the wall face. [ESTIMATE] */
   sillProjection: 0.09,
