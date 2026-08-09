@@ -769,6 +769,37 @@ export function stairPassageGeometry(
     })
   })
 
+  /**
+   * WHICH WAY THE SWEEP RUNS DECIDES BOTH WINDINGS, and it is not the same
+   * decision for the walls as for the caps. Reading the sign is the fix.
+   *
+   * sectionProfile() lists its points counter-clockwise in the (radius, height)
+   * plane, and that plane's own normal — radial × up — is the TANGENTIAL
+   * direction, the way azimuth increases. Work the two winding rules out from
+   * there and they point opposite ways:
+   *
+   *   walls  (a+k, b+k, b+k2)  face out of the tool only when the sections run
+   *                            toward DECREASING azimuth;
+   *   caps   (0, k+1, k)       face out of the tool only when they run toward
+   *                            INCREASING azimuth.
+   *
+   * So this function was correct for NEITHER winding. STAIR.winding is
+   * 'counterclockwise', azimuth decreases, and the walls were right while both
+   * end caps were inside-out; three-bvh-csg then flipped them again on the
+   * subtraction and left every passage end wall facing into the masonry —
+   * culled by a FrontSide material, so you looked straight through the tower at
+   * the end of each flight. Twelve ends, 23.06 m² of it. Turn `winding` back to
+   * 'clockwise' — it is a live leva control, and staircase.ts still calls the
+   * question UNRESOLVED — and the identical code would have inverted the walls
+   * instead, which is 60–97 m² per tube rather than 2.
+   *
+   * Nothing existing could have caught it. A cap lies in a plane containing the
+   * tower axis, so p·n = 0 over the whole fan and the origin-based signed volume
+   * comes out +21.58 either way round. What does catch it is Σ area·normal over
+   * a closed surface, which must vanish: it measured 7.42 m² here.
+   */
+  const rising = sections[sections.length - 1].azimuthDeg >= sections[0].azimuthDeg
+
   // wall quads between consecutive sections
   for (let i = 0; i < sections.length - 1; i++) {
     const a = i * K
@@ -777,16 +808,28 @@ export function stairPassageGeometry(
       const k2 = (k + 1) % K
       // Winding must stay outward-facing: reversed, the CSG evaluator stops
       // treating the tool as a solid and subtracts nothing at all.
-      indices.push(a + k, b + k, b + k2)
-      indices.push(a + k, b + k2, a + k2)
+      if (rising) {
+        indices.push(a + k, b + k2, b + k)
+        indices.push(a + k, a + k2, b + k2)
+      } else {
+        indices.push(a + k, b + k, b + k2)
+        indices.push(a + k, b + k2, a + k2)
+      }
     }
   }
 
-  // caps, so the sweep is a closed solid rather than an open tube
+  // caps, so the sweep is a closed solid rather than an open tube — wound
+  // against the sweep at the near end and with it at the far one, which is the
+  // opposite condition from the walls above
   const last = (sections.length - 1) * K
   for (let k = 1; k < K - 1; k++) {
-    indices.push(0, k + 1, k)
-    indices.push(last, last + k, last + k + 1)
+    if (rising) {
+      indices.push(0, k + 1, k)
+      indices.push(last, last + k, last + k + 1)
+    } else {
+      indices.push(0, k, k + 1)
+      indices.push(last, last + k + 1, last + k)
+    }
   }
 
   const geom = new THREE.BufferGeometry()

@@ -1,0 +1,314 @@
+/**
+ * THE SHELL MUST BE CLOSED AT EVERY STAIR DOORWAY END.
+ *
+ * Photographed at the end of a stair passage: triangles folded over each other
+ * with a grey void between them, and the masonry behind them simply gone. Every
+ * one of the twelve passage ends was open — 23.06 m² of end wall whose normal
+ * pointed into the stone instead of into the passage, culled by the shell's
+ * FrontSide material, so the eye ran straight out of the tower.
+ *
+ * The cause was in stairPassageGeometry(): its wall loft and its two end-cap
+ * fans are wound by rules that agree only for one sweep direction, so the tool
+ * was correct for NEITHER value of STAIR.winding. See the note there.
+ *
+ * Two properties, and neither is a tolerance.
+ *
+ * The first is pure mathematics on a mesh (CLAUDE.md rule 6): a closed,
+ * consistently oriented surface has Σ area·normal = 0, no directed edge
+ * traversed twice the same way, and a signed volume that does not depend on
+ * where you measure it from. That last one is the cheap regression test this
+ * project never had, and it is the one that matters: a cap lies in a plane
+ * containing the tower axis, so p·n vanishes over the whole fan and the
+ * ORIGIN-based volume reads 21.58 whichever way the caps are turned. Measured
+ * about a shifted origin instead it read −150.11, and the mesh is caught.
+ *
+ * The second is the property the owner photographed, asserted where they stood:
+ * on the finished shell, at each passage end, in that end's own plane.
+ *
+ * Both are checked for BOTH windings. `winding` is a live leva control and
+ * staircase.ts still calls the question UNRESOLVED, so a fix that only happened
+ * to suit 'counterclockwise' would break the day someone toggled it — and break
+ * far worse, since the walls are 60–97 m² per tube against the caps' 2.
+ */
+
+import { describe, expect, it } from 'vitest'
+import * as THREE from 'three'
+import {
+  BUTTRESS,
+  ENTRANCE,
+  STAIR,
+  TOWER,
+  WALL_LIFTS,
+  innerRadiusAt,
+  stairSettings,
+} from '../config/tower'
+import { PLAYER } from '../config/player'
+import {
+  planAllFlights,
+  stairDoorways,
+  stairPassageSections,
+  type PassageSection,
+  type Winding,
+} from './staircase'
+import windowData from '../data/windows.json'
+import { windowCentreY, type WindowSpec } from './windows'
+import { buildShellGeometry, stairPassageGeometry, type ShellParams } from './towerShell'
+
+const DEG = Math.PI / 180
+
+function tubesFor(winding: Winding): PassageSection[][] {
+  const flights = planAllFlights(stairSettings({ winding }), WALL_LIFTS, innerRadiusAt)
+  return stairPassageSections(
+    flights,
+    STAIR.width,
+    PLAYER.stairHeadroom,
+    innerRadiusAt,
+    undefined,
+    STAIR.doorwayWidth,
+  )
+}
+
+/** Triangles of an indexed geometry, as flat vertex triples. */
+function triangles(geometry: THREE.BufferGeometry) {
+  const pos = geometry.attributes.position.array
+  const idx = geometry.index!.array
+  const out: number[][] = []
+  for (let t = 0; t < idx.length; t += 3) {
+    const tri: number[] = []
+    for (const v of [idx[t], idx[t + 1], idx[t + 2]]) tri.push(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2])
+    out.push(tri)
+  }
+  return out
+}
+
+/** Twice the area-weighted normal of one triangle, from its index winding. */
+function crossOf([ax, ay, az, bx, by, bz, cx, cy, cz]: number[]) {
+  const ux = bx - ax
+  const uy = by - ay
+  const uz = bz - az
+  const vx = cx - ax
+  const vy = cy - ay
+  const vz = cz - az
+  return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]
+}
+
+describe('the stair passage is swept as a closed solid, whichever way the stair turns', () => {
+  for (const winding of ['counterclockwise', 'clockwise'] as const) {
+    describe(winding, () => {
+      const tubes = tubesFor(winding)
+
+      it('closes every tube: no boundary edge, and no edge traversed twice the same way', () => {
+        /*
+         * An edge used twice in the SAME direction means its two triangles
+         * disagree about which side is out. There were 26 per tube — thirteen
+         * per end, which is exactly the number of points in sectionProfile():
+         * the whole ring where a cap meets the tube.
+         */
+        const bad: string[] = []
+        tubes.forEach((sections, i) => {
+          const idx = stairPassageGeometry(sections)!.index!.array
+          const seen = new Map<string, number>()
+          for (let t = 0; t < idx.length; t += 3) {
+            const tri = [idx[t], idx[t + 1], idx[t + 2]]
+            for (let e = 0; e < 3; e += 1) seen.set(`${tri[e]}>${tri[(e + 1) % 3]}`, (seen.get(`${tri[e]}>${tri[(e + 1) % 3]}`) ?? 0) + 1)
+          }
+          let sameDirection = 0
+          let boundary = 0
+          for (const [key, n] of seen) {
+            if (n > 1) sameDirection += n - 1
+            const [a, b] = key.split('>')
+            if (!seen.has(`${b}>${a}`)) boundary += 1
+          }
+          if (sameDirection || boundary) {
+            bad.push(`tube ${i}: ${sameDirection} edges wound both ways, ${boundary} unmatched`)
+          }
+        })
+        expect(bad).toEqual([])
+      })
+
+      it('leaves no surface pointing the wrong way: the area-weighted normals cancel', () => {
+        // Σ area·normal = 0 over any closed, consistently oriented surface. With
+        // the caps inside-out it came out 6.7–8.4 m² per tube.
+        const bad: string[] = []
+        tubes.forEach((sections, i) => {
+          let sx = 0
+          let sy = 0
+          let sz = 0
+          for (const tri of triangles(stairPassageGeometry(sections)!)) {
+            const [nx, ny, nz] = crossOf(tri)
+            sx += nx / 2
+            sy += ny / 2
+            sz += nz / 2
+          }
+          const residual = Math.hypot(sx, sy, sz)
+          if (residual > 1e-6) bad.push(`tube ${i}: ${residual.toFixed(4)} m² uncancelled`)
+        })
+        expect(bad).toEqual([])
+      })
+
+      it('encloses the same volume measured from anywhere, and encloses it outward', () => {
+        /*
+         * THE CHECK THAT WOULD HAVE CAUGHT THIS ON THE DAY THE STAIR TURNED
+         * COUNTERCLOCKWISE, and the reason none of the existing ones did.
+         *
+         * Σ (1/6)·a·(b×c) is origin-independent for a closed, consistently
+         * oriented mesh, and only for one. The caps lie in planes through the
+         * tower axis, so they contribute exactly nothing when the origin is ON
+         * that axis — which is where every volume in this project has ever been
+         * measured from. Move the origin off it and the disagreement shows.
+         *
+         * Positive, too: three-bvh-csg subtracts nothing at all from a tool whose
+         * faces point inward, so the sign is not cosmetic.
+         */
+        const bad: string[] = []
+        const volumeAbout = (tris: number[][], ox: number, oy: number, oz: number) => {
+          let v = 0
+          for (const [ax, ay, az, bx, by, bz, cx, cy, cz] of tris) {
+            const px = ax - ox
+            const py = ay - oy
+            const pz = az - oz
+            const qx = bx - ox
+            const qy = by - oy
+            const qz = bz - oz
+            const rx = cx - ox
+            const ry = cy - oy
+            const rz = cz - oz
+            v += (px * (qy * rz - qz * ry) + py * (qz * rx - qx * rz) + pz * (qx * ry - qy * rx)) / 6
+          }
+          return v
+        }
+        tubes.forEach((sections, i) => {
+          const tris = triangles(stairPassageGeometry(sections)!)
+          const onAxis = volumeAbout(tris, 0, 0, 0)
+          const offAxis = volumeAbout(tris, 137, -61, 89)
+          if (onAxis <= 0) bad.push(`tube ${i}: volume ${onAxis.toFixed(4)} — the tool is inside-out`)
+          if (Math.abs(onAxis - offAxis) > 1e-6) {
+            bad.push(
+              `tube ${i}: ${onAxis.toFixed(4)} about the axis but ${offAxis.toFixed(4)} about a ` +
+                'shifted origin — the tool is not consistently wound',
+            )
+          }
+        })
+        expect(bad).toEqual([])
+      })
+    })
+  }
+})
+
+describe('the shell is closed at every stair doorway end', () => {
+  const tubes = tubesFor(STAIR.winding)
+  const flights = planAllFlights(stairSettings(), WALL_LIFTS, innerRadiusAt)
+  const built = buildShellGeometry({
+    buttressAzimuthDeg: BUTTRESS.azimuthDeg,
+    buttressProjection: BUTTRESS.projection,
+    buttressTipWidth: BUTTRESS.tipWidth,
+    buttressRootArcDeg: BUTTRESS.rootArcDeg,
+    buttressSkewDeg: BUTTRESS.skewDeg,
+    buttressHeight: TOWER.height,
+    entranceAzimuthDeg: ENTRANCE.azimuthDeg,
+    entranceWidth: ENTRANCE.width,
+    entranceHeight: ENTRANCE.height,
+    entranceSillY: ENTRANCE.thresholdY,
+    windows: (windowData.windows as WindowSpec[]).map((w) => ({
+      azimuthDeg: w.azimuthDeg,
+      centreY: windowCentreY(w, TOWER.groundY, TOWER.height),
+      outerWidth: w.outerWidth,
+      outerHeight: w.outerHeight,
+      innerWidth: w.innerWidth,
+      innerHeight: w.innerHeight,
+      head: w.head,
+    })),
+    stairPassage: tubes,
+    stairDoorways: stairDoorways(
+      flights,
+      STAIR.width,
+      PLAYER.height + 0.35,
+      innerRadiusAt,
+      (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+      WALL_LIFTS.map((l) => l.opensAtY),
+      STAIR.doorwayWidth,
+    ) as ShellParams['stairDoorways'],
+  })
+
+  /**
+   * The surface standing in one passage end's own plane, split by which way it
+   * faces.
+   *
+   * Measured IN THE PLANE, not within a radius of the end — bucketing by
+   * distance sweeps in the neighbouring vault and jambs and inflates the
+   * answer. A triangle counts only if all three of its corners lie in the plane
+   * and inside that end's cross-section.
+   */
+  function endWall(section: PassageSection, towardVoid: number) {
+    const az = section.azimuthDeg * DEG
+    // the plane's normal is the tangential direction: radial × up
+    const t = { x: Math.cos(az), z: Math.sin(az) }
+    const radial = { x: Math.sin(az), z: -Math.cos(az) }
+    const originOffset = section.innerRadius
+    let facingVoid = 0
+    let facingStone = 0
+    for (const tri of triangles(built.geometry)) {
+      let inSection = true
+      for (let v = 0; v < 9 && inSection; v += 3) {
+        const dx = tri[v] - radial.x * originOffset
+        const dz = tri[v + 2] - radial.z * originOffset
+        const alongNormal = dx * t.x + dz * t.z
+        const r = tri[v] * radial.x + tri[v + 2] * radial.z
+        inSection =
+          Math.abs(alongNormal) <= 2e-3 &&
+          r >= section.innerRadius - 0.02 &&
+          r <= section.outerRadius + 0.02 &&
+          tri[v + 1] >= section.bottomY - 0.02 &&
+          tri[v + 1] <= section.topY + 0.02
+      }
+      if (!inSection) continue
+      const [nx, ny, nz] = crossOf(tri)
+      const area = Math.hypot(nx, ny, nz) / 2
+      if (area < 1e-9) continue
+      if ((nx * t.x + nz * t.z) * towardVoid > 0) facingVoid += area
+      else facingStone += area
+    }
+    return { facingVoid, facingStone }
+  }
+
+  const ends = tubes.flatMap((sections, flight) => [
+    { name: `flight ${flight} foot`, section: sections[0], next: sections[1] },
+    {
+      name: `flight ${flight} head`,
+      section: sections[sections.length - 1],
+      next: sections[sections.length - 2],
+    },
+  ])
+
+  it('walls off all twelve ends', () => {
+    /*
+     * Stated separately from the direction, because "no surface facing the wrong
+     * way" is satisfied trivially by no surface at all. A passage that stopped
+     * against nothing would be a hole through the drum.
+     */
+    expect(ends.length).toBe(12)
+    const open = ends
+      .filter(
+        ({ section, next }) =>
+          endWall(section, Math.sign(next.azimuthDeg - section.azimuthDeg)).facingVoid < 0.2,
+      )
+      .map((e) => e.name)
+    expect(open).toEqual([])
+  })
+
+  it('turns every square metre of that wall toward the passage, not into the masonry', () => {
+    /*
+     * The whole fault, stated once. A triangle here whose normal points into the
+     * stone is a triangle the renderer culls, and what stands behind it is the
+     * outside of the tower.
+     */
+    const torn = ends
+      .map(({ name, section, next }) => ({
+        name,
+        ...endWall(section, Math.sign(next.azimuthDeg - section.azimuthDeg)),
+      }))
+      .filter((e) => e.facingStone > 1e-4)
+      .map((e) => `${e.name}: ${e.facingStone.toFixed(4)} m² facing into the stone`)
+    expect(torn).toEqual([])
+  })
+})
