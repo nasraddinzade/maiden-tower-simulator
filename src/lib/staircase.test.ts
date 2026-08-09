@@ -8,10 +8,11 @@ import {
   stairwellSpanDeg,
   stepAngleDeg,
   stepCountFor,
+  stairPassageSections,
   windingSign,
   type FlightParams,
 } from './staircase'
-import { FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt } from '../config/tower'
+import { FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt, stairSettings } from '../config/tower'
 
 const base: FlightParams = {
   fromY: 0,
@@ -371,5 +372,50 @@ describe('the stair against the real storeys', () => {
 
   it('never wraps more than a full turn in one storey', () => {
     for (const steps of flights) expect(flightArcDeg(steps)).toBeLessThan(360)
+  })
+})
+
+describe('the passage floor at a threshold', () => {
+  /*
+   * A trench at every doorway, and nothing in the suite saw it.
+   *
+   * The passage is cut a riser and a half below each tread so the lofted floor
+   * meets the tread's underside. Past the last tread there is no tread — the
+   * flight is drawn from its own steps — so the same depth applied to the lead
+   * sections left the floor 0.33 m below the storey it opens onto, over the
+   * whole width of the doorway. Walked and photographed at the foot of flight 1:
+   * floor at 6.73 against a storey at 7.06, a black slot beside the opening.
+   *
+   * The property, not the number: where a passage meets a landing, you do not
+   * step down into it.
+   */
+  const flights = planAllFlights(stairSettings(), WALL_LIFTS, innerRadiusAt)
+  const tubes = stairPassageSections(
+    flights,
+    STAIR.width,
+    2.1,
+    innerRadiusAt,
+    undefined,
+    STAIR.doorwayWidth,
+  )
+
+  it('is level with the landing at both ends of every flight', () => {
+    tubes.forEach((tube, i) => {
+      const flight = flights[i]
+      const footY = flight[0].treadY
+      const headY = flight[flight.length - 1].treadY
+      /*
+       * Lead sections are found by POSITION in the tube, not by azimuth. A
+       * flight can cross north — flight 0 runs from 100° to 15.6° — so ordering
+       * its ends by angle picks the wrong landing and the test then measures a
+       * storey height instead of a threshold.
+       */
+      const lead = (tube.length - flight.length) / 2
+      if (lead <= 0) return
+      for (let k = 0; k < lead; k += 1) {
+        expect(footY - tube[k].bottomY).toBeLessThanOrEqual(0.05)
+        expect(headY - tube[tube.length - 1 - k].bottomY).toBeLessThanOrEqual(0.05)
+      }
+    })
   })
 })

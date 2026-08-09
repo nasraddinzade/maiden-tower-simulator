@@ -418,6 +418,23 @@ export function stairPassageSections(
     s: StepPlacement,
     riser: number,
     azimuthDeg = s.azimuthDeg,
+    /**
+     * A LANDING section, not a section over a tread.
+     *
+     * The depth below is only ever there to clear the underside of a tread block,
+     * and past the end of a flight there is no tread — the flight is drawn from
+     * its own steps and stops with them. Cutting the lead sections a riser and a
+     * half down anyway leaves a trench at the threshold: measured in the model at
+     * the foot of flight 1, the passage floor stood at 6.73 where the storey is at
+     * 7.06, a 0.33 m drop the width of the doorway, reading from the room as a
+     * black slot beside the opening. Twelve flight ends, twelve trenches.
+     *
+     * So a lead section's floor is the LANDING's floor. The 0.02 m is not a
+     * threshold detail — it keeps this cut's floor off the doorway cutter's own,
+     * which sits exactly at the storey level. Two tools meeting on one plane is
+     * what cost this model its stair floor once already.
+     */
+    landing = false,
   ): PassageSection => {
     /**
      * The passage stays INSIDE the masonry.
@@ -440,7 +457,9 @@ export function stairPassageSections(
       innerRadius: Math.max(0.05, s.midRadius - half, innerFaceRadiusAt(s.treadY)),
       outerRadius: s.midRadius + half,
       // one and a half risers down, so the lofted floor meets the treads' underside
-      bottomY: s.treadY - 1.5 * Math.max(0.12, riser) - footTolerance,
+      bottomY: landing
+        ? s.treadY - footTolerance
+        : s.treadY - 1.5 * Math.max(0.12, riser) - footTolerance,
       topY: s.treadY + headroom,
     }
   }
@@ -501,11 +520,11 @@ export function stairPassageSections(
 
     const leadIn: PassageSection[] = []
     for (let k = leadSteps; k >= 1; k--) {
-      leadIn.push(sectionAt(flight[0], riser, flight[0].azimuthDeg - stepAngle * k))
+      leadIn.push(sectionAt(flight[0], riser, flight[0].azimuthDeg - stepAngle * k, true))
     }
     const leadOut: PassageSection[] = []
     for (let k = 1; k <= leadSteps; k++) {
-      leadOut.push(sectionAt(last, riser, last.azimuthDeg + lastAngle * k))
+      leadOut.push(sectionAt(last, riser, last.azimuthDeg + lastAngle * k, true))
     }
     tubes.push([...leadIn, ...body, ...leadOut])
   }
