@@ -34,6 +34,7 @@ import type { WallChase, WindowCut } from './lib/towerShell'
 import { windowCentreY, windowStoreyIndex, type WindowSpec } from './lib/windows'
 import { WindowGrilles } from './components/tower/WindowGrilles'
 import { WindowSurrounds } from './components/tower/WindowSurrounds'
+import { CourseBands } from './components/tower/CourseBands'
 import { WindowEmbrasures, type PlacedEmbrasure } from './components/tower/WindowEmbrasures'
 import { embrasureFoulsReveal, planEmbrasure } from './lib/embrasure'
 import windowData from './data/windows.json'
@@ -609,6 +610,7 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         The grilles go with the shell: they exist only where its openings do, and
         without the shell there are no openings to cover.
       */}
+      {showShell && !cutaway && windows && <CourseBands windows={windows} material={shellMat} />}
       {showShell && !cutaway && windows && <WindowGrilles windows={windows} />}
       {showShell && !cutaway && windows && (
         <WindowSurrounds windows={windows} material={shellMat} />

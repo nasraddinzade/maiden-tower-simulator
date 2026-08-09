@@ -107,6 +107,81 @@ export function beakShape(
   return s
 }
 
+/**
+ * The outer face in section: (radius, y) up the wall, with the banded coursing.
+ *
+ * A cylinder cannot show what the photographs show. The stripes on this tower are
+ * RELIEF — each band's stones oversail the course below, every bed throws a hard
+ * shadow, and the silhouette is visibly serrated. Tone alone cannot do that at
+ * any contrast.
+ *
+ * The drum ITSELF stays a cylinder, and the courses are drawn as masonry added
+ * to it — the same rule the grilles and the window surrounds follow. Turning the
+ * drum into a lathe of this profile was tried and backed out: it makes the outer
+ * radius a function of height, and eight tests are written against a constant
+ * 8.25 — the bounding box, the window widths, the outer-radius profile, the
+ * through-hole rays and the floor under the treads. Every one of them is
+ * answerable and none of them is wrong to ask. Added stone changes nothing they
+ * measure, which is the whole argument for building it this way.
+ *
+ * Three zones, in the order a mason built them: plain large-block work up to the
+ * boundary, then the ribbed courses, then a few plain courses and the coping roll
+ * that oversails the top. Below the paving the profile runs straight down at the
+ * plain radius — it is buried, and stepping it there would only cost triangles.
+ *
+ * See COURSING in config/tower.ts for where the numbers come from and how far
+ * the two readings that produced them disagree.
+ */
+export function drumProfile(
+  baseY: number,
+  topY: number,
+  radius: number,
+  groundY: number,
+  c: {
+    bandStartAboveGround: number
+    bandPitch: number
+    bandProjection: number
+    proudFraction: number
+    plainUnderCoping: number
+    copingProjection: number
+    copingDepth: number
+  },
+): Array<[number, number]> {
+  const pts: Array<[number, number]> = []
+  const push = (r: number, y: number) => {
+    const last = pts[pts.length - 1]
+    if (!last || Math.abs(last[0] - r) > 1e-9 || Math.abs(last[1] - y) > 1e-9) pts.push([r, y])
+  }
+
+  const copingFrom = topY - c.copingDepth
+  const ribsTo = copingFrom - c.plainUnderCoping
+  const bandFrom = Math.min(groundY + c.bandStartAboveGround, ribsTo)
+
+  push(radius, baseY)
+  push(radius, bandFrom)
+
+  const proud = radius + c.bandProjection
+  for (let y = bandFrom; y < ribsTo - 1e-6; y += c.bandPitch) {
+    /*
+     * The step OUT is at the bottom of a proud course and the step BACK at its
+     * top, so the ledge that casts the shadow is under the stone. Drawn the other
+     * way round the wall corbels inward and reads as a stack of plinths.
+     */
+    const proudTop = Math.min(y + c.bandPitch * c.proudFraction, ribsTo)
+    const bandTop = Math.min(y + c.bandPitch, ribsTo)
+    push(proud, y)
+    push(proud, proudTop)
+    push(radius, proudTop)
+    push(radius, bandTop)
+  }
+
+  push(radius, copingFrom)
+  push(radius + c.copingProjection, copingFrom + c.copingDepth * 0.35)
+  push(radius + c.copingProjection, topY - c.copingDepth * 0.15)
+  push(radius, topY)
+  return pts
+}
+
 /** Strip material groups so the single-material CSG evaluator stays happy. */
 function prep(g: THREE.BufferGeometry): THREE.BufferGeometry {
   g.clearGroups()
