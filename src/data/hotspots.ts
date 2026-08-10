@@ -93,6 +93,7 @@ const PASSAGE_ENDS: PassageEndAnchor[] = passageEndAnchors(
     STAIR.width,
     PLAYER.stairHeadroom,
     innerRadiusAt,
+    TOWER.topY,
     undefined,
     STAIR.doorwayWidth,
   ),

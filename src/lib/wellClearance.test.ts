@@ -3,6 +3,7 @@ import {
   ENTRANCE,
   FLOORS,
   STAIR,
+  TOWER,
   WALL_LIFTS,
   WATER,
   WELL,
@@ -19,6 +20,7 @@ const doorways = stairDoorways(
   ENTRANCE.height,
   innerRadiusAt,
   (i: number, end: 'foot' | 'head') => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+  TOWER.topY,
   WALL_LIFTS.map((l) => l.opensAtY),
   STAIR.doorwayWidth,
 )

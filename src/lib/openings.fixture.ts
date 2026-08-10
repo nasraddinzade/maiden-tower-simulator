@@ -46,6 +46,7 @@ export const SHIPPED_TUBES = stairPassageSections(
   STAIR.width,
   PLAYER.stairHeadroom,
   innerRadiusAt,
+  TOWER.topY,
   undefined,
   STAIR.doorwayWidth,
 )

@@ -363,6 +363,23 @@ export interface PassageSection {
   outerRadius: number
   bottomY: number
   topY: number
+  /**
+   * THIS STRETCH OF PASSAGE HAS NO VAULT, because the building has run out.
+   *
+   * Set where `tread + headroom` came out above the top of the masonry, which in
+   * this model happens over the last third of the roof climb and nowhere else.
+   * `topY` is then the top of the stone rather than a crown, and the two are not
+   * the same kind of thing: one is where a vault springs to, the other is where
+   * the building stops. Anything that draws or cuts these sections has to know
+   * which it has been handed — a pointed vault whose crown is exactly the roof
+   * surface is tangent to it, and tangency is the CSG case this model has twice
+   * lost a floor to.
+   *
+   * It is NOT a claim that the tower's roof is open over its stair. It is a claim
+   * about this model's own arithmetic, which cannot roof that stretch at all. See
+   * ROOF_QUESTION in config/tower.ts.
+   */
+  openToSky?: boolean
 }
 
 /**
@@ -386,6 +403,48 @@ export function stairPassageSections(
    * flight is a passage off the room, not a shaft.
    */
   innerFaceRadiusAt: (y: number) => number,
+  /**
+   * WORLD Y OF THE TOP OF THE STONE. A cutter may not remove stone that is not
+   * there, and until 2026-08-10 this one claimed to.
+   *
+   * The vault is `tread + headroom` above every step, which is right in five
+   * flights out of six and arithmetically impossible in the sixth. The roof
+   * climb lands on the deck at 26.749 and the masonry stops at 27.500, so the
+   * vault the rule asks for stands at 29.049 — 1.55 m of barrel vault in open
+   * air. Nothing was ever built there, because the shell has no stone above
+   * 27.500 for the tool to subtract (raycast over the built shell: max Y is
+   * 27.500 at every azimuth outside the cut), which is exactly why this went
+   * unnoticed: the lie was invisible.
+   *
+   * What the clamp changes is what the model ASSERTS. Without it,
+   * `stairPassageSections()` describes a tunnel through a building that ends
+   * 1.55 m below the tunnel's own crown, and everything reading the sections back
+   * is handed that as a fact — passageEndAnchors() published 29.049 as the crown
+   * of the roof flight's head opening, and fitReveal() then sized a 2.0 m reveal
+   * against it and passed its own validator.
+   *
+   * IT IS NOT FREE, and the first attempt shipped believing it was. The surplus
+   * was doing work nobody had noticed: it kept the cutter's crown clear of the
+   * roof plane. Clamped exactly onto that plane the pointed vault becomes tangent
+   * to it, the boolean is asked to resolve a tangency, and it leaves a curved lid
+   * of parapet stone roofing the stair — measured on the built shell, solid at
+   * 27.500 from azimuth 30 to 70 with the passage floor a metre below and nothing
+   * in between. The clamp is only honest together with sectionProfile()'s
+   * flattening of a vault that has nothing to spring from; see the note there.
+   *
+   * WHAT IT DOES NOT DO, and this must not be claimed for it. Over the last
+   * third of the roof climb the treads rise past `topY − headroom`, so the
+   * passage has less than its headroom of stone above it and then none at all:
+   * the cut goes clean through the parapet ring for about 50° of arc and the
+   * final steps come out under open sky. That breach is REAL — it is in the
+   * built shell, you can stand on the deck and look into it. Clamping the cutter
+   * neither closes it nor excuses it. Whether the tower's roof is like that is a
+   * question about the building that no source in docs/ answers; it is written
+   * out for the owner at ROOF_QUESTION in config/tower.ts, and until he answers,
+   * moving the deck, the parapet or the headroom to make the picture tidy would
+   * be fitting a measured stack to a view (CLAUDE.md rule 1).
+   */
+  masonryTopY: number,
   sideClearance = PASSAGE_SIDE_CLEARANCE,
   /**
    * Clear width of the doorway at each end, so the tube can be carried out far
@@ -452,15 +511,29 @@ export function stairPassageSections(
      * close. Inward the flight abuts the wall, as the source says; the clearance
      * survives on the outer side, where there is 5 m of masonry to take it.
      */
+    // one and a half risers down, so the lofted floor meets the treads' underside
+    const bottomY = landing
+      ? s.treadY - footTolerance
+      : s.treadY - 1.5 * Math.max(0.12, riser) - footTolerance
+    /*
+     * The vault, or the top of the stone where the stone runs out first.
+     *
+     * Never below the floor of the cut, however low the masonry is said to stop:
+     * an inverted section sweeps into a self-intersecting solid and the CSG that
+     * follows it is undefined. A tread standing above the top of the building is
+     * a fault in the lift table, not something a cutter should try to express by
+     * turning itself inside out.
+     */
+    const wanted = s.treadY + headroom
+    const topY = Math.max(bottomY + 1e-3, Math.min(wanted, masonryTopY))
     return {
       azimuthDeg,
       innerRadius: Math.max(0.05, s.midRadius - half, innerFaceRadiusAt(s.treadY)),
       outerRadius: s.midRadius + half,
-      // one and a half risers down, so the lofted floor meets the treads' underside
-      bottomY: landing
-        ? s.treadY - footTolerance
-        : s.treadY - 1.5 * Math.max(0.12, riser) - footTolerance,
-      topY: s.treadY + headroom,
+      bottomY,
+      topY,
+      // the headroom asked for more stone than the building has: no vault here
+      openToSky: wanted > masonryTopY + 1e-9,
     }
   }
 
@@ -689,6 +762,18 @@ export interface StairDoorway {
    * tread under its arc necessarily digs a pit under the highest one.
    */
   bottomRake: number
+  /**
+   * NO ARCH OVER THIS ONE, because the wall ends before the head does.
+   *
+   * The same fact PassageSection.openToSky records, and the roof exit is the one
+   * doorway it applies to: its head wants 2.1 m over a landing at 26.749 and the
+   * masonry stops at 27.500, so what stands over it is 0.751 m of parapet. An
+   * arch struck in that gives a semicircle whose crown lands exactly on the roof
+   * plane — tangent to it, coincident along a line, and the boolean then leaves a
+   * curved lid of stone over the way out. It is a notch in the top of the wall,
+   * and the cutter should say so. See doorwayCutter().
+   */
+  openToSky?: boolean
 }
 
 /**
@@ -709,6 +794,14 @@ export function stairDoorways(
   height: number,
   innerFaceRadiusAt: (y: number) => number,
   floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
+  /**
+   * World Y of the top of the stone — see the long note on the same argument to
+   * stairPassageSections(). The roof exit is the one doorway it touches: its
+   * head came out at 28.849 against masonry that stops at 27.500, so the arch
+   * was 1.35 m taller than the wall it is cut in. Like the passage's own crown
+   * it removed nothing up there; like it, it was a claim about a building.
+   */
+  masonryTopY: number,
   /**
    * Per flight, the floor levels it runs PAST and opens onto partway along.
    *
@@ -900,14 +993,18 @@ export function stairDoorways(
      */
     const onLanding = localRise < 1e-6
 
+    const bottomY = onLanding ? floorY : bedAtCentre - headClamp
+    const wantedTop = Math.max(floorY, underfoot.treadY) + height
     return {
       azimuthDeg,
       widthDeg,
       bottomRake: rakeCapped,
-      bottomY: onLanding ? floorY : bedAtCentre - headClamp,
-      topY: Math.max(floorY, underfoot.treadY) + height,
+      bottomY,
+      // the arch, or the top of the stone where the stone runs out first
+      topY: Math.max(bottomY + 1e-3, Math.min(wantedTop, masonryTopY)),
       innerRadius: Math.max(0.05, inner),
       outerRadius: s.midRadius + doorwayWidth / 2 + 0.06,
+      openToSky: wantedTop > masonryTopY + 1e-9,
     }
   }
 

@@ -8,11 +8,13 @@ import {
   stairwellSpanDeg,
   stepAngleDeg,
   stepCountFor,
+  stairDoorways,
   stairPassageSections,
   windingSign,
   type FlightParams,
 } from './staircase'
 import { FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt, stairSettings } from '../config/tower'
+import { PLAYER } from '../config/player'
 
 const base: FlightParams = {
   fromY: 0,
@@ -395,6 +397,7 @@ describe('the passage floor at a threshold', () => {
     STAIR.width,
     2.1,
     innerRadiusAt,
+    TOWER.topY,
     undefined,
     STAIR.doorwayWidth,
   )
@@ -417,5 +420,143 @@ describe('the passage floor at a threshold', () => {
         expect(headY - tube[tube.length - 1 - k].bottomY).toBeLessThanOrEqual(0.05)
       }
     })
+  })
+})
+
+/*
+ * NO CUTTER MAY REMOVE STONE THE BUILDING HAS NOT GOT.
+ *
+ * Fault of 2026-08-10. The vault is laid `tread + headroom` over every step, and
+ * for five flights out of six that is a rule about a tunnel inside a wall. For
+ * the roof climb it is not: the last tread is the deck at 26.749, the masonry
+ * stops at 27.500, and the rule asked for a crown at 29.049 — 1.55 m of barrel
+ * vault standing in the open air above the tower.
+ *
+ * NOTHING WAS DRAWN THERE, which is why it went unseen for so long: the shell
+ * has no stone above 27.500 for the tool to subtract, so the surplus removed
+ * nothing and moved no vertex. What it did was tell everything downstream that
+ * the passage was roofed up there. passageEndAnchors() published that crown as
+ * the head of an opening, fitReveal() sized a 2.0 m reveal against it, and
+ * validatePassageOpening() passed it — an opening whose own centre stands 0.499 m
+ * above the top of the building.
+ *
+ * THE SURPLUS WAS ALSO LOAD-BEARING, which is the part that had to be found by
+ * looking. Clamped and nothing else, the pointed vault's crown lands exactly on
+ * the roof plane and the boolean is handed a tangency; the built shell then
+ * carried a curved lid of parapet stone over the open stair. So the clamp travels
+ * with `openToSky`, and the two together are what render identically to the state
+ * before either — which is the only proof this pair can offer, and it is a
+ * photograph, not an assertion.
+ *
+ * None of this says whether the roof itself is right. See ROOF_QUESTION in
+ * config/tower.ts for what is still unknown.
+ */
+describe('the stair cutters stop where the masonry stops', () => {
+  const flights = planAllFlights(stairSettings(), WALL_LIFTS, innerRadiusAt)
+
+  it('never vaults a passage above the top of the tower', () => {
+    const tubes = stairPassageSections(
+      flights,
+      STAIR.width,
+      PLAYER.stairHeadroom,
+      innerRadiusAt,
+      TOWER.topY,
+      undefined,
+      STAIR.doorwayWidth,
+    )
+    for (const [i, tube] of tubes.entries()) {
+      for (const s of tube) {
+        expect(s.topY, `flight ${i} at az ${s.azimuthDeg.toFixed(2)}`).toBeLessThanOrEqual(
+          TOWER.topY + 1e-9,
+        )
+        // and a clamped section is still a section, not an inside-out one
+        expect(s.topY).toBeGreaterThan(s.bottomY)
+      }
+    }
+  })
+
+  it('never arches a doorway above the top of the tower', () => {
+    const doors = stairDoorways(
+      flights,
+      STAIR.width,
+      PLAYER.height + 0.35,
+      innerRadiusAt,
+      (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+      TOWER.topY,
+      WALL_LIFTS.map((l) => l.opensAtY),
+      STAIR.doorwayWidth,
+    )
+    for (const d of doors) {
+      expect(d.topY, `doorway at az ${d.azimuthDeg.toFixed(2)}`).toBeLessThanOrEqual(
+        TOWER.topY + 1e-9,
+      )
+      expect(d.topY).toBeGreaterThan(d.bottomY)
+    }
+  })
+
+  it('flags exactly the stretch that has no stone over it, and no other', () => {
+    /*
+     * The flag is what stops sectionProfile() springing a vault off nothing, so
+     * it has to be right at both edges: every section whose asked-for crown clears
+     * the top of the tower, and not one that does not.
+     *
+     * Only the roof climb has any. That is a fact about this stack — a deck at
+     * 26.749 under a top at 27.500 — and if it ever spreads to another flight,
+     * something in the storey heights has moved and this test is the place it
+     * should be noticed.
+     */
+    const tubes = stairPassageSections(
+      flights,
+      STAIR.width,
+      PLAYER.stairHeadroom,
+      innerRadiusAt,
+      TOWER.topY,
+      undefined,
+      STAIR.doorwayWidth,
+    )
+    tubes.forEach((tube, i) => {
+      for (const s of tube) {
+        const wantsMoreThanThereIs = s.topY >= TOWER.topY - 1e-9
+        expect(!!s.openToSky, `flight ${i} at az ${s.azimuthDeg.toFixed(2)}`).toBe(
+          wantsMoreThanThereIs,
+        )
+      }
+    })
+    // five flights untouched, the sixth flagged over its last stretch only
+    const flagged = tubes.map((t) => t.filter((s) => s.openToSky).length)
+    expect(flagged.slice(0, -1)).toEqual([0, 0, 0, 0, 0])
+    expect(flagged[flagged.length - 1]).toBeGreaterThan(0)
+    expect(flagged[flagged.length - 1]).toBeLessThan(tubes[tubes.length - 1].length)
+  })
+
+  it('leaves the other five flights exactly as they were, clamp or no clamp', () => {
+    /*
+     * The clamp must be inert everywhere the building is taller than the vault,
+     * or it is not a clamp but a change of headroom. Only the roof climb differs,
+     * and it differs by 1.549 m — the whole of the surplus.
+     */
+    const unclamped = stairPassageSections(
+      flights,
+      STAIR.width,
+      PLAYER.stairHeadroom,
+      innerRadiusAt,
+      Infinity,
+      undefined,
+      STAIR.doorwayWidth,
+    )
+    const clamped = stairPassageSections(
+      flights,
+      STAIR.width,
+      PLAYER.stairHeadroom,
+      innerRadiusAt,
+      TOWER.topY,
+      undefined,
+      STAIR.doorwayWidth,
+    )
+    const surplus = unclamped.map((t, i) =>
+      Math.max(...t.map((s, k) => s.topY - clamped[i][k].topY)),
+    )
+    expect(surplus.slice(0, -1)).toEqual([0, 0, 0, 0, 0])
+    expect(surplus[surplus.length - 1]).toBeCloseTo(1.549, 3)
   })
 })

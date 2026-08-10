@@ -41,6 +41,7 @@ function layout(overrides: Partial<Parameters<typeof stairSettings>[0]> = {}) {
     settings.width,
     PLAYER.stairHeadroom,
     innerRadiusAt,
+    TOWER.topY,
     undefined,
     STAIR.doorwayWidth,
   )
@@ -134,7 +135,15 @@ describe('the reveal fits the passage it is cut from', () => {
   it('clamps only what windows.json says was never measured', () => {
     // the recorded 2.4 m inner height does not fit under a 2.30 m vault anywhere
     expect(BASE.openings.every((o) => o.clampedHeight)).toBe(true)
-    for (const o of BASE.openings) {
+    /*
+     * Every end EXCEPT the one with no wall over it. head-8-9's landing is the
+     * roof deck and its crown is the top of the tower, 0.751 m up, so its reveal
+     * fits to nothing at all — which is the right answer and not a shape. See the
+     * early return in validatePassageOpening(). Before the passage cutter was
+     * clamped to the masonry this end reported a crown at 29.049 m, in open air,
+     * and a 2.0 m reveal fitted comfortably under it.
+     */
+    for (const o of BASE.openings.filter((x) => x.blindBecause !== 'parapet')) {
       expect(o.innerHeight).toBeLessThan(2.4)
       // and it still flares, which is the one thing [ref] does state
       expect(o.innerHeight).toBeGreaterThanOrEqual(o.outerHeight)

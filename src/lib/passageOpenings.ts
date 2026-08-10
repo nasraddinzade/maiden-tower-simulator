@@ -724,6 +724,24 @@ export function ladderResidual(
 
 /** Problems that should stop an opening being cut. Data, not exceptions. */
 export function validatePassageOpening(o: PassageOpening): string[] {
+  /*
+   * AN END WITH NO WALL OVER IT HAS NO SHAPE TO CHECK, and asking these questions
+   * of one produces noise, not a finding.
+   *
+   * `parapet` means the landing is the roof deck: 0.751 m of masonry stands over
+   * it and a 1.9 m slit does not fit in that at any sill. The planner has said so
+   * already, in `blindBecause`, and nothing is cut. Re-reporting it here as "head
+   * above the passage vault" is the same fact wearing a second hat, and it would
+   * make an honest model fail its own validator.
+   *
+   * It surfaced on 2026-08-10 only because stairPassageSections() stopped putting
+   * this end's crown at 29.049 — 1.55 m above the top of the tower. The reveal was
+   * being measured against a vault in mid-air and of course it fitted. `buttress`
+   * is deliberately NOT excused the same way: there the masonry is real and the
+   * opening's shape is real, it is only what lies beyond it that is solid.
+   */
+  if (o.blindBecause === 'parapet') return []
+
   const errs: string[] = []
   if (o.outerWidth <= 0 || o.outerHeight <= 0) errs.push(`${o.id}: outer size must be positive`)
   if (o.innerWidth <= o.outerWidth) errs.push(`${o.id}: does not flare inward`)

@@ -379,6 +379,80 @@ export const TOWER = {
   oculusRadius: OCULUS_RADIUS_DEFAULT,
 } as const
 
+// ———————————————————————————— the roof deck ————————————————————————————
+/**
+ * WHAT THE ROOF IS. [PLACEHOLDER] — and it is the only [PLACEHOLDER] in this
+ * file that is not a number but a shape.
+ *
+ * There is no `ROOF` block above because there is nothing sourced to put in one.
+ * What the model builds instead falls out of two other quantities: the deck is
+ * TOP_OF_FLOORS, the top of the eighth storey's ceiling structure, and the
+ * "parapet" is the whole remaining top of the wall — a ring 3.733 m thick and
+ * PARAPET (0.751 m) high, from the room face at r 4.517 out to the drum face at
+ * r 8.250. Nobody decided that. It is the residue of the vertical budget, and
+ * the deck is drawn only as far as the room face because that is where
+ * FloorStructures' annulus stops.
+ *
+ * `reference-photos/views_from/Maiden towers top old city baku azerbaijan.jpg`
+ * [PHOTO] does not look like that. It shows paving running out across the wall
+ * thickness with people standing on it, and a low thin parapet along the outer
+ * edge. If that is the building, the head of the roof stair stands UNDER the
+ * paving (it is at r 4.71–5.73, inside the wall) and comes out through an
+ * opening in the deck. In the model there is nothing over it but 0.751 m of the
+ * ring, the passage needs 2.300, and the cutter takes the ring away for about
+ * 50° of arc — the stair's last steps are open to the sky and a 0.190 m fin of
+ * stone is left standing where the deck edge and the passage cheek fail to meet.
+ * That is visible from the terrace, and it is the whole of fault A.
+ *
+ * The breach does not begin abruptly either, and the run-up to it is its own
+ * argument that this roof is wrong. From about azimuth 83 the passage's vault has
+ * under 0.30 m of stone over it, and from 80 to 63 it has 0.09 m — a lintel the
+ * thickness of a book carrying the top of a tower. Nothing is done about that: it
+ * is what the measured stack gives, and it is a consequence of a deck at 26.749
+ * under a top at 27.500 rather than a modelling slip. It would go away by itself
+ * if the paving crossed the wall.
+ *
+ * IT IS NOT REPAIRABLE FROM WHAT WE HAVE. Rebuilding the roof needs the paving's
+ * outward reach and the edge parapet's thickness and height, and
+ * docs/maiden-tower-reference.md contains not one line about the roof. Inventing
+ * a terrace is precisely the error CLAUDE.md rule 1 calls the worst in this
+ * project, so the model keeps the roof it can defend and says out loud that it
+ * is probably wrong.
+ *
+ * Printed to the dev console on every load, with the passage-opening conflicts
+ * and for the same reason: a question nobody is looking at is not open, it is
+ * lost.
+ */
+export const ROOF_QUESTION = [
+  'ROOF — [PLACEHOLDER]. Two questions for the owner; nothing above the 8th storey',
+  'can be trusted until they are answered. Ask in Russian, verbatim:',
+  '',
+  '  1. «Крыша: докуда доходит мощение террасы — до самого наружного края стены,',
+  '      или обрывается раньше и дальше идёт что-то другое? И какой парапет по',
+  '      краю: какой он толщины и какой высоты от настила, если встать рядом?',
+  '      Годится рулетка или один кадр, где парапет виден сбоку рядом с человеком.»',
+  '',
+  '     — where does the terrace paving reach, and what parapet stands at its edge?',
+  '       The model has the paving stopping at the inner wall face and calls the',
+  '       whole 3.7 m top of the wall a 0.75 m parapet. The photograph disagrees.',
+  '',
+  '  2. «Поднимаясь последним маршем на крышу, вы выходите через проём (люк) в',
+  '      мощении и оказываетесь посреди площадки — или через разрыв в парапете, то',
+  '      есть последние несколько ступеней уже под открытым небом? Если второе — за',
+  '      сколько ступеней до верха кончается свод над головой?»',
+  '',
+  '     — do you come out through an opening in the deck, or through a break in the',
+  '       parapet with the last steps under open sky? [VIDEO] 429–449 s ends with',
+  '       him stepping onto the deck and does not show what is over his head.',
+  '',
+  'The model currently builds the second answer, by accident rather than on',
+  'evidence: 26.749 (deck) + 2.300 (PLAYER.stairHeadroom) = 29.049 against a top',
+  'of 27.500, so the last 1.55 m of the climb CANNOT be roofed by this stack. Do',
+  'not close the breach by lowering the deck, raising the parapet or shortening',
+  'the headroom — all four numbers are measured or derived from measured, and',
+  'moving any of them fits the building to the picture (rule 1).',
+] as const
+
 // —————————————————————————————— buttress —————————————————————————————
 // Massive solid beak-like projection (docs/maiden-tower-reference.md).
 

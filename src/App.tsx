@@ -11,6 +11,7 @@ import {
   BUTTRESS,
   ENTRANCE,
   FLOORS,
+  ROOF_QUESTION,
   STAIR,
   TOWER,
   WALL_LIFTS,
@@ -216,6 +217,9 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
       stair.stairWidth,
       PLAYER.stairHeadroom,
       innerRadiusAt,
+      // and where the stone stops, so the roof climb's vault is not asserted in
+      // mid-air — see the note on the argument and ROOF_QUESTION
+      TOWER.topY,
       undefined,
       STAIR.doorwayWidth,
     )
@@ -297,6 +301,7 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
       PLAYER.height + 0.35,
       innerRadiusAt,
       LANDING_Y_OF,
+      TOWER.topY,
       WALL_LIFTS.map((l) => l.opensAtY),
       STAIR.doorwayWidth,
     )
@@ -421,6 +426,22 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
       console.warn(`[passage openings] ${line}`)
     }
   }, [openings])
+
+  /*
+   * AND THE ROOF, which belongs in the same place for the same reason.
+   *
+   * This one is not a conflict between two statements — it is a hole in the
+   * record with a visible consequence: the roof climb's last 1.55 m cannot be
+   * roofed by the measured stack, so the cutter takes the parapet ring away over
+   * about 50° of arc and the final steps come out under the sky. Whether the
+   * building does that is unknown and unknowable from docs/. Printed once per
+   * load so that whoever next stands on the deck and sees the breach finds the
+   * question already written rather than reaching for a plausible terrace.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.warn(`[roof]\n${ROOF_QUESTION.join('\n')}`)
+  }, [])
 
   const apertures = useMemo(() => buildApertures(windows ?? []), [windows])
   useEffect(() => onApertures(apertures), [apertures, onApertures])

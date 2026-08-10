@@ -180,6 +180,7 @@ describe('the stair leaves no slot that looks through', () => {
     STAIR.width,
     PLAYER.stairHeadroom,
     innerRadiusAt,
+    TOWER.topY,
     undefined,
     STAIR.doorwayWidth,
   )
@@ -323,6 +324,7 @@ describe('the stair leaves no slot that looks through', () => {
       innerRadiusAt,
       (i: number, end: 'foot' | 'head') =>
         end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY,
+      TOWER.topY,
       WALL_LIFTS.map((l) => l.opensAtY),
       STAIR.doorwayWidth,
     )

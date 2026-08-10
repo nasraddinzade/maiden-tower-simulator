@@ -539,6 +539,7 @@ describe('the shell carries a floor under every tread', () => {
     STAIR.width,
     PLAYER.stairHeadroom,
     innerRadiusAt,
+    TOWER.topY,
     undefined,
     STAIR.doorwayWidth,
   )
@@ -548,6 +549,7 @@ describe('the shell carries a floor under every tread', () => {
     ENTRANCE.height,
     innerRadiusAt,
     (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+    TOWER.topY,
     WALL_LIFTS.map((l) => l.opensAtY),
     STAIR.doorwayWidth,
   )

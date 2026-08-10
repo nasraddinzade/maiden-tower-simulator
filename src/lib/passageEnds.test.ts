@@ -62,6 +62,7 @@ function tubesFor(winding: Winding): PassageSection[][] {
     STAIR.width,
     PLAYER.stairHeadroom,
     innerRadiusAt,
+    TOWER.topY,
     undefined,
     STAIR.doorwayWidth,
   )
@@ -216,6 +217,7 @@ describe('the shell is closed at every stair doorway end', () => {
       PLAYER.height + 0.35,
       innerRadiusAt,
       (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+      TOWER.topY,
       WALL_LIFTS.map((l) => l.opensAtY),
       STAIR.doorwayWidth,
     ) as ShellParams['stairDoorways'],

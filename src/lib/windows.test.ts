@@ -83,7 +83,14 @@ describe('flaresInward', () => {
     // it used to be asserted of the arched window; the openings it is asserted of
     // now are the ones that survived, and the reveal is clamped by the passage,
     // so this is a real check on fitReveal() and not a restatement of the JSON
-    for (const o of SHIPPED_ENDS) expect(flaresInward(o), o.id).toBe(true)
+    //
+    // head-8-9 is not among them and must not be: its landing is the roof deck,
+    // the only masonry over it is 0.751 m of parapet, and fitReveal() correctly
+    // gives it no reveal at all. An opening with no height does not flare, and
+    // asking whether it does is asking about a hole that is not there.
+    for (const o of SHIPPED_ENDS.filter((x) => x.blindBecause !== 'parapet')) {
+      expect(flaresInward(o), o.id).toBe(true)
+    }
   })
 })
 

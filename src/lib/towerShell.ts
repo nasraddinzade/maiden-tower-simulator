@@ -312,6 +312,13 @@ export function windowProfile(
 const WINDOW_CUT_OVERSHOOT = 1 // m
 
 /**
+ * How far the passage cutter runs past the top of the stone where the passage
+ * has no vault. Same hygiene as WINDOW_CUT_OVERSHOOT and the same warning: this
+ * is a tolerance, and nothing in the tower is this tall. See sectionProfile().
+ */
+const PASSAGE_SKY_OVERSHOOT = 0.05 // m
+
+/**
  * Cutting tool for one window.
  *
  * Built as a box whose inner end is scaled up, then aimed along the opening's
@@ -598,9 +605,32 @@ export function doorwayCutter(d: StairDoorway): THREE.BufferGeometry {
   const tangential = Math.max(0.2, 2 * d.outerRadius * Math.sin((d.widthDeg * DEG) / 2))
   const height = Math.max(0.2, d.topY - d.bottomY)
 
+  /*
+   * A DOORWAY WITH NO WALL OVER ITS HEAD IS NOT ARCHED. Same fault, same shape of
+   * fix as sectionProfile()'s.
+   *
+   * archTunnel() strikes a semicircle of radius half-the-width, so its crown
+   * stands exactly at `height`. Where `height` is the last of the stone — the
+   * roof exit, 0.751 m of parapet over a landing on the deck — that crown is
+   * tangent to the roof plane, and a boolean asked to resolve a tangency leaves
+   * whatever it leaves. Measured on the built shell it left a curved lid over the
+   * way out onto the terrace.
+   *
+   * So: a plain box, carried PASSAGE_SKY_OVERSHOOT past the top of the stone.
+   * Nothing about the building is being asserted by the square head — there is no
+   * head, the wall simply stops.
+   */
   // archTunnel runs its axis along local Z; the doorway's axis is RADIAL, so
   // the tunnel's width becomes the tangential span and its depth the wall run.
-  const geom = archTunnel(tangential, height, depth)
+  const geom = d.openToSky
+    ? (() => {
+        const h = height + PASSAGE_SKY_OVERSHOOT
+        const box = new THREE.BoxGeometry(tangential, h, depth)
+        // archTunnel's origin is at the sill, centred on the span; match it
+        box.translate(0, h / 2, 0)
+        return mergeVertices(box)
+      })()
+    : archTunnel(tangential, height, depth)
   /*
    * Rake the tool before it is turned: archTunnel's local X is the tangential
    * span, so shearing Y against X tilts sill AND head together and the clear
@@ -797,9 +827,47 @@ function sectionProfile(s: PassageSection, arched: boolean, arcSegments = 5): Ar
   }
 
   const span = s.outerRadius - s.innerRadius
-  const crownRise = (Math.sqrt(3) / 2) * span
-  // keep at least a little straight wall under the springing
-  const springY = Math.max(s.bottomY + 0.15, s.topY - crownRise)
+
+  /*
+   * A SECTION WITH NO VAULT IS CUT FLAT ON TOP, AND CUT PAST THE TOP OF THE STONE.
+   *
+   * Where PassageSection.openToSky is set, `topY` is not a crown — it is the top
+   * of the building, and there is nothing above it to hold an arch up. Springing
+   * one anyway is what this did on 2026-08-10 for the last third of the roof
+   * climb, and it is worth recording what came out, because it looked plausible
+   * and was not:
+   *
+   *   - the pointed vault's crown sits exactly AT topY, so with topY on the roof
+   *     plane the arch was tangent to the top of the drum along a single line.
+   *     Off that line the soffit curves away, so the cutter left a curved lid of
+   *     parapet stone roofing the stair, thinning to nothing at the crown.
+   *     Raycast down the built shell at r 5.2: solid at 27.500 from azimuth 30 to
+   *     70, with the passage floor 1.1 m below it and open air in between — a
+   *     tunnel roofed by a stone membrane that nothing holds up.
+   *   - along the tangent line the two surfaces are coincident, which is the
+   *     exact CSG case that has cost this model the floor under a whole flight
+   *     twice.
+   *
+   * So the arc is flattened — `rise` goes to zero and the top edge is a straight
+   * line at the top of the stone — and carried PASSAGE_SKY_OVERSHOOT above it, so
+   * the tool's top face is unambiguously outside the solid. FLATTENED rather than
+   * replaced by a four-point box, because stairPassageGeometry() lofts section to
+   * section vertex by vertex and takes the vertex count from the FIRST profile:
+   * hand it a 13-point arch and a 4-point box in one tube and the sweep is
+   * garbage. The points stay, they simply lie on the straight.
+   *
+   * This restores what the shell drew before the clamp — a trench open to the sky
+   * over the last stretch of the roof climb — but now it is drawn on purpose,
+   * from arithmetic that is written down (26.749 + 2.300 against a top of
+   * 27.500), instead of falling out of a cutter that reached 1.55 m into the air
+   * and never said so. Whether the tower is like that is ROOF_QUESTION.
+   */
+  // radius of the two generating arcs — zero flattens the vault onto the straight
+  const arcRadius = s.openToSky ? 0 : span
+  const springY = s.openToSky
+    ? s.topY + PASSAGE_SKY_OVERSHOOT
+    : // keep at least a little straight wall under the springing
+      Math.max(s.bottomY + 0.15, s.topY - (Math.sqrt(3) / 2) * span)
 
   const pts: Array<[number, number]> = [
     [s.innerRadius, s.bottomY],
@@ -809,12 +877,12 @@ function sectionProfile(s: PassageSection, arched: boolean, arcSegments = 5): Ar
   // outer half: arc centred on the INNER springing point
   for (let i = 1; i <= arcSegments; i++) {
     const t = (i / arcSegments) * (Math.PI / 3) // 0 → 60°
-    pts.push([s.innerRadius + span * Math.cos(t), springY + span * Math.sin(t)])
+    pts.push([s.innerRadius + span * Math.cos(t), springY + arcRadius * Math.sin(t)])
   }
   // inner half: mirror, centred on the OUTER springing point
   for (let i = arcSegments - 1; i >= 1; i--) {
     const t = (i / arcSegments) * (Math.PI / 3)
-    pts.push([s.outerRadius - span * Math.cos(t), springY + span * Math.sin(t)])
+    pts.push([s.outerRadius - span * Math.cos(t), springY + arcRadius * Math.sin(t)])
   }
   pts.push([s.innerRadius, springY])
   return pts
