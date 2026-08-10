@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { barOffsets, grilleBars } from './grille'
 import { WINDOW_GRILLE } from '../config/tower'
-import windowData from '../data/windows.json'
-import type { WindowSpec } from './windows'
+import { SHIPPED_CUTS } from './openings.fixture'
 
 const { barSide, uprights, rails, embed } = WINDOW_GRILLE
 
@@ -53,7 +52,7 @@ describe('grille bar layout', () => {
      * exact opposite. Asserting the ORDER rather than the numbers keeps the test
      * about the character of the thing.
      */
-    for (const w of windowData.windows as WindowSpec[]) {
+    for (const w of SHIPPED_CUTS) {
       const bars = grilleBars(w.outerWidth, w.outerHeight, barSide, uprights, rails, embed)
       const v = bars.filter((b) => b.orientation === 'vertical').length
       const h = bars.filter((b) => b.orientation === 'horizontal').length

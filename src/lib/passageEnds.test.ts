@@ -50,8 +50,7 @@ import {
   type PassageSection,
   type Winding,
 } from './staircase'
-import windowData from '../data/windows.json'
-import { windowCentreY, type WindowSpec } from './windows'
+import { SHIPPED_CUTS, SHIPPED_ENDS } from './openings.fixture'
 import { buildShellGeometry, stairPassageGeometry, type ShellParams } from './towerShell'
 
 const DEG = Math.PI / 180
@@ -209,15 +208,7 @@ describe('the shell is closed at every stair doorway end', () => {
     entranceWidth: ENTRANCE.width,
     entranceHeight: ENTRANCE.height,
     entranceSillY: ENTRANCE.thresholdY,
-    windows: (windowData.windows as WindowSpec[]).map((w) => ({
-      azimuthDeg: w.azimuthDeg,
-      centreY: windowCentreY(w, TOWER.groundY, TOWER.height),
-      outerWidth: w.outerWidth,
-      outerHeight: w.outerHeight,
-      innerWidth: w.innerWidth,
-      innerHeight: w.innerHeight,
-      head: w.head,
-    })),
+    windows: SHIPPED_CUTS,
     stairPassage: tubes,
     stairDoorways: stairDoorways(
       flights,
@@ -285,6 +276,15 @@ describe('the shell is closed at every stair doorway end', () => {
      * Stated separately from the direction, because "no surface facing the wrong
      * way" is satisfied trivially by no surface at all. A passage that stopped
      * against nothing would be a hole through the drum.
+     *
+     * IT SURVIVES [OWNER] 2026-08-10 WORD FOR WORD, and that is worth saying,
+     * because "openings at the beginning and the end of the passages" looks like
+     * a direct contradiction of it. It is not: the end of a passage is a PLACE,
+     * not a surface. The slit is cut RADIALLY through the passage's outer cheek
+     * over the landing; the cap stays solid stone. A hole through the cap would
+     * run tangentially — 6.8 m of masonry from the cheek to the drum face on that
+     * bearing — and would surface metres round the drum from the landing it was
+     * meant to light. See planPassageOpenings().
      */
     expect(ends.length).toBe(12)
     const open = ends
@@ -310,5 +310,78 @@ describe('the shell is closed at every stair doorway end', () => {
       .filter((e) => e.facingStone > 1e-4)
       .map((e) => `${e.name}: ${e.facingStone.toFixed(4)} m² facing into the stone`)
     expect(torn).toEqual([])
+  })
+
+  /*
+   * AND THE OTHER HALF OF THE SAME SENTENCE: the cap is stone, the cheek is a
+   * hole. Both have to be asserted on ONE shell or the pair can be satisfied by
+   * building nothing at all.
+   *
+   * This is the guard the brief asks for by name — no opening that lights
+   * nothing — and it was missing. It is not a restatement of the planner's
+   * daylight rule in passageOpenings.test.ts: that rule decides which ends are
+   * WORTH cutting, on the plan, and says nothing about whether the boolean
+   * afterwards actually removed any stone. Nothing else in the suite closes that
+   * gap — passageEnds' other two tests measure the CAP, and towerShell.test.ts
+   * only counts degenerate triangles over the shipped set, which a shell with no
+   * openings at all would pass.
+   *
+   * It is worth saying what this does NOT catch, because that was checked and
+   * came out the other way. stairBearingClip() was the suspected route to a blind
+   * slit; it is not, at these numbers — the haunch tops out 0.27 m below the sill
+   * (see the note on that function), and forcing it back on for every opening
+   * leaves this test green. The guard is here for the general case, not for that
+   * one.
+   */
+  it('opens each built slit through to daylight, and leaves the withheld ones shut', () => {
+    /*
+     * ONE ray per opening, not outerRadiusProfileAt()'s 720-bucket sweep. The
+     * sweep costs a full turn of the drum per call and eleven of them time the
+     * suite out; the question here is about eleven named bearings, so it is asked
+     * on those bearings. Same cast, same first-hit rule.
+     */
+    const mesh = new THREE.Mesh(built.geometry)
+    mesh.updateMatrixWorld(true)
+    const caster = new THREE.Raycaster()
+    const firstStoneAt = (azimuthDeg: number, y: number): number => {
+      const az = (azimuthDeg * Math.PI) / 180
+      const dx = Math.sin(az)
+      const dz = -Math.cos(az)
+      const far = TOWER.outerRadius * 6
+      caster.set(
+        new THREE.Vector3(dx * far, y, dz * far),
+        new THREE.Vector3(-dx, 0, -dz).normalize(),
+      )
+      const hits = caster.intersectObject(mesh, false)
+      return hits.length ? Math.hypot(hits[0].point.x, hits[0].point.z) : 0
+    }
+
+    const shut: string[] = []
+    for (const o of SHIPPED_ENDS.filter((x) => x.built)) {
+      const r = firstStoneAt(o.azimuthDeg, o.centreY)
+      /*
+       * A ray cast inward on the slit's own bearing must get past the drum face.
+       * Where the opening is cut it runs on to the far end of the reveal or into
+       * the passage behind it; where it is not, it stops at the face.
+       */
+      if (r > o.revealEndRadius + 0.5) {
+        shut.push(`${o.id} (az ${o.azimuthDeg.toFixed(1)}): first stone at r ${r.toFixed(4)}`)
+      }
+    }
+    expect(shut).toEqual([])
+
+    /*
+     * The complement, so the test cannot pass by cutting everything. An end the
+     * planner withheld for the pier must still be solid on its bearing — and it
+     * is the buttress that answers there, further out than the drum face.
+     */
+    const leaked: string[] = []
+    for (const o of SHIPPED_ENDS.filter((x) => x.blockedBy === 'buttress')) {
+      const r = firstStoneAt(o.azimuthDeg, o.centreY)
+      if (r < TOWER.outerRadius - 0.01) {
+        leaked.push(`${o.id} (az ${o.azimuthDeg.toFixed(1)}): opened at r ${r.toFixed(4)}`)
+      }
+    }
+    expect(leaked).toEqual([])
   })
 })

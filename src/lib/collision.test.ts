@@ -9,7 +9,7 @@ import {
   wallColliders,
   yawThenTilt,
   type BoxSpec,
-  type PassageWindow,
+  type PassageBand,
 } from './collision'
 import { PLAYER } from '../config/player'
 import { EXTERNAL_STAIR } from '../config/site'
@@ -47,7 +47,7 @@ const baseParams = {
   topY: 26.6,
   bandBoundaries: BANDS,
   entrance: { azimuthDeg: 270, widthDeg: 8, sillY: 2, headY: 4 },
-  passageAt: (): PassageWindow[] => [],
+  passageAt: (): PassageBand[] => [],
 }
 
 /** Radius of a box's inner face, measured back from its centre. */

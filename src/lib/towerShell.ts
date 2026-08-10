@@ -190,6 +190,8 @@ function prep(g: THREE.BufferGeometry): THREE.BufferGeometry {
 
 /** One opening in world space: a truncated pyramid, small face at the outer wall. */
 export interface WindowCut {
+  /** Stable identity, so grilles, surrounds, beams and hotspots agree on one. */
+  id: string
   azimuthDeg: number
   /** World Y of the opening's centre. */
   centreY: number
@@ -197,10 +199,34 @@ export interface WindowCut {
   outerHeight: number
   innerWidth: number
   innerHeight: number
+  /**
+   * Radius at which the reveal STOPS and the widths reach their inner values.
+   *
+   * The room face for a chamber opening, and the passage's OUTER CHEEK for a
+   * slit at the end of a flight. It has to be given rather than derived, because
+   * innerRadiusAt(centreY) answers the wrong question for a slit: measured at
+   * y = 7.06 the room face stands at r 3.65 and the passage cheek at 4.86, so
+   * taking the room face would open the reveal to 1.23 m instead of the 1.50 it
+   * asks for and then keep cutting through the passage's inner cheek and a metre
+   * into the chamber — a hole in the storey wall exactly where the owner says
+   * there are none.
+   */
+  revealEndRadius: number
   /** Shape of the opening's head. Defaults to 'flat'. */
   head?: WindowHead
   /** Which end of the reveal a grille hangs at. Defaults to 'outer'. */
-  barrierAt?: 'outer' | 'room'
+  barrierAt?: 'outer' | 'revealEnd'
+  /**
+   * Whether the stone the stair is carried on is protected from this cutter.
+   *
+   * True only for a CHAMBER opening — see stairBearingClip(). A slit at the end
+   * of a passage IS part of that passage, so the clash the clip arbitrates does
+   * not exist for it, and it is excluded on that principle rather than on any
+   * effect: at the shipped numbers the clip and a slit miss each other by 0.27 m
+   * and the flag changes nothing either way. The measurement, and what would
+   * make it start to matter, are written up on stairBearingClip().
+   */
+  clipAgainstStairBearing?: boolean
 }
 
 /**
@@ -303,14 +329,21 @@ const WINDOW_CUT_OVERSHOOT = 1 // m
  * honoured and neither end is a face of the wall.
  *
  * So the box carries four vertex rings, not two: the taper runs from outerWidth
- * exactly at r = outerRadius to innerWidth exactly at r = innerRadiusAt(centreY),
- * and the two overshoot rings repeat their neighbour's section unchanged. The
- * wall thickness that governs the splay is the ACTUAL one at this height, which
- * is why the same slit reads differently near the base and near the parapet.
+ * exactly at r = outerRadius to innerWidth exactly at r = w.revealEndRadius, and
+ * the two overshoot rings repeat their neighbour's section unchanged. The wall
+ * thickness that governs the splay is the ACTUAL one crossed, which is why the
+ * same slit reads differently near the base and near the parapet.
+ *
+ * WHAT CHANGED ON 2026-08-10 IS ONE WORD: the far plane used to be
+ * innerRadiusAt(centreY), the room face, because every opening was a chamber
+ * opening. Most of them are slits at the ends of stair passages now and their
+ * reveal stops on the passage's outer cheek. The four-ring construction and its
+ * invariant survive intact; only which plane counts as "the far face" moved, and
+ * with it the depth of masonry crossed — from about 4.6 m to 2.5–3.5 m.
  */
 export function windowCutter(w: WindowCut): THREE.BufferGeometry {
   const R = TOWER.outerRadius
-  const inner = innerRadiusAt(w.centreY)
+  const inner = w.revealEndRadius
   const wall = R - inner // masonry actually crossed at this height
   const depth = wall + 2 * WINDOW_CUT_OVERSHOOT
   const halfDepth = depth / 2
@@ -589,6 +622,29 @@ export function doorwayCutter(d: StairDoorway): THREE.BufferGeometry {
 /**
  * The stone the stair stands on, as a CLIPPER FOR THE WINDOW TOOLS rather than
  * a solid unioned into the building.
+ *
+ * IT APPLIES TO CHAMBER OPENINGS ONLY, and after 2026-08-10 there is exactly one
+ * of those: the later arched window. The premise has inverted for everything
+ * else. This clip exists because a window and a stair were competitors for the
+ * same stone — two unmeasured azimuths colliding — and the owner's statement
+ * makes the tower's slits PART OF the stair, so the argument no longer applies
+ * to them. Hence WindowCut.clipAgainstStairBearing, and the function is kept
+ * because its argument is still exactly right for the window it still governs.
+ *
+ * WHAT THE FLAG COSTS TODAY IS NOTHING, AND THAT IS MEASURED, NOT ASSUMED. The
+ * first draft of this note claimed that clipping a passage slit "would take out
+ * the whole reveal". It would not, and the claim was never checked: this volume
+ * is a HAUNCH UNDER THE PASSAGE FLOOR, spanning bottomY − 2·floorSlab to
+ * bottomY + 0.05, while a slit's sill stands PASSAGE_OPENING.sillAboveLanding
+ * above the landing. Measured on all six built slits: haunch top at landing
+ * +0.03, sill at landing +0.30, overlap 0.000 m on every one. Forcing the clip
+ * back on for every opening leaves the built shell pierced exactly as before.
+ *
+ * So the flag is a NO-OP for slits at the shipped numbers and is kept as a
+ * statement of which openings the argument covers — with the 0.27 m clearance
+ * pinned by a test, because it is only a no-op while the sill stays clear of the
+ * haunch. Drop sillAboveLanding to zero, or deepen the haunch, and the clip
+ * starts eating reveals silently.
  *
  * A window reveal that crosses the flight really does eat the passage floor —
  * measured on the built shell, storey 3's opening takes it out from under the
@@ -947,8 +1003,18 @@ export function buildShellGeometry(p: ShellParams): {
   result = evaluator.evaluate(result, cavityB, SUBTRACTION)
   result = evaluator.evaluate(result, entranceB, SUBTRACTION)
 
-  // The stair passage: carve it before the windows so a window cut that lands on
-  // the flight still resolves cleanly.
+  /*
+   * The stair passage, carved BEFORE the windows — same order, different reason.
+   *
+   * It used to be "so a window cut that lands on the flight still resolves
+   * cleanly", which described an accident. Since 2026-08-10 most openings are
+   * deliberately part of a passage: a slit's reveal starts on the passage's outer
+   * cheek and its inner overshoot runs on into the tunnel. Cutting the tunnel
+   * first means that overshoot ends in void it does not have to remove, instead
+   * of the window tool and the passage tool meeting along a shared surface. This
+   * model has lost the floor under a whole flight twice to near-coincident CSG;
+   * the order is load-bearing and must not be swapped.
+   */
   for (const flight of p.stairPassage ?? []) {
     const passage = stairPassageGeometry(flight)
     if (!passage) continue
@@ -961,8 +1027,9 @@ export function buildShellGeometry(p: ShellParams): {
    * Window openings — each a truncated pyramid, narrow face outward, so the
    * reveal flares into the room exactly as [ref] describes.
    *
-   * Clipped first against the stone the stair is carried on, where there is a
-   * stair to carry — see stairBearingClip().
+   * CHAMBER openings are clipped against the stone the stair is carried on; a
+   * slit at the end of a passage is not — see WindowCut.clipAgainstStairBearing
+   * and the note on stairBearingClip().
    */
   const bearing = (p.stairPassage ?? [])
     .map((flight) => stairBearingClip(flight))
@@ -975,9 +1042,11 @@ export function buildShellGeometry(p: ShellParams): {
   for (const w of p.windows ?? []) {
     let tool = new Brush(prep(windowCutter(w)))
     tool.updateMatrixWorld(true)
-    for (const clip of bearing) {
-      tool = evaluator.evaluate(tool, clip, SUBTRACTION)
-      tool.updateMatrixWorld(true)
+    if (w.clipAgainstStairBearing) {
+      for (const clip of bearing) {
+        tool = evaluator.evaluate(tool, clip, SUBTRACTION)
+        tool.updateMatrixWorld(true)
+      }
     }
     result = evaluator.evaluate(result, tool, SUBTRACTION)
   }

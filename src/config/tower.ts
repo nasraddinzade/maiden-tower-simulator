@@ -490,7 +490,27 @@ export const STAIR: {
   landingLength: number
   endLandingLength: number
 } = {
-  winding: 'counterclockwise', // from photographs; contradicts the spec's assumed clockwise
+  /**
+   * From photographs of the tread wedges; contradicts the spec's assumed
+   * clockwise, and src/lib/staircase.ts still marks the question UNRESOLVED.
+   *
+   * IT IS NO LONGER AN INTERIOR QUESTION EITHER. Flipping it mirrors every
+   * flight, which since 2026-08-10 mirrors every exterior slit onto the other
+   * side of the drum — the switch is live in the leva panel and moves the
+   * façade. An unresolved parameter now drives the one thing in this project
+   * that was genuinely measured off photographs.
+   *
+   * That cuts both ways and the tempting half must be said out loud: it means
+   * an exterior frame could in principle SETTLE the winding, by asking which
+   * sense puts the slits where they are seen. Using it that way today would be
+   * fitting an unresolved value to bearings the window file itself calls ±20°
+   * systematic, on top of a start azimuth that is a placeholder. Two unknowns,
+   * one observation. Not settled here.
+   *
+   * QUESTION FOR THE OWNER: climbing a passage in the wall, is the tower's axis
+   * on your left or on your right?
+   */
+  winding: 'counterclockwise',
   riserTarget: 0.2, // m — spec band 0.18–0.22; the real riser is rounded to fit each storey
   goingTarget: 0.3, // m — [ASSUMPTION] tread depth along the walking line; not in any source
   width: 0.9, // m — radial width of the flight, per the Phase-4 spec
@@ -511,6 +531,36 @@ export const STAIR: {
   wallClearance: 0.25,
   /**
    * ° — where every flight begins. Still [PLACEHOLDER]: no source fixes it.
+   *
+   * IT IS NO LONGER AN INTERIOR NUMBER. Since 2026-08-10 it sets the FAÇADE.
+   *
+   * [OWNER]: "НА ЯРУСАХ ОКНА ТОЛЬКО В НАЧАЛЕ И В КОНЦЕ ПРОХОДОВ ЛЕСТНИЦ. НА
+   * САМИХ ЯРУСАХ НИКАКИХ ОКОН НЕТ." Every exterior slit is now the end of a
+   * flight, so this angle — a placeholder — decides where all of them appear on
+   * the drum. Whoever drags this slider in leva moves the whole façade, and
+   * nothing on screen will say so.
+   *
+   * THE ARGUMENT BELOW HAS INVERTED, and it is left standing because it is the
+   * record of how the value was chosen. 100 was picked so the stair would MISS
+   * the window column. The stair IS the window column now, so that reason is
+   * void; but reaching for its opposite — retuning until the derived bearings sit
+   * on the photographed ones — would be moving the placeholder to fit readings
+   * whose own file calls them ±20° systematic and calls the lower column "a
+   * judgement inside a 6 deg spread". The placeholder moved once to get away from
+   * the photographs; moving it back to them closes a circle rather than settling
+   * anything. It stays at 100 until the owner or a tape says otherwise.
+   *
+   * WHAT 100 COSTS, measured on the built model rather than argued: the six
+   * flight feet stand on landings centred at azimuth 108.7–110.2 (and 121.9 for
+   * the roof climb, whose landing pays for its interior landing in arc). The
+   * buttress root arc is 72.7–113.5 [OSM], so five of those six ends look into
+   * 9.7–10.4 m of solid pier and carry no opening at all. The heads, at 5.7, 8.8,
+   * 16.9, 19.4, 21.6 and 310.2, are all clear of it, but the last of them is the
+   * roof landing and has parapet above it rather than wall. Six slits, therefore,
+   * against eight in the photographs.
+   *
+   * QUESTION FOR THE OWNER: standing in a chamber facing the entrance, is the
+   * doorway onto the stair to your left or to your right?
    *
    * It was 200, and 200 put the stair through the windows. The flights stack in
    * one sector and the widest sweeps 160°, so from 200 they cover the whole arc
@@ -769,6 +819,82 @@ export const LIFTS: StairLift[] = buildLifts()
 /** Just the flights cut in the masonry — the modern spiral is not one of them. */
 export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair')
 
+// ———————————————————— openings at the ends of the passages ————————————————————
+/**
+ * How a slit is fixed to the end of a stair passage.
+ *
+ * [OWNER], 2026-08-10: "НА ЯРУСАХ ОКНА ТОЛЬКО В НАЧАЛЕ И В КОНЦЕ ПРОХОДОВ
+ * ЛЕСТНИЦ. НА САМИХ ЯРУСАХ НИКАКИХ ОКОН НЕТ" — openings are only at the
+ * beginning and the end of the stair passages; the storeys themselves have none.
+ * See src/lib/passageOpenings.ts for what follows from that and src/data/
+ * windows.json for what it costs the photographic record.
+ *
+ * Nothing here is a measurement, and two of the four are not even estimates —
+ * they are CSG hygiene, which is why they are named for what they do rather than
+ * for a part of the building.
+ */
+export const PASSAGE_OPENING = {
+  /**
+   * m — masonry between the landing floor and the slit's sill. [PLACEHOLDER].
+   *
+   * NO SOURCE GIVES IT, and the temptation is to reach for the photographs: the
+   * eight measured slit centres, re-referred to the nearest landing below them,
+   * imply sills from −0.43 to +2.08 m. A 2.5 m spread is not a measurement of
+   * anything, and taking its median would be dressing a guess as a reading.
+   *
+   * So this is a CONSTRUCTION rule instead, and its whole virtue is that it
+   * introduces no new number: one slab thickness of stone under the sill, the
+   * same course the floors are built of. It is bounded above by geometry rather
+   * than by taste — the clear light over a landing is PLAYER.stairHeadroom, and
+   * a 1.9 m opening leaves at most 0.40 m under it, so any sill in 0…0.40 fits
+   * and anything more does not. One slab, 0.30, sits inside that band — which is
+   * luck rather than corroboration, and if the slab thickness ever moves this
+   * needs re-checking against the same bound.
+   *
+   * QUESTION FOR THE OWNER: standing on the landing at the end of a passage, does
+   * the slit start at knee height, at the waist, at the chest?
+   */
+  sillAboveLanding: FLOOR_SLAB,
+  /** m — the same course of stone over the head. [PLACEHOLDER]; see above. */
+  lintelUnderCrown: FLOOR_SLAB,
+  /**
+   * ° of jamb kept between the reveal's inner mouth and the passage's end cap.
+   * CSG hygiene, not a dimension: the mouth is nearly as long as the landing it
+   * opens off, and without a margin the loft's middle ring lands exactly on the
+   * plane the end cap was just swept from.
+   */
+  jambMarginDeg: 1,
+  /** m kept between the reveal's inner head and the vault soffit. CSG hygiene. */
+  crownMargin: 0.05,
+  /**
+   * Ends carrying a stepped BRANCH up from the landing to the slit. [PLACEHOLDER],
+   * and shipped EMPTY — not one invented step.
+   *
+   * [OWNER] said steps lead up to some of the tower's windows, and until this
+   * change the model read that as recesses in the chamber wall. Under his new
+   * statement there are no chamber openings for such a recess to serve, and the
+   * surviving candidate is a short flight off a passage LANDING — which is
+   * exactly what [VIDEO] shows on the roof climb: a barred gate at 429–449 s with
+   * a separate blocked stair rising behind it to a window slit, and the earlier
+   * reading counted three such branches at 6, 3 and 3 steps.
+   *
+   * It is not modelled, because a six-riser branch demonstrably cannot be the end
+   * of the main passage: 6 × 0.2 m of climb plus a 1.9 m slit puts the head at
+   * 3.1 m over a vault 2.30 m high. It is a separate tunnel, and no source gives
+   * its length, its bearing or its gradient. Rule 1.
+   *
+   * QUESTION FOR THE OWNER: do those steps climb from the stair landing up to the
+   * slit, or from the room into a recess in the wall?
+   */
+  branchAtEnds: [] as string[],
+  /**
+   * Deliberately NOT modelled, recorded so nobody assumes it was overlooked:
+   * three barred branches to slits, [VIDEO] 429–449 s, 6/3/3 steps. Geometry for
+   * them exists in no source.
+   */
+  unmodelledBranches: 3,
+} as const
+
 // ———————————————————————————————— well ————————————————————————————————
 
 // The best-sourced part of the whole model: [ref] gives almost every dimension
@@ -793,6 +919,15 @@ export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair
  * the character — a coarse grid of a few bars each way, not a fine mesh and not
  * a single stanchion — so the values are chosen to read as that at walking
  * distance and are deliberately round, to look like the guesses they are.
+ *
+ * WHERE THE GATE STANDS is unchanged and its justification is not. The reading
+ * was "in a slit's embrasure the wrought gate stands at the top of the steps, at
+ * the outer end, with the whole flight of steps between the room and the gate".
+ * There is no flight of steps between a room and this gate any more: behind it
+ * now is the stair landing itself. That may well be the correct reading of the
+ * same frame — a barred gate at the outer end of a reveal, with the passage
+ * behind it — but it is a different sentence about the same photograph, and
+ * re-using the old wording silently would hide that the premise moved.
  */
 export const WINDOW_GRILLE = {
   /** Square bar, side in metres. [ESTIMATE] */
@@ -818,18 +953,28 @@ export const WINDOW_GRILLE = {
 /**
  * The stepped embrasures at the windows whose sills are out of reach.
  *
- * "к некоторым окнам в настоящей башне ведут ступени" [OWNER]. Which ones is not
- * chosen here — planEmbrasure() derives it from the openings' own heights, and
- * comes out at three of the nine: lower-2, upper-1 and upper-2, whose inner
- * sills stand 1.83, 2.95 and 2.60 m above the floors they light. The other six
- * sit between 1.06 and 1.61 m, which is a window you simply look out of.
+ * NOTHING USES THIS ANY MORE, and the reason is worth more than the numbers.
  *
- * A CONFLICT worth writing down: an earlier reading of the walkthrough footage
- * counted three barred branches off the stair with 6, 3 and 3 steps. The COUNT
- * of branches matches this derivation exactly; the steps do not — the rule below
- * gives 6, 5 and 1. The 6 agrees. Nothing here is tuned to make the other two
- * agree, because the footage note is a recollection of frames, not a measurement,
- * and bending the geometry to it would be fitting the model to a memory.
+ * "к некоторым окнам в настоящей башне ведут ступени" [OWNER]. This block was
+ * that testimony's carrier: recesses cut into a CHAMBER wall, with steps up to a
+ * slit's inner sill. planEmbrasure() derived which openings got them from the
+ * openings' own heights and returned three of nine — lower-2, upper-1, upper-2.
+ *
+ * On 2026-08-10 the same owner said there are no openings in the chamber walls
+ * at all. That does not contradict the steps; it relocates them. The receivers
+ * are zero now (an opening at the end of a passage has its sill 0.30 m above the
+ * landing, so planEmbrasure() returns null for every one), and the layer is off.
+ *
+ * A CONFLICT THAT HAS TURNED INTO A CORROBORATION, which is a thing that has to
+ * be recorded rather than quietly re-used. This note used to hold, as a conflict,
+ * a [VIDEO] reading counting three barred branches off the stair at 6, 3 and 3
+ * steps — the count matching the derivation, the step numbers (6, 5, 1) not. It
+ * is not a conflict under the owner's new statement: a branch off the STAIR
+ * climbing to a slit is what the roof-climb footage plainly shows at 429–449 s,
+ * and it is the natural home for "steps lead up to some of the windows". What
+ * agreed was the COUNT of branches, not the number of steps, and it was not
+ * right to tune the steps to a recollection of frames before and it is not right
+ * now. See PASSAGE_OPENING.branchAtEnds, which ships empty.
  */
 export const WINDOW_EMBRASURE = {
   /** m — target riser, matched to the stair's own so the two read as one mason's work. [ESTIMATE] */
@@ -911,6 +1056,14 @@ export const ENTRANCE_ARCHIVOLT = {
   stones: 15,
 } as const
 
+/**
+ * NOT BUILT WHERE THERE IS NO DAYLIGHT. A surround is dressed stone on the drum
+ * face; on a bearing the buttress covers, the "drum face" is 10 m inside a solid
+ * pier and the frame would be masonry buried in masonry. The planner already
+ * withholds such openings (see PassageOpening.built), so today nothing reaches
+ * this block that should not — but the guard belongs with the rule, because the
+ * first nudge of STAIR.startAzimuthDeg changes which ends are covered.
+ */
 export const WINDOW_SURROUND = {
   /** m — how far the sill stands proud of the wall face. [ESTIMATE] */
   sillProjection: 0.09,
@@ -1020,14 +1173,18 @@ export const WELL = {
    * leaving the stair on storey 3 walked into a 0.30 m pipe across the opening.
    * The owner photographed it and called it, exactly, pipes in the entrances.
    *
-   * 230 is chosen to be clear of everything that is not a placeholder: the stair
-   * sweeps 100 down through 0 to about 300, the slit columns stand between 123
-   * and 170, and the entrance is at 270. That leaves the arc between the windows
-   * and the entrance, and 230 sits in the middle of it.
+   * 230 is chosen to be clear of everything that is not a placeholder.
    *
    * Two placeholders were in conflict and this is the one that moved, because
    * nothing depends on it: the stair's azimuth had already been moved once to
    * clear the windows, and moving it again would have put those back at risk.
+   *
+   * THE REASONING IS REBUILT, THE VALUE IS NOT. It used to read "the slit columns
+   * stand between 123 and 170", and after 2026-08-10 no slit stands there: the
+   * openings are the ends of the flights and their bearings are 5.7–21.6, 110
+   * (blind, in the pier) and 310. 230 survives the re-check on its own merits —
+   * the nearest thing to it is the head of 4→6 at 310, 80° away, and the entrance
+   * at 270 — so the number is kept and only the argument for it is replaced.
    */
   azimuthDeg: 230,
   /** Distance of the wellhead from the tower axis. [PLACEHOLDER]. */

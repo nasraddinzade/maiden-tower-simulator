@@ -29,6 +29,16 @@ const DEG = Math.PI / 180
  * The bands break for the openings. A ring running through a window would close
  * it, so each band is drawn as arcs with a gap wherever an opening crosses it —
  * which is also how the real courses read, stopped against the dressed jambs.
+ *
+ * A CONSEQUENCE TO SHOW THE OWNER RATHER THAN SMOOTH AWAY. Since [OWNER]
+ * 2026-08-10 the openings are the ends of the stair flights, and the flights are
+ * stacked in one sector of the wall, so five of the six slits stand inside a 14°
+ * arc between y 8.3 and 24.7. Every course they cross is broken in the same
+ * place, and the drum will read with a near-continuous vertical seam up that
+ * sector. That is what a stacked stair with a slit at each landing produces; it
+ * is not a bug in this file, and it must not be hidden by nudging
+ * STAIR.startAzimuthDeg, which is a [PLACEHOLDER] and would be being tuned for
+ * appearance.
  */
 export function CourseBands({
   windows,

@@ -8,6 +8,28 @@
  * splay from 0.40 m outside to 1.50 m inside and from 1.90 m tall to 2.40 m, so
  * the surface you actually lean on is 0.25 m lower than the outer sill and it is
  * the one that decides whether you can see through.
+  *
+ * ————————————————————————————————————————————————————————————————————————
+ * NOTHING CALLS THIS TODAY, AND IT IS NOT DEAD BY ACCIDENT.
+ *
+ * [OWNER], 2026-08-10: "НА ЯРУСАХ ОКНА ТОЛЬКО В НАЧАЛЕ И В КОНЦЕ ПРОХОДОВ
+ * ЛЕСТНИЦ. НА САМИХ ЯРУСАХ НИКАКИХ ОКОН НЕТ." A stepped recess in a chamber wall
+ * has to climb to an opening in a chamber wall; there is one left, the modern
+ * arched window, and its inner sill is already at hand height. planEmbrasure()
+ * therefore returns null for everything the model contains — checked in
+ * embrasure.test.ts rather than assumed — and App.tsx no longer draws the layer.
+ * The renderer component that drew it (WindowEmbrasures.tsx) is deleted: it would
+ * have to be rebuilt out of arc sectors rather than radial blocks for the carrier
+ * described below, so keeping it dormant would have preserved nothing but a
+ * shape that no longer fits.
+ *
+ * THIS MODULE STAYS, because the testimony it served has not gone away. [OWNER]
+ * also said steps lead up to some of the tower's windows, and the surviving
+ * candidate is a short branch off a stair LANDING — which [VIDEO] shows behind a
+ * barred gate on the roof climb, at 429–449 s, with two more like it counted
+ * elsewhere. No source gives that branch a length, a bearing or a gradient, so
+ * PASSAGE_OPENING.branchAtEnds ships empty (CLAUDE.md rule 1) and the maths waits
+ * here with its tests. Deleting it would erase the only trace of the statement.
  */
 
 export interface EmbrasurePlan {

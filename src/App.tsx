@@ -6,7 +6,7 @@ import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
 import {
   stairSettings,
-  WINDOW_EMBRASURE,
+  PASSAGE_OPENING,
   BUTTRESS,
   ENTRANCE,
   FLOORS,
@@ -26,18 +26,21 @@ import {
   stairwellSpanDeg,
   type Winding,
 } from './lib/staircase'
+import {
+  passageEndAnchors,
+  planPassageOpenings,
+  type OpeningFitting,
+} from './lib/passageOpenings'
 import { Staircase } from './components/tower/Staircase'
 import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
-import { windowCentreY, windowStoreyIndex, type WindowSpec } from './lib/windows'
+import { windowCentreY, type ChamberWindowSpec } from './lib/windows'
 import { WindowGrilles } from './components/tower/WindowGrilles'
 import { WindowSurrounds } from './components/tower/WindowSurrounds'
 import { CourseBands } from './components/tower/CourseBands'
 import { EntranceArchivolt } from './components/tower/EntranceArchivolt'
-import { WindowEmbrasures, type PlacedEmbrasure } from './components/tower/WindowEmbrasures'
-import { embrasureFoulsReveal, planEmbrasure } from './lib/embrasure'
 import windowData from './data/windows.json'
 import { TowerWireframe } from './components/tower/TowerWireframe'
 import { TowerShell, type ShellStats } from './components/tower/TowerShell'
@@ -50,6 +53,7 @@ import { useMasonry } from './hooks/useMasonry'
 import { COURSE_HEIGHT } from './lib/masonry'
 import { SunSystem } from './components/sun/SunSystem'
 import { SunBeams, buildApertures } from './components/sun/SunBeams'
+import type { OpeningAperture } from './lib/sun'
 import { CompassDisc } from './components/sun/CompassDisc'
 import { SunControls } from './components/ui/SunControls'
 import { WaterSystem } from './components/tower/WaterSystem'
@@ -67,6 +71,16 @@ import { MaybeXR, useLazyXR } from './components/xr/LazyXR'
 
 interface SceneProps {
   onStats: (s: ShellStats) => void
+  /**
+   * The panel outside the Canvas needs the openings too, and it must be the SAME
+   * list the shell was cut from.
+   *
+   * Recomputing them out there from the module-level STAIR defaults would be the
+   * silent divergence this refactor exists to close: the panel would name and
+   * test apertures the building does not have, and nothing on screen would say
+   * so. Lifted through a callback, exactly as the shell's own stats are.
+   */
+  onApertures: (a: OpeningAperture[]) => void
   hotspot: HotspotId | null
   onHotspot: (id: HotspotId | null) => void
   onPerf: (s: PerfSample) => void
@@ -78,113 +92,43 @@ interface SceneProps {
 }
 
 /**
- * How far the recess is cut outside the reveal on each side, metres.
+ * THE STEPPED EMBRASURES ARE GONE FROM THE SCENE, and this is where they stood.
  *
- * Only enough that the two cuts are never near-coincident; see the note where
- * the chases are built. [ESTIMATE] — the photographs show a recess a little
- * wider than the opening above it but give no figure.
+ * [OWNER], 2026-08-10: "НА ЯРУСАХ ОКНА ТОЛЬКО В НАЧАЛЕ И В КОНЦЕ ПРОХОДОВ
+ * ЛЕСТНИЦ. НА САМИХ ЯРУСАХ НИКАКИХ ОКОН НЕТ." With no openings in the chamber
+ * walls there is nothing for a chamber recess to serve, and the layer would be
+ * steps up to a window that is not there — which is exactly what the brief
+ * forbids leaving behind.
+ *
+ * It is not a loss of evidence: planEmbrasure() decides by height, and every
+ * opening at the end of a passage has its sill 0.30 m above the landing it opens
+ * off, so the rule returns null for all of them. Zero receivers, checkable.
+ *
+ * src/lib/embrasure.ts and its tests are KEPT. The owner's other statement —
+ * that steps lead up to some of the tower's windows — has not gone away, and its
+ * only surviving carrier is a short branch off a stair landing. See
+ * PASSAGE_OPENING.branchAtEnds, which ships empty because no source gives that
+ * branch a length, a bearing or a gradient.
  */
-const EMBRASURE_MARGIN = 0.12
 
 /**
- * How far the recess's crown stands above the reveal's inner sill, metres.
+ * The storey level at each end of a flight, defined ONCE.
  *
- * [ESTIMATE], and its job is structural rather than architectural: it is what
- * keeps the recess's ceiling off the window's floor, which were the same plane
- * before. Half the recess's own width is what a round head rises anyway, so this
- * is the smallest value that does not flatten it.
+ * The doorway at an end and the slit at the same end are two holes in the same
+ * landing. Computing that landing's level twice is how they would come to
+ * disagree, and this model has already paid for placing a doorway and the ramp
+ * up to it from separate arithmetic.
  */
-const EMBRASURE_HEAD_RISE = 0.45
+const LANDING_Y_OF = (i: number, end: 'foot' | 'head'): number =>
+  end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY
 
-/**
- * The openings that need steps up to them, worked out rather than chosen.
- *
- * Module level, not a hook: it depends on nothing the panel can change, and both
- * the chases and the drawn steps have to agree on it exactly.
- */
-/**
- * Where every opening's reveal sits, so a recess can be tested against them.
- *
- * The inner mouth is what matters: the reveal flares to innerWidth at the room
- * face and that is the widest it ever is, so a recess that clears it there
- * clears it everywhere.
- */
-const REVEALS = (windowData.windows as WindowSpec[]).map((w) => {
-  const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
-  const face = innerRadiusAt(centre)
-  return {
-    id: w.id,
-    azimuthDeg: w.azimuthDeg,
-    halfWidthDeg: (w.innerWidth / 2 / Math.max(0.5, face)) * (180 / Math.PI),
-    bottomY: centre - w.innerHeight / 2,
-    topY: centre + w.innerHeight / 2,
-  }
-})
+/** The editable half of each passage opening — see src/data/windows.json. */
+const OPENING_FITTINGS = windowData.passageOpenings as OpeningFitting[]
 
-const EMBRASURES: PlacedEmbrasure[] = (windowData.windows as WindowSpec[])
-  .map((w) => {
-    const floorYs = FLOORS.map((f) => f.floorY)
-    const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
-    const floorY = floorYs[windowStoreyIndex(w, floorYs, TOWER.groundY, TOWER.height)]
-    const plan = planEmbrasure(
-      centre - w.innerHeight / 2 - floorY,
-      floorY,
-      PLAYER.eyeHeight,
-      WINDOW_EMBRASURE.riserTarget,
-      WINDOW_EMBRASURE.going,
-      WINDOW_EMBRASURE.platformDepth,
-    )
-    if (!plan) return null
-    // the same taper the chase is cut with, so the stone fills the hole exactly
-    const face = innerRadiusAt(plan.platformY)
-    const wall = TOWER.outerRadius - face
-    const mouthWidth = w.innerWidth + 2 * EMBRASURE_MARGIN
-    const backAtFullWall = w.outerWidth + 2 * EMBRASURE_MARGIN
-    const placed = {
-      id: w.id,
-      azimuthDeg: w.azimuthDeg,
-      floorY,
-      plan,
-      mouthWidth,
-      backWidth:
-        mouthWidth +
-        (backAtFullWall - mouthWidth) * Math.min(1, plan.depth / Math.max(0.5, wall)),
-    }
-    /*
-     * Not built if it would cut across a neighbour's reveal — see
-     * embrasureFoulsReveal(). Measured before this guard: upper-2's step blocks
-     * stood at radius 6.63 and 7.08 on the line of sight through upper-1's
-     * opening, inside its reveal, where there should be nothing but splay and
-     * daylight.
-     */
-    const fouled = embrasureFoulsReveal(
-      {
-        id: w.id,
-        azimuthDeg: w.azimuthDeg,
-        halfWidthDeg: (placed.mouthWidth / 2 / Math.max(0.5, face)) * (180 / Math.PI),
-        bottomY: floorY,
-        topY: plan.platformY + PLAYER.eyeHeight + EMBRASURE_HEAD_RISE,
-      },
-      REVEALS,
-    )
-    if (fouled) return null
-    return placed
-  })
-  .filter((e): e is PlacedEmbrasure => e !== null)
+/** The one opening left in a chamber wall: the modern arched insertion. */
+const CHAMBER_WINDOWS = windowData.chamberOpenings as unknown as ChamberWindowSpec[]
 
-
-
-
-/** The same recesses as arcs, so the wall colliders open where the stone does. */
-const EMBRASURE_OPENINGS = EMBRASURES.map((e) => ({
-  azimuthDeg: e.azimuthDeg,
-  widthDeg:
-    ((WINDOW_EMBRASURE.width + 0.12) / innerRadiusAt(e.plan.platformY)) * (180 / Math.PI),
-  sillY: e.floorY,
-  headY: e.plan.platformY + PLAYER.eyeHeight,
-}))
-
-function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook }: SceneProps) {
+function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook }: SceneProps) {
   const { showShell, showWireframe, showScaleRef, cutaway } = useControls('View', {
     showShell: true,
     showWireframe: false,
@@ -232,21 +176,53 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
   // leva's options control is typed as string; the values are the Winding union
   const winding = stair.winding as Winding
 
+  /**
+   * ONE layout for the whole stair, and everything derived from it downstream.
+   *
+   * This used to be four separate calls to planAllFlights(), each rebuilding the
+   * same six-field literal from the same sliders. That was already the failure
+   * stairSettings() was written to stop — a literal kept in sync by hand — and it
+   * became load-bearing on 2026-08-10: the exterior openings are now ends of
+   * these flights, so a stale plan would cut the shell in one place and put the
+   * grilles, the surrounds, the course breaks and the sun beams in another, with
+   * nothing on screen to say so.
+   */
+  const flightPlan = useMemo(() => {
+    const settings = stairSettings({
+      winding,
+      riserTarget: stair.riserTarget,
+      goingTarget: stair.goingTarget,
+      width: stair.stairWidth,
+      wallClearance: stair.wallClearance,
+      startAzimuthDeg: stair.startAzimuthDeg,
+    })
+    const flights = planAllFlights(settings, WALL_LIFTS, innerRadiusAt)
+    // Vault height above each tread. [ASSUMPTION] — no source gives it. 2.0 m
+    // was the first guess and proved unwalkable: it left 0.14 m over a 1.75 m
+    // head, and the character controller has to lift the capsule a full riser
+    // to mount the next step, so it hit the vault and refused every time.
+    const tubes = stairPassageSections(
+      flights,
+      stair.stairWidth,
+      PLAYER.stairHeadroom,
+      innerRadiusAt,
+      undefined,
+      STAIR.doorwayWidth,
+    )
+    return { settings, flights, tubes }
+  }, [
+    winding,
+    stair.riserTarget,
+    stair.goingTarget,
+    stair.stairWidth,
+    stair.wallClearance,
+    stair.startAzimuthDeg,
+  ])
+
   /** Where each flight breaks through the structure above it. */
   const stairwells = useMemo<Array<StairwellCut | undefined>>(() => {
     if (!stair.cutStairwells) return []
-    const flights = planAllFlights(
-      stairSettings({
-        winding,
-        riserTarget: stair.riserTarget,
-        goingTarget: stair.goingTarget,
-        width: stair.stairWidth,
-        wallClearance: stair.wallClearance,
-        startAzimuthDeg: stair.startAzimuthDeg,
-      }),
-      WALL_LIFTS,
-      innerRadiusAt,
-    )
+    const { flights } = flightPlan
     const cuts: Array<StairwellCut | undefined> = []
     flights.forEach((steps, i) => {
       const lift = WALL_LIFTS[i]
@@ -287,55 +263,16 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
       }
     })
     return cuts
-  }, [
-    stair.cutStairwells,
-    winding,
-    stair.riserTarget,
-    stair.goingTarget,
-    stair.stairWidth,
-    stair.wallClearance,
-    stair.startAzimuthDeg,
-  ])
+  }, [stair.cutStairwells, flightPlan, stair.stairWidth, stair.wallClearance])
 
   /**
    * The void the stair needs through the masonry. Cutting it is what turns the
    * treads from blocks entombed in stone into a passage you can actually walk.
    */
-  const stairPassage = useMemo(() => {
-    if (!stair.cutStairwells) return undefined
-    const flights = planAllFlights(
-      stairSettings({
-        winding,
-        riserTarget: stair.riserTarget,
-        goingTarget: stair.goingTarget,
-        width: stair.stairWidth,
-        wallClearance: stair.wallClearance,
-        startAzimuthDeg: stair.startAzimuthDeg,
-      }),
-      WALL_LIFTS,
-      innerRadiusAt,
-    )
-    // Vault height above each tread. [ASSUMPTION] — no source gives it. 2.0 m
-    // was the first guess and proved unwalkable: it left 0.14 m over a 1.75 m
-    // head, and the character controller has to lift the capsule a full riser
-    // to mount the next step, so it hit the vault and refused every time.
-    return stairPassageSections(
-      flights,
-      stair.stairWidth,
-      PLAYER.stairHeadroom,
-      innerRadiusAt,
-      undefined,
-      STAIR.doorwayWidth,
-    )
-  }, [
-    stair.cutStairwells,
-    winding,
-    stair.riserTarget,
-    stair.goingTarget,
-    stair.stairWidth,
-    stair.wallClearance,
-    stair.startAzimuthDeg,
-  ])
+  const stairPassage = useMemo(
+    () => (stair.cutStairwells ? flightPlan.tubes : undefined),
+    [stair.cutStairwells, flightPlan],
+  )
 
   /**
    * The arched openings between each room and the stair passage. With the
@@ -344,36 +281,16 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
    */
   const doorways = useMemo(() => {
     if (!stair.cutStairwells) return undefined
-    const flights = planAllFlights(
-      stairSettings({
-        winding,
-        riserTarget: stair.riserTarget,
-        goingTarget: stair.goingTarget,
-        width: stair.stairWidth,
-        wallClearance: stair.wallClearance,
-        startAzimuthDeg: stair.startAzimuthDeg,
-      }),
-      WALL_LIFTS,
-      innerRadiusAt,
-    )
     return stairDoorways(
-      flights,
+      flightPlan.flights,
       stair.stairWidth,
       PLAYER.height + 0.35,
       innerRadiusAt,
-      (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+      LANDING_Y_OF,
       WALL_LIFTS.map((l) => l.opensAtY),
       STAIR.doorwayWidth,
     )
-  }, [
-    stair.cutStairwells,
-    winding,
-    stair.riserTarget,
-    stair.goingTarget,
-    stair.stairWidth,
-    stair.wallClearance,
-    stair.startAzimuthDeg,
-  ])
+  }, [stair.cutStairwells, flightPlan, stair.stairWidth])
 
   /**
    * The chase the Ø 30 cm downpipe stands in, one per storey it passes.
@@ -397,85 +314,98 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         depth: WATER.downpipeDiameter * 1.6,
       })
     }
-    /*
-     * And the recesses the window steps stand in.
-     *
-     * Cut as chases rather than as anything new: a chase is exactly what an
-     * embrasure is — a blind bite into the room-side face that does not go
-     * through. Doing it here also means the steps themselves cut nothing, so a
-     * change to them can never open a hole in the wall.
-     */
-    for (const e of EMBRASURES) {
-      /*
-       * THE RECESS FOLLOWS THE REVEAL ABOVE IT, a fixed margin wider all the way.
-       *
-       * It was a parallel-sided box 1.32 m across. The reveal it runs under
-       * narrows from 1.50 m at the room face to 0.40 m outside, so the box sat
-       * INSIDE the reveal near the room and OUTSIDE it from about 0.7 m deep,
-       * and the two sets of side faces crossed at a glancing angle in between.
-       * Near-coincident CSG faces are what the owner was seeing as holes you can
-       * look through and a lip you catch on — at eye level, because the box's
-       * flat top is built to meet the window's inner sill.
-       *
-       * Given the same taper plus EMBRASURE_MARGIN on each side, the recess is
-       * strictly outside the reveal at every depth and the two surfaces never
-       * come near each other.
-       */
-      out.push({
-        azimuthDeg: e.azimuthDeg,
-        // the placed embrasure already carries both, so the cut and the stone
-        // that fills it can never be computed two different ways
-        width: e.mouthWidth,
-        bottomY: e.floorY,
-        /*
-         * PAST the reveal's inner sill, not level with it.
-         *
-         * platformY + eyeHeight IS that sill by construction — the platform is
-         * placed to bring the eye to it — so a flat lid there made the recess's
-         * ceiling and the window's floor the same plane. Two coincident CSG
-         * surfaces, at eye level, which is exactly where the owner was looking
-         * when they called the surfaces holey. Carried a head's rise higher, the
-         * recess opens INTO the window instead of butting against it, and the
-         * round head has somewhere to go.
-         */
-        topY: e.plan.platformY + PLAYER.eyeHeight + EMBRASURE_HEAD_RISE,
-        depth: e.plan.depth,
-        arched: true,
-        // the reveal's own width where the recess ends
-        outerWidth: e.backWidth,
-      })
-    }
     return out
   }, [])
 
   // Phase-5 spec: openings come from src/data/windows.json so they can be edited
   // without a rebuild. Every value there is photo-derived, not surveyed.
+  //
+  // THERE IS NO AZIMUTH CONTROL ANY MORE. An opening at the end of a passage has
+  // no bearing of its own — nudging it would slide it off the landing it opens
+  // off and out of the tunnel the walker is standing in. The control that moves
+  // the slits is Staircase → start az°, and it moves every one of them at once.
   const windowCtl = useControls('Windows', {
     cutWindows: true,
-    azimuthNudgeDeg: { value: 0, min: -40, max: 40, step: 1, label: 'azimuth nudge°' },
     widthScale: { value: 1, min: 0.4, max: 2.5, step: 0.05, label: 'outer width ×' },
     flareScale: { value: 1, min: 0.5, max: 3, step: 0.05, label: 'inward flare ×' },
   })
 
+  /**
+   * Every opening in the tower, cut from ONE list.
+   *
+   * The shell, the course breaks, the grilles, the surrounds and the sun beams
+   * all take this array, so the hole in the stone and everything hung in it
+   * cannot come from different arithmetic.
+   */
+  const openings = useMemo(() => {
+    const anchors = passageEndAnchors(flightPlan.flights, flightPlan.tubes, LANDING_Y_OF)
+    return planPassageOpenings({
+      anchors,
+      fittings: OPENING_FITTINGS,
+      liftLabel: (i) => ({
+        from: WALL_LIFTS[i].fromFloorNumber,
+        to: WALL_LIFTS[i].toFloorNumber,
+      }),
+      cfg: PASSAGE_OPENING,
+      buttress: BUTTRESS,
+      outerRadius: TOWER.outerRadius,
+      /*
+       * The pier runs the full height of the drum in the model, and the config is
+       * explicit that this is UNRESOLVED — one reading of the exterior set puts
+       * its head level with the parapet, another at 18.3 ± 0.5 m. That question
+       * used to be cosmetic. It now decides how many openings the tower has: at
+       * the low reading the feet of 6→7 and 7→8 rise clear of the pier and the
+       * count goes from six to eight.
+       */
+      buttressTopY: Math.min(ENTRANCE.groundY - 0.5 + TOWER.height, TOWER.topY),
+      towerTopY: TOWER.topY,
+    })
+  }, [flightPlan])
+
   const windows = useMemo<WindowCut[] | undefined>(() => {
     if (!windowCtl.cutWindows) return undefined
-    return (windowData.windows as WindowSpec[]).map((w) => {
-      // From the photographic fraction, NOT from floorIndex + sill: see
-      // windowCentreY(). floorIndex survives only as a grouping key.
+    const scale = (outer: number, inner: number) => {
+      const o = outer * windowCtl.widthScale
+      return { outerWidth: o, innerWidth: o + (inner - outer) * windowCtl.flareScale }
+    }
+    const cuts: WindowCut[] = openings
+      .filter((o) => o.built)
+      .map((o) => ({
+        id: o.id,
+        azimuthDeg: o.azimuthDeg,
+        centreY: o.centreY,
+        ...scale(o.outerWidth, o.innerWidth),
+        outerHeight: o.outerHeight,
+        innerHeight: o.innerHeight,
+        revealEndRadius: o.revealEndRadius,
+        head: o.head,
+        barrierAt: o.barrierAt,
+        // it IS the passage, so the clash the clip arbitrates does not arise.
+        // At these numbers the clip would miss it by 0.27 m anyway — see the
+        // measurement on stairBearingClip().
+        clipAgainstStairBearing: false,
+      }))
+    for (const w of CHAMBER_WINDOWS) {
       const centreY = windowCentreY(w, TOWER.groundY, TOWER.height)
-      const outerWidth = w.outerWidth * windowCtl.widthScale
-      return {
-        azimuthDeg: w.azimuthDeg + windowCtl.azimuthNudgeDeg,
+      cuts.push({
+        id: w.id,
+        azimuthDeg: w.azimuthDeg,
         centreY,
-        outerWidth,
+        ...scale(w.outerWidth, w.innerWidth),
         outerHeight: w.outerHeight,
-        innerWidth: outerWidth + (w.innerWidth - w.outerWidth) * windowCtl.flareScale,
         innerHeight: w.innerHeight,
+        // a chamber opening's reveal really does end at the room face
+        revealEndRadius: innerRadiusAt(centreY),
         head: w.head,
         barrierAt: w.barrierAt,
-      }
-    })
-  }, [windowCtl.cutWindows, windowCtl.azimuthNudgeDeg, windowCtl.widthScale, windowCtl.flareScale])
+        clipAgainstStairBearing: true,
+      })
+    }
+    return cuts
+  }, [openings, windowCtl.cutWindows, windowCtl.widthScale, windowCtl.flareScale])
+
+  const apertures = useMemo(() => buildApertures(windows ?? []), [windows])
+  useEffect(() => onApertures(apertures), [apertures, onApertures])
 
   // Phase-7 spec: procedural limestone. Colours are MEASURED from the reference
   // photographs (see lib/masonry.ts); only the pattern controls are free.
@@ -617,9 +547,6 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
       {showShell && !cutaway && windows && (
         <WindowSurrounds windows={windows} material={shellMat} />
       )}
-      {showShell && !cutaway && (
-        <WindowEmbrasures embrasures={EMBRASURES} material={innerMat} withColliders={firstPerson} />
-      )}
       {showWireframe && (
         <TowerWireframe showInner showFloors showScaleRef={false} showFeatures={false} />
       )}
@@ -637,7 +564,6 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
           stairPassage={stairPassage}
           stairwells={stairwells}
           doorways={doorways}
-          embrasures={EMBRASURE_OPENINGS}
         />
       )}
 
@@ -654,9 +580,17 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
         showAllStoreys={!firstPerson || !perf.cullStoreys}
       />
 
+      {/*
+        The apertures are the SAME array that cuts the shell, not a second
+        reading of the data file. buildApertures() used to rebuild each centre
+        from floorY + heightAboveFloor while the shell was cutting from the
+        photographic fraction, so the beams were drawn through openings a metre
+        away from the openings that exist. Both fields are gone now, and so is
+        the chance of the two disagreeing again.
+      */}
       <SunBeams
         date={date}
-        apertures={buildApertures(windowData.windows as never, FLOORS)}
+        apertures={apertures}
         visible={sky.showBeams || !!hypothesisVisuals.solarBeam}
       />
       {/*
@@ -739,6 +673,8 @@ function Scene({ onStats, onPerf, date, hypothesis, hotspot, onHotspot, firstPer
 export default function App() {
   const { t } = useTranslation('ui')
   const [stats, setStats] = useState<ShellStats | null>(null)
+  /** The openings the shell was actually cut with; see SceneProps.onApertures. */
+  const [apertures, setApertures] = useState<OpeningAperture[]>([])
 
   // Walk mode is a top-level switch: it decides whether physics runs, whether
   // colliders are built, and which camera controls the view.
@@ -873,7 +809,7 @@ export default function App() {
           setLiveClock(true)
           setDate(new Date())
         }}
-        apertures={buildApertures(windowData.windows as never, FLOORS)}
+        apertures={apertures}
       />
 
       {stats && (
@@ -906,6 +842,7 @@ export default function App() {
         <Physics paused={!firstPerson} debug={showColliders}>
           <Scene
             onStats={setStats}
+            onApertures={setApertures}
             onPerf={setPerf}
             date={date}
             hypothesis={hypothesis}

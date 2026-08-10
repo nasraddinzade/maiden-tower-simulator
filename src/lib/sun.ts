@@ -103,8 +103,16 @@ export interface OpeningAperture {
   innerHeight: number
   /** Radius of the outer face at this opening. */
   outerRadius: number
-  /** Radius of the inner face at this opening. */
-  innerRadius: number
+  /**
+   * Radius at which the reveal ENDS.
+   *
+   * Called innerRadius until 2026-08-10, when it stopped being the room face for
+   * most openings: a slit's reveal now ends on the outer cheek of the stair
+   * passage it lights. The arithmetic below is unaffected — it only ever wanted
+   * the depth of masonry the ray crosses — but the old name had become a false
+   * statement about where the light arrives.
+   */
+  revealEndRadius: number
 }
 
 export interface BeamHit {
@@ -142,7 +150,7 @@ export function beamThroughOpening(
   // light cannot arrive through the back of a wall
   if (Math.abs(bearingOffsetDeg) >= 90) return null
 
-  const depth = Math.max(0.01, opening.outerRadius - opening.innerRadius)
+  const depth = Math.max(0.01, opening.outerRadius - opening.revealEndRadius)
 
   // Crossing `depth` of masonry, a ray slides sideways by depth·tan(offset) and
   // up or down by depth·tan(altitude).

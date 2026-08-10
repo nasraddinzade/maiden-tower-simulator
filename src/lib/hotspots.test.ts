@@ -19,6 +19,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { FLOORS, LIFTS, STAIR, WALL_LIFTS, innerRadiusAt } from '../config/tower'
+import { SHIPPED_ENDS, SHIPPED_TUBES } from './openings.fixture'
 import { HOTSPOTS, type HotspotId } from '../data/hotspots'
 import { approachAzimuthDeg, planAllFlights } from './staircase'
 
@@ -93,12 +94,57 @@ describe('hotspot markers agree with the config', () => {
     expect(nearest, `nearest stair doorway is ${nearest.toFixed(1)}° away`).toBeLessThan(3)
   })
 
-  it('keeps every interior marker inside the room it belongs to', () => {
+  it('keeps every interior marker in a place a visitor can stand', () => {
+    /*
+     * "Inside the room" was the whole rule until 2026-08-10. It is not any more:
+     * the tower's openings are at the ends of the stair passages, so a marker for
+     * one has to stand ON THE LANDING, which is inside the masonry by definition.
+     * The rule that survives is the one that mattered — a marker must be
+     * somewhere a visitor can actually be — so a marker is either in a chamber or
+     * in a stair passage, and never in solid stone.
+     */
     for (const h of HOTSPOTS.filter((x) => x.interior)) {
       const r = Math.hypot(h.position[0], h.position[2])
-      expect(r, `${h.id} is buried in the masonry`).toBeLessThanOrEqual(
-        innerRadiusAt(h.position[1]),
+      const y = h.position[1]
+      if (r <= innerRadiusAt(y)) continue
+      const az = azimuthOf(h.position)
+      const inPassage = SHIPPED_TUBES.some((tube) =>
+        tube.some(
+          (sec) =>
+            angularGapDeg(az, sec.azimuthDeg) < 3 &&
+            r >= sec.innerRadius &&
+            r <= sec.outerRadius &&
+            y >= sec.bottomY &&
+            y <= sec.topY,
+        ),
       )
+      expect(inPassage, `${h.id} is buried in the masonry at r ${r.toFixed(2)}, y ${y.toFixed(2)}`).toBe(
+        true,
+      )
+    }
+  })
+
+  it('stands each window marker on an opening that is actually built', () => {
+    /*
+     * THE TEST THAT WAS MISSING, and its absence is why a stale azimuth survived.
+     *
+     * 'slits' and the marker now called 'passage-slit' both carried a written
+     * 141° — the single-ladder reading of the photographs, already superseded on
+     * 2026-08-09 when the lower column moved to 170, and superseded again by
+     * [OWNER] on 2026-08-10. Nothing failed, because a marker on blank masonry
+     * renders exactly like a marker on an opening and the panel it opens claims
+     * "here is where the model can be checked against a photograph".
+     */
+    const built = SHIPPED_ENDS.filter((o) => o.built)
+    expect(built.length).toBeGreaterThan(0)
+    for (const id of ['slits', 'passage-slit'] as const) {
+      const h = HOTSPOTS.find((x) => x.id === id)!
+      const az = azimuthOf(h.position)
+      const nearest = built.reduce((best, o) =>
+        angularGapDeg(az, o.azimuthDeg) < angularGapDeg(az, best.azimuthDeg) ? o : best,
+      )
+      expect(angularGapDeg(az, nearest.azimuthDeg), `${id} bearing`).toBeLessThan(3)
+      expect(Math.abs(h.position[1] - nearest.centreY), `${id} height`).toBeLessThan(1.6)
     }
   })
 })

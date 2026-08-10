@@ -10,8 +10,7 @@ import {
   stairSettings,
 } from '../config/tower'
 import { planAllFlights, stairDoorways } from './staircase'
-import windowData from '../data/windows.json'
-import type { WindowSpec } from './windows'
+import { SHIPPED_CUTS } from './openings.fixture'
 
 const flights = planAllFlights(stairSettings(), WALL_LIFTS, innerRadiusAt)
 const doorways = stairDoorways(
@@ -50,10 +49,26 @@ describe('the downpipe stands clear of everything a visitor walks through', () =
   })
 
   it('is not in a window reveal', () => {
+    /*
+     * NEARLY A DUPLICATE OF THE STAIR TEST NOW, and it is kept anyway.
+     *
+     * Every opening but one is an end of a flight since [OWNER] 2026-08-10, so
+     * "clear of the reveals" is mostly implied by "clear of the arc the stair
+     * sweeps" below. The exception is the arched window, which has a bearing of
+     * its own and is the only thing this can still catch on its own — and the
+     * implication runs the wrong way to rely on: a reveal reaches OUT from the
+     * passage cheek to the drum face, so an opening can foul the chase at a
+     * radius the passage never occupies.
+     *
+     * The premise the old version rested on is also gone and should not be
+     * quietly reused: WELL.azimuthDeg = 230 was chosen partly because "the slit
+     * columns stand between 123 and 170". No slit stands there now. The value
+     * survives its own re-check on other grounds; see the note in config.
+     */
     const clashes: string[] = []
-    for (const w of windowData.windows as WindowSpec[]) {
+    for (const w of SHIPPED_CUTS) {
       const half = chaseHalfDeg(FLOORS[WELL.startsAtFloorIndex].floorY)
-      const wHalf = (w.innerWidth / 2 / innerRadiusAt(0)) * (180 / Math.PI)
+      const wHalf = (w.innerWidth / 2 / w.revealEndRadius) * (180 / Math.PI)
       if (sep(WELL.azimuthDeg, w.azimuthDeg) < half + wHalf) clashes.push(w.id)
     }
     expect(clashes).toEqual([])

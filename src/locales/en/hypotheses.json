@@ -75,7 +75,7 @@
     ],
     "against": [
       "No source identifies which window is meant, which makes the claim hard to test.",
-      "Tested in this model: at sunrise on 21 December the closest match is the arched window, about 1° off — but that window is a documented later insertion. The nearest original slit misses by roughly 8°.",
+      "Tested in this model: at sunrise on 21 December the closest match is the slit at the foot of the roof climb, about 1° off, with the arched window about 2° off. Neither settles anything. The arched window is a documented later insertion; and since the owner's statement of 2026-08-10 every slit is the end of a stair flight, so its bearing is set by STAIR.startAzimuthDeg — a placeholder no source fixes. That 1° is a consequence of a placeholder, not a result. Before the change the nearest original slit missed by roughly 8°.",
       "The window azimuths here were recovered from photographs and carry about ±20° of systematic error, so the result settles the question neither way."
     ]
   },

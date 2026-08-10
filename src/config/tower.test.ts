@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { SHIPPED_ENDS } from '../lib/openings.fixture'
 import {
   BUTTRESS,
   ENTRANCE,
@@ -185,10 +186,35 @@ describe('the vertical budget stays closed', () => {
      * The second conflict the datum slip created. Photographs put the highest
      * slit at about 0.94 of the tower's height; with the old stack that fell
      * inside solid parapet, which no real opening can do.
+     *
+     * STILL AN EXTERNAL CHECK, and deliberately so. 0.94 is a photographic
+     * reading and stays one: since [OWNER] 2026-08-10 the model builds its
+     * openings from the ends of the stair flights instead, so this no longer
+     * describes anything the model places — which is exactly what makes it worth
+     * keeping. Written against the derived opening it would be a tautology; kept
+     * as a reading, it goes on testing the vertical budget against something
+     * outside the budget's own arithmetic.
      */
     const slitY = TOWER.groundY + 0.94 * TOWER.height
     expect(slitY).toBeGreaterThan(FLOORS[FLOORS.length - 1].floorY)
     expect(slitY).toBeLessThan(TOWER.topY - TOWER.parapetHeight)
+  })
+
+  it('reports how far the derived topmost opening stands from that reading', () => {
+    /*
+     * The residual, published rather than resolved. The highest openings the
+     * model builds are the head of 7→8 and, at the same level, the foot of the
+     * roof climb: centres at 0.906 of the height, against 0.94 photographed —
+     * 1.01 m apart. The roof climb's own head would be higher still and is not
+     * built at all: there is parapet above it, not wall.
+     *
+     * Two ways of finding the top of the ladder, a metre apart. Nothing is
+     * adjusted to close it; the number is the finding.
+     */
+    const topDerived = Math.max(...SHIPPED_ENDS.filter((o) => o.built).map((o) => o.centreY))
+    const fraction = (topDerived - TOWER.groundY) / TOWER.height
+    expect(fraction).toBeCloseTo(0.906, 2)
+    expect((0.94 - fraction) * TOWER.height).toBeCloseTo(1.01, 1)
   })
 })
 

@@ -24,13 +24,13 @@
     "title": "Stair in the wall thickness",
     "text": "The flight runs inside the masonry, abutting the inner circle. The winding was read from photographs — counterclockwise when ascending, though the work plan had assumed the opposite. No source gives step dimensions, so riser and going are chosen so that each flight lands exactly on the next floor."
   },
-  "window-niche": {
-    "title": "Window niche",
-    "text": "Narrow outside, flaring inward. This is an aperture for admitting a beam, not a sector for viewing: a slit in a 4 m wall accepts light only within a few degrees of its own axis. The inner dimensions are not measured — the single interior photograph gives proportion, not metres."
+  "passage-slit": {
+    "title": "Slit at a stair landing",
+    "text": "Narrow outside, flaring inward. This is an aperture for admitting a beam, not a sector for viewing: a slit in this wall accepts light only within a few degrees of its own axis. It opens off the landing at the end of a stair passage rather than off a chamber — the owner, who has walked the building, states that the storeys themselves have no windows at all and that the openings are only at the beginning and the end of the stair passages. So the reveal stops at the passage wall, about 2.7 m in, not at the room face. The inner dimensions are still not measured: the single interior photograph gives proportion, not metres."
   },
   "slits": {
     "title": "Slit windows from outside",
-    "text": "Eight slits are countable on the photographed face, in two columns of four. The lower column is a true vertical; the upper one drifts sideways by about 11°. The azimuths were recovered from photographs and carry roughly ±20° of error, pinned to the buttress measured from the footprint."
+    "text": "Eight slits are countable on the photographed face, in two columns of four. The lower column is a true vertical; the upper one drifts sideways by about 11°. The model produces that pattern for a different reason than it used to: every opening is the end of one of the six stair flights, and the flights are stacked one above another in a single sector of the wall, so all the feet share a bearing, all the heads share another, and the heads drift because the wall thins with height. It does NOT reproduce the photographs. Six openings against eight, columns about 100° apart against 35°, and a rise of one storey between them against the 2.78 m the frames measure. Those disagreements are shown rather than tuned away."
   },
   "entrance": {
     "title": "The entrance",

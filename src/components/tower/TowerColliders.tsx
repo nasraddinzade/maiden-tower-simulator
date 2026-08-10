@@ -5,7 +5,7 @@ import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import {
   floorColliders,
   guardRingBoxes,
-  passageWindowsAt,
+  stairPassageBandsAt,
   wallColliders,
   type BoxSpec,
 } from '../../lib/collision'
@@ -19,13 +19,17 @@ export interface TowerCollidersProps {
   stairwells?: Array<StairwellCut | undefined>
   /** Arched doorways between the rooms and the stair passage. */
   doorways?: StairDoorway[]
-  /**
-   * The stepped recesses at the high windows. They are cut out of the SHELL as
-   * chases, and the shell carries no collider — so without listing them here the
-   * wall boxes stand solid across a recess you can see into and not walk into,
-   * which is exactly how they behaved when first built.
+  /*
+   * There used to be an `embrasures` prop here — the stepped recesses at the high
+   * windows, which are cut out of the SHELL as chases and so needed the wall
+   * boxes opened for them. There are no chamber openings to recess into since
+   * [OWNER] 2026-08-10, the layer is gone, and this component got simpler rather
+   * than being taught a new case.
+   *
+   * A slit at the end of a stair passage needs nothing here either: the void is
+   * already the passage, whose own boxes stop at the outer cheek, and the reveal
+   * beyond that is masonry the walker must not enter.
    */
-  embrasures?: Array<{ azimuthDeg: number; widthDeg: number; sillY: number; headY: number }>
   /** Boxes around the circumference. The addendum asks for 24–32 per storey. */
   sectors?: number
   onCount?: (n: number) => void
@@ -49,7 +53,6 @@ export function TowerColliders({
   stairPassage,
   stairwells,
   doorways,
-  embrasures,
   sectors = 32,
   onCount,
 }: TowerCollidersProps) {
@@ -66,7 +69,7 @@ export function TowerColliders({
     )
 
     const sectorDeg = 360 / sectors
-    const passageAt = (azimuthDeg: number) => passageWindowsAt(sections, azimuthDeg, sectorDeg)
+    const passageAt = (azimuthDeg: number) => stairPassageBandsAt(sections, azimuthDeg, sectorDeg)
 
     // one band per storey, plus the parapet above the top floor
     const bands = [
@@ -101,7 +104,6 @@ export function TowerColliders({
           sillY: d.bottomY,
           headY: d.topY,
         })),
-        ...(embrasures ?? []),
       ],
       passageAt,
     })
@@ -206,7 +208,7 @@ export function TowerColliders({
     }
 
     return [...walls, ...floors, ...guards]
-  }, [stairPassage, stairwells, doorways, embrasures, sectors])
+  }, [stairPassage, stairwells, doorways, sectors])
 
   onCount?.(boxes.length)
 

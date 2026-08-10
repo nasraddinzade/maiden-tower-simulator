@@ -19,8 +19,7 @@ import {
   treadDepth,
 } from './staircase'
 import { azimuthToVector } from './geometry'
-import windowData from '../data/windows.json'
-import { windowCentreY, type WindowSpec } from './windows'
+import { SHIPPED_CUTS } from './openings.fixture'
 import {
   buildShellGeometry,
   innerRadiusProfileAt,
@@ -44,21 +43,16 @@ const PARAMS: ShellParams = {
 }
 
 /*
- * The openings exactly as App.tsx builds them — from the photographic fraction,
- * not from floorIndex + heightAboveFloor. This used to carry its own copy of the
- * old formula, so it went on cutting windows at heights the app had stopped
- * using, and any fault that depended on where a window actually lands could not
- * show up here.
+ * The openings exactly as App.tsx builds them, from openings.fixture.ts.
+ *
+ * This used to carry its own copy of the placement formula, so it went on
+ * cutting windows at heights the app had stopped using and any fault that
+ * depended on where a window actually lands could not show up here. Since
+ * 2026-08-10 an opening is the end of a stair flight, so a local copy would now
+ * be a whole second layout rather than one stale formula — hence one derivation,
+ * shared.
  */
-const WINDOW_CUTS = (windowData.windows as WindowSpec[]).map((w) => ({
-  azimuthDeg: w.azimuthDeg,
-  centreY: windowCentreY(w, TOWER.groundY, TOWER.height),
-  outerWidth: w.outerWidth,
-  outerHeight: w.outerHeight,
-  innerWidth: w.innerWidth,
-  innerHeight: w.innerHeight,
-  head: w.head,
-}))
+const WINDOW_CUTS = SHIPPED_CUTS
 
 const built = buildShellGeometry(PARAMS)
 
@@ -125,12 +119,14 @@ describe('shell bounding box', () => {
 
 describe('window cutter flares the right way', () => {
   const w = {
+    id: 'flare-probe',
     azimuthDeg: 141,
     centreY: 10,
     outerWidth: 0.4,
     outerHeight: 1.9,
     innerWidth: 1.5,
     innerHeight: 2.4,
+    revealEndRadius: innerRadiusAt(10),
   }
 
   /** Tangential half-spread of the cutter's vertices, bucketed by radius. */
@@ -148,7 +144,7 @@ describe('window cutter flares the right way', () => {
       const r = Math.hypot(x, z)
       const tangential = Math.abs(x * tx + z * tz)
       if (r > TOWER.outerRadius) nearOuter = Math.max(nearOuter, tangential)
-      if (r < innerRadiusAt(w.centreY) + 0.5) nearInner = Math.max(nearInner, tangential)
+      if (r < w.revealEndRadius + 0.5) nearInner = Math.max(nearInner, tangential)
     }
     return { nearOuter, nearInner }
   }
@@ -233,13 +229,23 @@ describe('the reveal splays face to face, not across the tool overshoot', () => 
    * one level and not another is exactly the bug coming back.
    */
   const HEIGHTS = [0, 10, 20, TOWER.topY - 1]
-  const slit = (centreY: number) => ({
+  /*
+   * A SYNTHETIC opening, and its reveal is deliberately taken all the way to the
+   * room face: the invariant under test is "outerWidth exactly at the outer face,
+   * innerWidth exactly at the far end of the reveal, and a straight taper in
+   * between", and it has to hold wherever that far end is put. Every real slit
+   * now stops on a stair passage's outer cheek instead, which is the same
+   * arithmetic over a shorter run — see the passage-cheek case below.
+   */
+  const slit = (centreY: number, revealEndRadius = innerRadiusAt(centreY)) => ({
+    id: `synthetic-${centreY}`,
     azimuthDeg: 141,
     centreY,
     outerWidth: 0.4,
     outerHeight: 1.9,
     innerWidth: 1.5,
     innerHeight: 2.4,
+    revealEndRadius,
   })
 
   it('samples heights where the wall really is a different thickness', () => {
@@ -284,6 +290,22 @@ describe('the reveal splays face to face, not across the tool overshoot', () => 
     }
   })
 
+  it.each(HEIGHTS)('honours a reveal that stops on a passage cheek (y = %s)', (y) => {
+    /*
+     * The case every shipped slit is in now. The far plane moves in from the
+     * room face to the stair passage's outer cheek, so the taper is compressed
+     * into 2.5–3.5 m instead of 4.6 — and both faces must still be exact, or the
+     * hole in the drum is the wrong width and the mouth misses the landing.
+     */
+    const cheek = innerRadiusAt(y) + 1.2
+    const w = slit(y, cheek)
+    expect(clearSpan(windowCutter(w), w.azimuthDeg, TOWER.outerRadius, y)).toBeCloseTo(
+      w.outerWidth,
+      5,
+    )
+    expect(clearSpan(windowCutter(w), w.azimuthDeg, cheek, y)).toBeCloseTo(w.innerWidth, 5)
+  })
+
   it.each(HEIGHTS)('gives the head and sill the same treatment (y = %s)', (y) => {
     const w = slit(y)
     const az = w.azimuthDeg
@@ -300,12 +322,14 @@ describe('the reveal splays face to face, not across the tool overshoot', () => 
 
 describe('window openings pierce the wall (Phase 5)', () => {
   const testWindow = {
+    id: 'pierce-probe',
     azimuthDeg: 141,
     centreY: 10,
     outerWidth: 0.4,
     outerHeight: 1.9,
     innerWidth: 1.5,
     innerHeight: 2.4,
+    revealEndRadius: innerRadiusAt(10),
   }
   const pierced = buildShellGeometry({ ...PARAMS, windows: [testWindow] })
 
@@ -658,10 +682,18 @@ describe('an opening is finished at the top the way its data says', () => {
     expect(widthAt(pointed, y)).toBeLessThan(widthAt(round, y))
   })
 
-  it('cuts all nine shipped openings without breaking the mesh', () => {
+  it('cuts every shipped opening without breaking the mesh', () => {
+    /*
+     * The count is no longer written down here. It was "all nine", which was the
+     * number of rows in windows.json; the shipped set is now derived — the ends
+     * of the flights that reach daylight, plus the arched insertion — and a
+     * literal would go stale the first time STAIR.startAzimuthDeg moves. What
+     * this asserts is what it is for: every head shape in the set is exercised.
+     */
     const full = buildShellGeometry({ ...PARAMS, windows: WINDOW_CUTS })
     expect(full.stats.degenerateCount).toBe(0)
     expect(WINDOW_CUTS.filter((w) => w.head === 'round').length).toBeGreaterThan(0)
+    expect(WINDOW_CUTS.filter((w) => w.head === 'flat').length).toBeGreaterThan(0)
     expect(WINDOW_CUTS.filter((w) => w.head === 'pointed').length).toBe(1)
   })
 })

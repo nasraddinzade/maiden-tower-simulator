@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { grilleBars } from '../../lib/grille'
 import { azimuthToVector } from '../../lib/geometry'
-import { TOWER, WINDOW_GRILLE, innerRadiusAt } from '../../config/tower'
+import { TOWER, WINDOW_GRILLE } from '../../config/tower'
 import type { WindowCut } from '../../lib/towerShell'
 
 /**
@@ -17,12 +17,24 @@ import type { WindowCut } from '../../lib/towerShell'
  * against a splayed reveal, which is exactly the kind of near-coincident work
  * that cost this model its stair floor once already.
  *
- * NO COLLIDER. You cannot walk into a slit — the reveal is a hole 0.4 m wide in
- * the outer face and the walker never reaches it — so a collider here would be
- * geometry nobody can touch, which this project does not build.
+ * NO COLLIDER, AND THE OLD REASON FOR IT IS DEAD.
  *
- * All in ONE merged geometry: nine openings times five or six bars is fifty-odd
- * meshes otherwise, for something that is a few dozen triangles in total.
+ * It used to be "you cannot walk into a slit — the walker never reaches it".
+ * Since [OWNER] 2026-08-10 the walker stands on a landing about a metre from a
+ * reveal whose inner mouth is 1.45 m wide and 2 m tall, so that sentence is
+ * simply false and a grille you can walk through is on this project's forbidden
+ * list.
+ *
+ * The conclusion survives on a different footing, and it is checked rather than
+ * asserted — see the collider test in wallIntegrity.test.ts. wallColliders()
+ * emits a 'passageOuter' box for every azimuth the passage occupies, running
+ * from the passage's outer cheek outward over the passage's full height. The
+ * reveal starts at that same cheek and lies wholly inside that height band, so
+ * the mouth is already walled off by the stair's own collider. Adding a second
+ * box in the same place would be the collider nobody can touch.
+ *
+ * All in ONE merged geometry: six or seven openings times five or six bars is
+ * forty-odd meshes otherwise, for something that is a few dozen triangles.
  */
 export function WindowGrilles({
   windows,
@@ -44,20 +56,24 @@ export function WindowGrilles({
       /*
        * WHICH END OF THE REVEAL, and it is not the same for both kinds.
        *
-       * In a slit's embrasure the wrought gate stands at the TOP of the steps,
-       * at the outer end just short of the slit, with the whole flight between it
-       * and the room. In the later arched window the grille is at the ROOM face,
-       * lock plate and keeper on the right jamb, glazed casement behind it. One
-       * rule for both would be wrong on one of them.
+       * A slit's wrought gate stands at the OUTER end of the reveal, just short
+       * of the slit itself. In the later arched window the grille is at the far
+       * end instead — the room face — with lock plate and keeper on the right
+       * jamb and a glazed casement behind it. One rule for both would be wrong on
+       * one of them.
        *
        * Two of the four blind readings placed the slit gate at the inner end and
        * criticised the model for having it outside. The re-check found the model
        * right and the readings wrong, which is the only reason this ends up as a
        * per-opening field rather than a global flip.
+       *
+       * The second value used to be spelled 'room'. It is 'revealEnd' now: for a
+       * slit the far end of the reveal is a stair landing, and the field has to
+       * name the surface rather than the space behind it.
        */
       const radius =
-        w.barrierAt === 'room'
-          ? innerRadiusAt(w.centreY) + inset
+        w.barrierAt === 'revealEnd'
+          ? w.revealEndRadius + inset
           : TOWER.outerRadius - inset
 
       for (const bar of bars) {

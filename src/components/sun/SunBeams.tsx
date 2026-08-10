@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { azimuthToVector } from '../../lib/geometry'
 import { openingsLit, sunPosition, type OpeningAperture } from '../../lib/sun'
-import { SITE, TOWER, innerRadiusAt } from '../../config/tower'
+import { SITE, TOWER } from '../../config/tower'
+import type { WindowCut } from '../../lib/towerShell'
 
 export interface SunBeamsProps {
   date: Date
@@ -28,11 +29,19 @@ export function SunBeams({ date, apertures, visible }: SunBeamsProps) {
       const dir = azimuthToVector(ap.azimuthDeg)
       // start at the opening's inner face and run inward across the room
       const start = new THREE.Vector3(
-        dir.x * ap.innerRadius,
+        dir.x * ap.revealEndRadius,
         ap.centreY,
-        dir.z * ap.innerRadius,
+        dir.z * ap.revealEndRadius,
       )
-      const length = ap.innerRadius * 1.7
+      /*
+       * As far as the reveal is deep, and no further.
+       *
+       * It used to run innerRadius × 1.7, i.e. right across the chamber, because
+       * every opening lit a chamber. Most of them light a stair landing 0.9 m
+       * wide now; a shaft drawn across the room from one would pass through the
+       * inner cheek of the passage and out into a storey that has no window.
+       */
+      const length = Math.max(0.5, TOWER.outerRadius - ap.revealEndRadius)
       const inward = new THREE.Vector3(-dir.x, 0, -dir.z).normalize()
       // drop the far end by the sun's altitude so the shaft points where it should
       inward.y = -Math.tan((sun.altitudeDeg * Math.PI) / 180)
@@ -78,32 +87,26 @@ export function SunBeams({ date, apertures, visible }: SunBeamsProps) {
   )
 }
 
-/** Build the aperture list the solar test consumes, from the window data. */
-export function buildApertures(
-  windows: Array<{
-    id: string
-    floorIndex: number
-    azimuthDeg: number
-    heightAboveFloor: number
-    outerWidth: number
-    outerHeight: number
-    innerWidth: number
-    innerHeight: number
-  }>,
-  floors: Array<{ floorY: number }>,
-): OpeningAperture[] {
-  return windows.map((w) => {
-    const centreY = floors[w.floorIndex].floorY + w.heightAboveFloor + w.outerHeight / 2
-    return {
-      id: w.id,
-      azimuthDeg: w.azimuthDeg,
-      centreY,
-      outerWidth: w.outerWidth,
-      outerHeight: w.outerHeight,
-      innerWidth: w.innerWidth,
-      innerHeight: w.innerHeight,
-      outerRadius: TOWER.outerRadius,
-      innerRadius: innerRadiusAt(centreY),
-    }
-  })
+/**
+ * The aperture list the solar test consumes — built from the SAME cuts that
+ * carve the shell.
+ *
+ * It used to take the raw JSON and rebuild each centre as floorY +
+ * heightAboveFloor + outerHeight/2, while the shell had already moved to the
+ * photographic height fraction. The two disagreed by more than a metre and
+ * nothing complained. Handing it the WindowCut array closes that off: if the
+ * beam is drawn, it is drawn through a hole that exists.
+ */
+export function buildApertures(windows: WindowCut[]): OpeningAperture[] {
+  return windows.map((w) => ({
+    id: w.id,
+    azimuthDeg: w.azimuthDeg,
+    centreY: w.centreY,
+    outerWidth: w.outerWidth,
+    outerHeight: w.outerHeight,
+    innerWidth: w.innerWidth,
+    innerHeight: w.innerHeight,
+    outerRadius: TOWER.outerRadius,
+    revealEndRadius: w.revealEndRadius,
+  }))
 }

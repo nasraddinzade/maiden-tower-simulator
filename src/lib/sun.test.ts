@@ -9,9 +9,9 @@ import {
   sunriseAzimuth,
   type OpeningAperture,
 } from './sun'
-import { SITE, FLOORS, TOWER, innerRadiusAt } from '../config/tower'
-import windowData from '../data/windows.json'
-import type { WindowSpec } from './windows'
+import { SITE } from '../config/tower'
+import { SHIPPED_CUTS, SHIPPED_ENDS, CHAMBER_WINDOWS } from './openings.fixture'
+import { buildApertures } from '../components/sun/SunBeams'
 
 const { latitude: LAT, longitude: LON } = SITE
 
@@ -129,7 +129,7 @@ describe('beam through an opening', () => {
     innerWidth: 1.5,
     innerHeight: 2.4,
     outerRadius: 8.25,
-    innerRadius: 8.25 - 4.0,
+    revealEndRadius: 8.25 - 4.0,
   }
 
   it('admits nothing when the sun is down', () => {
@@ -178,24 +178,38 @@ describe('beam through an opening', () => {
  * at winter-solstice sunrise, which openings does the sun actually reach?
  */
 describe('Islamov’s winter-solstice claim, tested rather than assumed', () => {
-  const apertures: OpeningAperture[] = (windowData.windows as WindowSpec[]).map((w) => {
-    const floor = FLOORS[w.floorIndex]
-    const centreY = floor.floorY + w.heightAboveFloor + w.outerHeight / 2
-    return {
-      id: w.id,
-      azimuthDeg: w.azimuthDeg,
-      centreY,
-      outerWidth: w.outerWidth,
-      outerHeight: w.outerHeight,
-      innerWidth: w.innerWidth,
-      innerHeight: w.innerHeight,
-      outerRadius: TOWER.outerRadius,
-      innerRadius: innerRadiusAt(centreY),
-    }
-  })
+  /*
+   * The SAME openings the shell is cut with. This block used to rebuild each
+   * centre as floorY + heightAboveFloor + outerHeight/2 while the app had moved
+   * on to the photographic fraction, so Phase 8 was being answered for a tower
+   * with windows a metre from the real ones. Both fields are gone; the apertures
+   * come off the cuts.
+   */
+  const apertures: OpeningAperture[] = buildApertures(SHIPPED_CUTS)
 
   it('has no opening pre-flagged as the solstice one', () => {
-    expect((windowData.windows as WindowSpec[]).some((w) => w.solsticeAligned)).toBe(false)
+    expect(SHIPPED_ENDS.some((o) => o.solsticeAligned)).toBe(false)
+    expect(CHAMBER_WINDOWS.some((w) => w.solsticeAligned)).toBe(false)
+  })
+
+  it('asks the question of a SHALLOWER reveal than it used to, which changes the answer', () => {
+    /*
+     * Recorded so the change is not mistaken for noise. A slit's reveal now stops
+     * on the stair passage's outer cheek instead of crossing to the room face, so
+     * the masonry a ray must cross falls from about 4.6 m to 2.5–3.5 and the
+     * acceptance cone widens. The bearings moved too, by more than 100°. Phase 8
+     * will report a different set of lit openings, and that is the finding to
+     * publish rather than a discrepancy to remove (CLAUDE.md rule 7).
+     */
+    const slits = apertures.filter((a) => a.id !== 'arched-later')
+    for (const a of slits) {
+      const depth = a.outerRadius - a.revealEndRadius
+      expect(depth).toBeGreaterThan(2.4)
+      expect(depth).toBeLessThan(3.6)
+    }
+    // the arched window is the one opening that still crosses to a room
+    const arched = apertures.find((a) => a.id === 'arched-later')!
+    expect(arched.outerRadius - arched.revealEndRadius).toBeGreaterThan(4)
   })
 
   it('reports a definite, reproducible answer at solstice sunrise', () => {
@@ -218,6 +232,8 @@ describe('Islamov’s winter-solstice claim, tested rather than assumed', () => 
 
   it('never lets the midday summer sun down a slit', () => {
     const sun = sunPosition(new Date(2026, 5, 21, 12, 40), LAT, LON)
-    expect(openingsLit(sun, apertures.filter((a) => a.id.startsWith('lower') || a.id.startsWith('upper')))).toEqual([])
+    expect(
+      openingsLit(sun, apertures.filter((a) => a.id !== 'arched-later')),
+    ).toEqual([])
   })
 })

@@ -83,8 +83,17 @@ export function rotate(
   ]
 }
 
-/** Where the stair passage sits at one azimuth: a vertical band and a radial span. */
-export interface PassageWindow {
+/**
+ * Where the stair passage sits at one azimuth: a vertical band and a radial span.
+ *
+ * Called PassageWindow, and the function below passageWindowsAt(), until
+ * 2026-08-10. "Window" meant a gap in the collider band, which was harmless
+ * while the tower's windows were all in chamber walls somewhere else. Since
+ * [OWNER] said the openings are at the ends of the stair passages there really
+ * are windows in a passage, and the old name would have read as a promise this
+ * type does not keep. Same shape, honest name.
+ */
+export interface PassageBand {
   bottomY: number
   topY: number
   /** Room-side boundary of the void — the back of the jamb. */
@@ -116,7 +125,7 @@ export interface WallColliderParams {
    * crosses, the wall box starts at the passage's OUTER face instead of the
    * room face, so the passage stays open but its outer side is still solid.
    */
-  passageAt: (azimuthDeg: number) => PassageWindow[]
+  passageAt: (azimuthDeg: number) => PassageBand[]
 }
 
 /** Shortest signed difference a − b, in (−180, 180]. */
@@ -188,13 +197,13 @@ export type FlightSection = PassageSection & { flight: number }
  * Keyed on the flight, two passages cannot be confused however close they run.
  * That is the real invariant and it survives whatever the flights do next.
  */
-export function passageWindowsAt(
+export function stairPassageBandsAt(
   sections: FlightSection[],
   azimuthDeg: number,
   sectorDeg: number,
   marginDeg = 3,
-): PassageWindow[] {
-  const byFlight = new Map<number, PassageWindow>()
+): PassageBand[] {
+  const byFlight = new Map<number, PassageBand>()
   for (const s of sections) {
     const d = Math.abs(((((s.azimuthDeg - azimuthDeg) % 360) + 540) % 360) - 180)
     if (d > sectorDeg / 2 + marginDeg) continue

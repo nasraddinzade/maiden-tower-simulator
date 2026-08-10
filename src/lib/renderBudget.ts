@@ -5,6 +5,14 @@
  * number that can be asserted in CI rather than a figure read off a HUD once.
  * That matters for the 30 fps Android target: a future change that quietly
  * doubles the triangle count should fail the test, not the phone.
+ *
+ * A KNOWN BLIND SPOT, recorded so nobody cites a green budget as proof of
+ * something it never looked at: this counts cupolas, floors, the stair and the
+ * water system. It does NOT count the window grilles, the dressed surrounds, the
+ * course bands, or anything else built per OPENING. Going from nine openings to
+ * six on 2026-08-10 therefore passed the ceilings in silence — and so would going
+ * from six to thirteen. Add those parts here before the opening count is used to
+ * argue about performance either way.
  */
 
 import * as THREE from 'three'

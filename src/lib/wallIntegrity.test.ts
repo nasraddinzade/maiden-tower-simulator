@@ -11,11 +11,12 @@ import {
 import { PLAYER } from '../config/player'
 import {
   MIN_JAMB_THICKNESS,
-  passageWindowsAt,
+  stairPassageBandsAt,
   wallColliders,
   type FlightSection,
 } from './collision'
 import { planAllFlights, stairDoorways, stairPassageSections } from './staircase'
+import { SHIPPED_ENDS } from './openings.fixture'
 
 /*
  * THE ROOM WALL MUST NOT HAVE HOLES IN IT.
@@ -63,7 +64,7 @@ describe('passage openings are counted per flight', () => {
     const bad: string[] = []
     for (let s = 0; s < SECTORS; s += 1) {
       const az = s * sectorDeg + sectorDeg / 2
-      const windows = passageWindowsAt(sections, az, sectorDeg)
+      const windows = stairPassageBandsAt(sections, az, sectorDeg)
       const flightsHere = new Set(
         sections
           .filter((x) => {
@@ -88,7 +89,7 @@ describe('passage openings are counted per flight', () => {
     const storey = FLOORS[1].floorY - FLOORS[0].floorY
     for (let s = 0; s < SECTORS; s += 1) {
       const az = s * sectorDeg + sectorDeg / 2
-      for (const w of passageWindowsAt(sections, az, sectorDeg)) {
+      for (const w of stairPassageBandsAt(sections, az, sectorDeg)) {
         expect(w.topY - w.bottomY, `az ${az.toFixed(1)}`).toBeLessThan(storey)
       }
     }
@@ -120,7 +121,7 @@ describe('the wall beside a passage is never left out', () => {
       sillY: d.bottomY,
       headY: d.topY,
     })),
-    passageAt: (az) => passageWindowsAt(sections, az, sectorDeg),
+    passageAt: (az) => stairPassageBandsAt(sections, az, sectorDeg),
   })
 
   it('leaves no wall box thinner than the minimum jamb', () => {
@@ -157,7 +158,7 @@ describe('the wall beside a passage is never left out', () => {
             const dAz = Math.abs(((bAz - az + 540) % 360) - 180)
             return dAz < sectorDeg * 0.6 && Math.abs(b.position[1] - y) <= b.halfExtents[1] && r > 0
           }) ||
-          passageWindowsAt(sections, az, sectorDeg).some((w) => y >= w.bottomY && y <= w.topY) ||
+          stairPassageBandsAt(sections, az, sectorDeg).some((w) => y >= w.bottomY && y <= w.topY) ||
           doorways.some((dw) => {
             const dAz = Math.abs(((dw.azimuthDeg - az + 540) % 360) - 180)
             return dAz < dw.widthDeg / 2 + sectorDeg / 2 && y >= dw.bottomY && y <= dw.topY
@@ -169,5 +170,111 @@ describe('the wall beside a passage is never left out', () => {
       }
     }
     expect(missing).toEqual([])
+  })
+})
+
+describe('a slit at a passage end is walled off by the passage’s own colliders', () => {
+  /*
+   * THE ARGUMENT WindowGrilles.tsx USED TO MAKE IS DEAD, AND ITS REPLACEMENT IS
+   * CHECKED HERE RATHER THAN ASSERTED IN A COMMENT.
+   *
+   * The old one was "you cannot walk into a slit — the walker never reaches it".
+   * Since [OWNER] 2026-08-10 the walker stands on a landing about a metre from a
+   * reveal whose inner mouth is up to 1.5 m wide and 2 m tall, so that sentence
+   * is simply false, and a grille you can walk through is on this project's
+   * forbidden list.
+   *
+   * What is true instead: the reveal begins exactly at the passage's outer cheek,
+   * and wallColliders() puts a 'passageOuter' box there covering the passage's
+   * full height. The mouth is therefore closed by the stair's own physics, and a
+   * second box in the same place would be the collider nobody can touch. If the
+   * geometry ever moves so that stops being true, this fails instead of the
+   * walker leaving the building at 20 m.
+   */
+  const boxes = wallColliders({
+    sectors: SECTORS,
+    outerRadius: TOWER.outerRadius,
+    innerRadiusAt,
+    baseY: ENTRANCE.groundY - 0.5,
+    topY: TOWER.topY,
+    bandBoundaries: [
+      ENTRANCE.groundY - 0.5,
+      ...FLOORS.map((f) => f.floorY),
+      TOWER.topY - TOWER.parapetHeight,
+      TOWER.topY,
+    ],
+    entrance: {
+      azimuthDeg: ENTRANCE.azimuthDeg,
+      widthDeg: (ENTRANCE.width / TOWER.outerRadius) * (180 / Math.PI),
+      sillY: ENTRANCE.thresholdY,
+      headY: ENTRANCE.thresholdY + ENTRANCE.height,
+    },
+    openings: doorways.map((d) => ({
+      azimuthDeg: d.azimuthDeg,
+      widthDeg: d.widthDeg,
+      sillY: d.bottomY,
+      headY: d.topY,
+    })),
+    passageAt: (az) => stairPassageBandsAt(sections, az, sectorDeg),
+  })
+
+  const built = SHIPPED_ENDS.filter((o) => o.built)
+
+  it('has an outer box standing across every reveal, sill to head', () => {
+    expect(built.length).toBeGreaterThan(0)
+    const holes: string[] = []
+    for (const o of built) {
+      for (const y of [
+        o.centreY - o.outerHeight / 2 + 0.05,
+        o.centreY,
+        o.centreY + o.outerHeight / 2 - 0.05,
+      ]) {
+        const closed = boxes.some((b) => {
+          if (b.kind !== 'passageOuter') return false
+          const bAz = ((Math.atan2(b.position[0], -b.position[2]) * 180) / Math.PI + 360) % 360
+          const dAz = Math.abs(((bAz - o.azimuthDeg + 540) % 360) - 180)
+          if (dAz > sectorDeg) return false
+          if (Math.abs(b.position[1] - y) > b.halfExtents[1]) return false
+          const r = Math.hypot(b.position[0], b.position[2])
+          // the box must start at or inside where the reveal starts
+          return r - b.halfExtents[0] <= o.revealEndRadius + 0.05
+        })
+        if (!closed) holes.push(`${o.id} open at y ${y.toFixed(2)}`)
+      }
+    }
+    expect(holes).toEqual([])
+  })
+
+  it('tells a doorway and a slit at the same end apart', () => {
+    /*
+     * They are two different holes in one landing and the wall-integrity sampler
+     * would happily credit one for the other: it samples at floorY + 0.9, which
+     * is inside a slit's height AND inside a doorway's, and the two are only a
+     * few degrees apart at a flight's head. A test that passed because the
+     * doorway was there would say nothing at all about the slit.
+     */
+    for (const o of built) {
+      const sill = o.centreY - o.outerHeight / 2
+      const head = o.centreY + o.outerHeight / 2
+      /*
+       * In azimuth ALONE they can be a degree apart and still be different
+       * things, because the flights stack: the head doorway of 2→3 stands at
+       * bearing 9.7 and the slit at the head of 3→4 at 8.8, four and a half
+       * metres higher. The pair that would actually be confused is one that
+       * shares a height band as well.
+       */
+      const confusable = doorways.filter((d) => {
+        const gap = Math.abs(((d.azimuthDeg - o.azimuthDeg + 540) % 360) - 180)
+        return gap < 3 && d.topY > sill && d.bottomY < head
+      })
+      expect(
+        confusable.map((d) => `az ${d.azimuthDeg.toFixed(1)} y ${d.bottomY.toFixed(2)}`),
+        `${o.id} cannot be told apart from a doorway`,
+      ).toEqual([])
+
+      // and they are cut the opposite ways: the doorway breaks INTO the room,
+      // the slit runs from the same cheek out to the drum face
+      for (const d of doorways) expect(d.innerRadius).toBeLessThan(o.revealEndRadius)
+    }
   })
 })

@@ -11,15 +11,30 @@
  * it is inference.
  */
 
-import { FLOORS, LIFTS, STAIR, TOWER, WALL_LIFTS, WELL, innerRadiusAt } from '../config/tower'
+import {
+  FLOORS,
+  LIFTS,
+  PASSAGE_OPENING,
+  STAIR,
+  TOWER,
+  WALL_LIFTS,
+  WELL,
+  innerRadiusAt,
+} from '../config/tower'
+import { PLAYER } from '../config/player'
 import { azimuthToVector } from '../lib/geometry'
-import { approachAzimuthDeg, planAllFlights } from '../lib/staircase'
+import {
+  approachAzimuthDeg,
+  planAllFlights,
+  stairPassageSections,
+} from '../lib/staircase'
+import { passageEndAnchors, type PassageEndAnchor } from '../lib/passageOpenings'
 
 export type HotspotId =
   | 'cupola-oculus'
   | 'well'
   | 'staircase'
-  | 'window-niche'
+  | 'passage-slit'
   | 'slits'
   | 'entrance'
   | 'buttress'
@@ -61,6 +76,54 @@ function outsideAt(azimuthDeg: number, y: number, out = 1.2): [number, number, n
  * layout the stair is drawn from, or it points at whatever the layout used to be.
  */
 const WALL_FLIGHTS = planAllFlights(STAIR, WALL_LIFTS, innerRadiusAt)
+
+/**
+ * The ends of the passages, laid out off the same plan.
+ *
+ * Two window markers used to sit on a written-down azimuth of 141, which was the
+ * old single-ladder reading of the photographs and had already gone stale when
+ * the lower column moved to 170 on 2026-08-09. Nothing complained, because a
+ * marker on blank masonry renders exactly like a marker on an opening. Deriving
+ * them is the only fix that stays fixed.
+ */
+const PASSAGE_ENDS: PassageEndAnchor[] = passageEndAnchors(
+  WALL_FLIGHTS,
+  stairPassageSections(
+    WALL_FLIGHTS,
+    STAIR.width,
+    PLAYER.stairHeadroom,
+    innerRadiusAt,
+    undefined,
+    STAIR.doorwayWidth,
+  ),
+  (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+)
+
+/** Shortest signed difference a − b, in (−180, 180]. */
+function angleDelta(a: number, b: number): number {
+  return ((((a - b) % 360) + 540) % 360) - 180
+}
+
+/**
+ * Where an opening at one end of a passage stands: centred on the landing arc,
+ * at the sill height PASSAGE_OPENING gives it. The same rule planPassageOpenings()
+ * applies, kept in step by a test rather than by memory.
+ */
+function passageOpeningAt(id: string): { azimuthDeg: number; centreY: number; outerHeight: number } {
+  const [end, from, to] = id.split('-')
+  const i = WALL_LIFTS.findIndex(
+    (l) => l.fromFloorNumber === Number(from) && l.toFloorNumber === Number(to),
+  )
+  const a = PASSAGE_ENDS.find((x) => x.flightIndex === i && x.end === end)
+  if (!a) throw new Error(`hotspots: no passage end ${id}`)
+  const outerHeight = 1.9 // m — from windows.json; only the marker's height uses it
+  return {
+    azimuthDeg:
+      a.capAzimuthDeg + angleDelta(a.treadAzimuthDeg, a.capAzimuthDeg) / 2,
+    centreY: a.landingY + PASSAGE_OPENING.sillAboveLanding + outerHeight / 2,
+    outerHeight,
+  }
+}
 
 /**
  * A point in a chamber, facing the doorway onto the flight that climbs out of it.
@@ -148,15 +211,32 @@ export const HOTSPOTS: Hotspot[] = [
     confidence: 'inferred',
   },
   {
-    id: 'window-niche',
-    position: insideAt(4, 141, 2.0),
+    /*
+     * Was 'window-niche', standing inside storey 5 at a written-down azimuth of
+     * 141 and describing a stepped recess in the chamber wall. [OWNER] says
+     * there is no opening in any chamber wall, so both the place and the subject
+     * were wrong. It marks the real thing instead: a slit at the head of a
+     * flight, seen from the landing it lights.
+     */
+    id: 'passage-slit',
+    position: (() => {
+      const o = passageOpeningAt('head-3-4')
+      const d = azimuthToVector(o.azimuthDeg)
+      const a = PASSAGE_ENDS.find((x) => x.flightIndex === 1 && x.end === 'head')!
+      // just inside the passage's outer cheek, facing the reveal
+      const r = a.cheekRadius - 0.5
+      return [d.x * r, a.landingY + PLAYER.eyeHeight, d.z * r] as [number, number, number]
+    })(),
     photo: 'photos/window-niche.jpg',
     interior: true,
     confidence: 'inferred',
   },
   {
     id: 'slits',
-    position: outsideAt(141, TOWER.height * 0.5),
+    position: (() => {
+      const o = passageOpeningAt('head-6-7')
+      return outsideAt(o.azimuthDeg, o.centreY)
+    })(),
     photo: 'photos/slits.jpg',
     interior: false,
     confidence: 'inferred',

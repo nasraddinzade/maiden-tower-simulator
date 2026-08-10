@@ -4,17 +4,38 @@ import {
   groupByAzimuth,
   solsticeWindows,
   splayHalfAngleDeg,
-  validateWindow,
-  type WindowSpec,
+  validateChamberWindow,
   windowCentreY,
-  centreYDrift,
   windowStoreyIndex,
   sillAboveFloor,
+  type ChamberWindowSpec,
 } from './windows'
-import windowData from '../data/windows.json'
-import { FLOORS, SITE, TOWER, wallThicknessAt } from '../config/tower'
+import { CHAMBER_WINDOWS, SHIPPED_ENDS } from './openings.fixture'
+import { BUTTRESS, FLOORS, TOWER, wallThicknessAt } from '../config/tower'
 
-const WINDOWS = windowData.windows as WindowSpec[]
+/*
+ * WHAT THIS FILE STILL COVERS, AFTER 2026-08-10.
+ *
+ * [OWNER]: the tower's slits are at the beginning and the end of the stair
+ * passages, and the storeys themselves have no windows at all. So the eight
+ * slits left this file for src/lib/passageOpenings.ts, where their azimuth and
+ * height are derived from the flight rather than stored, and are tested in
+ * passageOpenings.test.ts.
+ *
+ * Three tests that used to live here are honestly no longer applicable, rather
+ * than moved, and it is worth naming them so nobody looks for them:
+ *   - "keeps the lower column on one exact bearing" and "keeps the two columns
+ *     well apart" asserted the photographic azimuths. Those are now a record in
+ *     windows.json's photographicLadder, and the model is SCORED against them
+ *     instead of built from them — see the residual tests in
+ *     passageOpenings.test.ts, which assert the disagreement rather than
+ *     agreement.
+ *   - "records how far the two fields disagreed" tested centreYDrift(), whose
+ *     two inputs (floorIndex, heightAboveFloor) are both gone. The function is
+ *     deleted; it is the only one that became meaningless rather than moving.
+ */
+
+const CHAMBER = CHAMBER_WINDOWS
 
 describe('splay geometry', () => {
   it('is zero when the opening does not widen', () => {
@@ -30,6 +51,21 @@ describe('splay geometry', () => {
   it('rejects a non-positive wall', () => {
     expect(() => splayHalfAngleDeg(0.4, 1, 0)).toThrow()
   })
+
+  it('is wider now the reveal is shorter, which is the Phase-8 consequence', () => {
+    /*
+     * A slit's reveal used to cross the whole wall to the room face, about 4.6 m;
+     * it now stops on the passage's outer cheek, 2.5–3.5 m. The same mouth over
+     * less depth is a wider acceptance cone, so Phase 8 will report a DIFFERENT
+     * set of lit openings. Recorded here as a consequence to be published, not
+     * corrected (CLAUDE.md rule 7).
+     */
+    const shallow = SHIPPED_ENDS[0]
+    const deep = TOWER.outerRadius - 3.65 // the room face at the same height
+    expect(
+      splayHalfAngleDeg(shallow.outerWidth, shallow.innerWidth, TOWER.outerRadius - shallow.revealEndRadius),
+    ).toBeGreaterThan(splayHalfAngleDeg(shallow.outerWidth, shallow.innerWidth, deep))
+  })
 })
 
 describe('flaresInward', () => {
@@ -44,194 +80,101 @@ describe('flaresInward', () => {
   })
 })
 
-describe('the shipped window data', () => {
-  it('parses and is non-empty', () => {
-    expect(WINDOWS.length).toBeGreaterThan(0)
+describe('the one opening left in a chamber wall', () => {
+  it('is the later arched insertion, and only it', () => {
+    expect(CHAMBER).toHaveLength(1)
+    expect(CHAMBER[0].id).toBe('arched-later')
+    expect(CHAMBER[0].kind).toBe('arched')
   })
 
-  it('has unique ids', () => {
-    const ids = new Set(WINDOWS.map((w) => w.id))
-    expect(ids.size).toBe(WINDOWS.length)
+  it('records that the owner’s statement touches it, rather than quietly keeping it', () => {
+    // it is exempted as a modern insertion, and that is a judgement — it has to
+    // be visible in the data, not buried in a commit message
+    expect(CHAMBER[0].questionedBy).toMatch(/OWNER/)
+    expect(CHAMBER[0].questionedBy).toContain('2026-08-10')
   })
 
   it('passes validation against the real tower', () => {
-    for (const w of WINDOWS) {
-      const sillY = FLOORS[w.floorIndex].floorY + w.heightAboveFloor
-      const errs = validateWindow(w, FLOORS.length, wallThicknessAt(sillY))
-      expect(errs).toEqual([])
+    for (const w of CHAMBER) {
+      const y = windowCentreY(w, TOWER.groundY, TOWER.height)
+      expect(validateChamberWindow(w, wallThicknessAt(y))).toEqual([])
     }
   })
 
-  it('makes every opening flare inward, as the sources describe', () => {
-    for (const w of WINDOWS) expect(flaresInward(w)).toBe(true)
+  it('flares inward, as the sources describe', () => {
+    for (const w of CHAMBER) expect(flaresInward(w)).toBe(true)
   })
 
-  it('leaves storeys 1 and 2 unlit, as the photographs show', () => {
-    const lowest = Math.min(...WINDOWS.map((w) => w.floorIndex))
-    expect(lowest).toBeGreaterThanOrEqual(2)
+  it('keeps its reveal on the room face, which is what makes it a chamber opening', () => {
+    // the field it needs, heightFraction, is meaningless for a passage slit and
+    // exactly right here: it is a photogrammetric reading off the outer face
+    expect(CHAMBER[0].heightFraction).toBe(0.5)
+    expect(windowCentreY(CHAMBER[0], TOWER.groundY, TOWER.height)).toBeCloseTo(12.75, 2)
   })
 
-  it('holds eight slits plus the later arched insertion', () => {
-    expect(WINDOWS.filter((w) => w.kind === 'slit')).toHaveLength(8)
-    expect(WINDOWS.filter((w) => w.kind === 'arched')).toHaveLength(1)
+  it('clears the buttress, which is a small independent check on the pier bearing', () => {
+    // half-width on the drum face, plus the root arc's own edge at 113.5 [OSM]
+    const half = (CHAMBER[0].outerWidth / 2 / TOWER.outerRadius) * (180 / Math.PI)
+    const nearEdge = CHAMBER[0].azimuthDeg - half
+    const rootEnd = BUTTRESS.azimuthDeg - BUTTRESS.skewDeg + BUTTRESS.rootArcDeg / 2
+    expect(nearEdge).toBeGreaterThan(rootEnd)
+    expect(nearEdge - rootEnd).toBeLessThan(10) // "close to the re-entrant", as recorded
   })
 
-  it('keeps the slits’ measured 1:4.8 proportion', () => {
-    for (const w of WINDOWS.filter((w) => w.kind === 'slit')) {
-      const ratio = w.outerHeight / w.outerWidth
-      expect(ratio).toBeGreaterThan(3.5)
-      expect(ratio).toBeLessThan(6)
-    }
-  })
-
-  it('keeps the lower column on one exact bearing', () => {
-    const lower = WINDOWS.filter((w) => w.id.startsWith('lower-'))
-    expect(lower).toHaveLength(4)
-    const az = new Set(lower.map((w) => w.azimuthDeg))
-    expect(az.size).toBe(1) // a true vertical generator, as measured
-  })
-
-  it('keeps the two columns well apart in bearing', () => {
-    /*
-     * THIS TEST USED TO ASSERT THE OPPOSITE, and it was asserting a mistake.
-     *
-     * It said azimuth clustering merges the two columns because the drifting
-     * upper one sweeps through the lower one's bearing — true of the data as it
-     * then stood, where the lower column sat at 141 and the upper at 132–143,
-     * threaded through each other. Re-reading the exterior photographs put the
-     * two columns about 35° apart, and the lower one moved to 170. On the drum
-     * they are two separate lines with a broad band of blank masonry between,
-     * which is what the photographs show and what the old data denied.
-     */
-    const lower = WINDOWS.filter((w) => w.id.startsWith('lower-'))
-    const upper = WINDOWS.filter((w) => w.id.startsWith('upper-'))
-    const gap = Math.min(
-      ...lower.flatMap((l) => upper.map((u) => Math.abs(l.azimuthDeg - u.azimuthDeg))),
+  it('lights a storey, and reports which one from where it IS', () => {
+    const floorYs = FLOORS.map((f) => f.floorY)
+    const i = windowStoreyIndex(CHAMBER[0], floorYs, TOWER.groundY, TOWER.height)
+    expect(floorYs[i]).toBeLessThanOrEqual(
+      windowCentreY(CHAMBER[0], TOWER.groundY, TOWER.height) - CHAMBER[0].outerHeight / 2,
     )
-    // 35 ± 6 across four blind readings; assert only that they do not overlap
-    expect(gap).toBeGreaterThan(20)
-  })
-
-  it('spreads the upper column across a few degrees, not one bearing', () => {
-    const upper = WINDOWS.filter((w) => w.id.startsWith('upper-'))
-    const az = upper.map((w) => w.azimuthDeg)
-    expect(Math.max(...az) - Math.min(...az)).toBeGreaterThan(5)
-  })
-
-  it('rises monotonically with the photographed height fractions', () => {
-    const lower = WINDOWS.filter((w) => w.id.startsWith('lower-'))
-    for (let i = 1; i < lower.length; i++) {
-      expect(lower[i].heightFraction).toBeGreaterThan(lower[i - 1].heightFraction)
-    }
+    expect(sillAboveFloor(CHAMBER[0], floorYs, TOWER.groundY, TOWER.height)).toBeGreaterThan(0)
   })
 })
 
 describe('the solstice flag stays unassigned (CLAUDE.md rule 7)', () => {
   it('designates no aperture, because no source identifies one', () => {
-    expect(solsticeWindows(WINDOWS)).toEqual([])
+    expect(solsticeWindows(CHAMBER)).toEqual([])
+    expect(solsticeWindows(SHIPPED_ENDS)).toEqual([])
   })
 
-  it('has not been quietly set on whichever slit sits near the solstice bearing', () => {
-    const phi = (SITE.latitude * Math.PI) / 180
-    const solsticeAz = (Math.acos(Math.sin((-23.44 * Math.PI) / 180) / Math.cos(phi)) * 180) / Math.PI
-    const near = WINDOWS.filter((w) => Math.abs(w.azimuthDeg - solsticeAz) < 25)
-    // some openings do lie near that bearing — that is exactly why none may be flagged
-    expect(near.length).toBeGreaterThan(0)
-    for (const w of near) expect(w.solsticeAligned).toBe(false)
+  it('has not been quietly set on the opening nearest the solstice bearing', () => {
+    // ~120.7° at Baku; the arched window at 123 is the closest thing in the
+    // model and misses by about two degrees, which is precisely why it must not
+    // be flagged in advance of Phase 8's calculation
+    expect(Math.abs(CHAMBER[0].azimuthDeg - 120.7)).toBeLessThan(5)
+    expect(CHAMBER[0].solsticeAligned).toBe(false)
   })
 })
 
-describe('validateWindow catches bad edits to the JSON', () => {
-  const good = WINDOWS[0]
+describe('validateChamberWindow catches bad edits to the JSON', () => {
+  const ok = CHAMBER[0]
 
-  it('flags an out-of-range storey', () => {
-    expect(validateWindow({ ...good, floorIndex: 99 }, FLOORS.length, 4)).toContainEqual(
-      expect.stringContaining('outside'),
-    )
-  })
   it('flags an opening that does not flare', () => {
-    expect(validateWindow({ ...good, innerWidth: 0.1 }, FLOORS.length, 4)).toContainEqual(
-      expect.stringContaining('flare'),
-    )
+    const bad: ChamberWindowSpec = { ...ok, innerWidth: 0.1 }
+    expect(validateChamberWindow(bad, 4).join(' ')).toMatch(/flare/)
   })
   it('flags a height fraction outside the tower', () => {
-    expect(validateWindow({ ...good, heightFraction: 1.4 }, FLOORS.length, 4)).toContainEqual(
-      expect.stringContaining('heightFraction'),
+    const bad: ChamberWindowSpec = { ...ok, heightFraction: 1.4 }
+    expect(validateChamberWindow(bad, 4).join(' ')).toMatch(/heightFraction/)
+  })
+  it('flags a mouth too wide for the wall it is cut through', () => {
+    const bad: ChamberWindowSpec = { ...ok, innerWidth: 20 }
+    expect(validateChamberWindow(bad, 4).join(' ')).toMatch(/implausibly wide/)
+  })
+})
+
+describe('groupByAzimuth measures the model instead of recovering the photograph', () => {
+  it('finds the derived heads standing as one loose column', () => {
+    const heads = SHIPPED_ENDS.filter(
+      (o) => o.built && o.end === 'head' && o.flightIndex !== 2,
     )
-  })
-})
-
-describe('window height comes from the photograph, not from the storey', () => {
-  const windows = windowData.windows as WindowSpec[]
-  const drifts = centreYDrift(windows, (i) => FLOORS[i].floorY, TOWER.groundY, TOWER.height)
-
-  it('places every opening inside the tower, clear of ground and parapet', () => {
-    for (const w of windows) {
-      const y = windowCentreY(w, TOWER.groundY, TOWER.height)
-      expect(y - w.outerHeight / 2).toBeGreaterThan(TOWER.groundY)
-      expect(y + w.outerHeight / 2).toBeLessThan(TOWER.topY)
-    }
+    // one group at a 15° tolerance: four heads spread over 13.6° in all, which
+    // is the drift of the column and not four separate bearings
+    expect(groupByAzimuth(heads, 15)).toHaveLength(1)
   })
 
-  it('keeps the two topmost slits apart, as eleven photographs put them', () => {
-    /*
-     * upper-3 (0.84) and upper-4 (0.94) were built at IDENTICAL height while the
-     * geometry read heightAboveFloor — both storeys carry the filler 1.4 — so
-     * they merged into one wide double aperture 3° apart in azimuth. The
-     * photographs put them about 2.9 m apart vertically.
-     */
-    const y = (id: string) =>
-      windowCentreY(windows.find((w) => w.id === id)!, TOWER.groundY, TOWER.height)
-    expect(y('upper-4') - y('upper-3')).toBeGreaterThan(2.5)
-  })
-
-  it('preserves the order the photographs establish within each column', () => {
-    for (const column of groupByAzimuth(windows, 12)) {
-      const byFraction = [...column].sort((a, b) => a.heightFraction - b.heightFraction)
-      const ys = byFraction.map((w) => windowCentreY(w, TOWER.groundY, TOWER.height))
-      for (let i = 1; i < ys.length; i += 1) expect(ys[i]).toBeGreaterThan(ys[i - 1])
-    }
-  })
-
-  it('records how far the two fields disagreed, rather than hiding it', () => {
-    /*
-     * Not a tolerance to tighten. This asserts the disagreement was REAL and
-     * large — which is the whole reason the fraction now decides. If a survey
-     * ever refills heightAboveFloor with measurements, this test will fail and
-     * the failure is the signal to delete it.
-     */
-    const worst = Math.max(...drifts.map((d) => Math.abs(d.drift)))
-    expect(worst).toBeGreaterThan(1)
-  })
-})
-
-describe('which storey an opening actually lights', () => {
-  const windows = windowData.windows as WindowSpec[]
-  const floorYs = FLOORS.map((f) => f.floorY)
-  const storeyOf = (w: WindowSpec) => windowStoreyIndex(w, floorYs, TOWER.groundY, TOWER.height)
-
-  it('never puts an opening below the floor it is said to light', () => {
-    for (const w of windows) {
-      expect(sillAboveFloor(w, floorYs, TOWER.groundY, TOWER.height)).toBeGreaterThanOrEqual(0)
-    }
-  })
-
-  it('rises monotonically with the opening, so the mapping cannot double back', () => {
-    const byHeight = [...windows].sort((a, b) => a.heightFraction - b.heightFraction)
-    for (let i = 1; i < byHeight.length; i += 1) {
-      expect(storeyOf(byHeight[i])).toBeGreaterThanOrEqual(storeyOf(byHeight[i - 1]))
-    }
-  })
-
-  it("disagrees with the file's own floorIndex, which is the point", () => {
-    /*
-     * Not a tolerance. floorIndex was written against the old
-     * floorIndex + heightAboveFloor formula and several entries no longer match
-     * where the photographs put the opening. This asserts the disagreement is
-     * real so nobody quietly starts trusting the field again; if a survey ever
-     * rewrites windows.json, this fails and should then be deleted.
-     */
-    const disagreeing = windows.filter((w) => storeyOf(w) !== w.floorIndex)
-    expect(disagreeing.length).toBeGreaterThan(0)
+  it('does not merge the feet with the heads, as the photographs never did either', () => {
+    const built = SHIPPED_ENDS.filter((o) => o.built)
+    expect(groupByAzimuth(built, 10).length).toBeGreaterThan(1)
   })
 })

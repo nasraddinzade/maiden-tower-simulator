@@ -3,29 +3,44 @@ import { embrasureFoulsReveal, embrasureTreads, planEmbrasure, treadWear } from 
 import {
   ENTRANCE,
   FLOORS,
-  STAIR,
   TOWER,
-  WALL_LIFTS,
   WINDOW_EMBRASURE,
   innerRadiusAt,
 } from '../config/tower'
-import { flightRiser, planAllFlights, treadDepth } from './staircase'
 import { wallColliders, type WallColliderParams } from './collision'
 import { PLAYER } from '../config/player'
-import windowData from '../data/windows.json'
-import { windowCentreY, windowStoreyIndex, type WindowSpec } from './windows'
+import { SHIPPED_ENDS, CHAMBER_WINDOWS } from './openings.fixture'
+import { windowCentreY, windowStoreyIndex, type ChamberWindowSpec } from './windows'
 
 const E = WINDOW_EMBRASURE
 const floorYs = FLOORS.map((f) => f.floorY)
 
-function innerSillAbove(w: WindowSpec) {
+function innerSillAbove(w: ChamberWindowSpec) {
   const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
   const storey = windowStoreyIndex(w, floorYs, TOWER.groundY, TOWER.height)
   return { above: centre - w.innerHeight / 2 - floorYs[storey], floorY: floorYs[storey] }
 }
 
-describe('which windows get steps', () => {
-  const windows = windowData.windows as WindowSpec[]
+/**
+ * THE LAYER HAS NO RECEIVERS AND THE MATHS IS STILL TESTED. Read this before
+ * concluding the file is dead code.
+ *
+ * [OWNER], 2026-08-10: the tower's openings are at the beginning and the end of
+ * the stair passages, and the storeys themselves have none. A stepped recess in
+ * a chamber wall needs an opening in a chamber wall to climb to; there is one
+ * left, the modern arched window, and its sill is already at hand height. So the
+ * layer builds nothing and App.tsx no longer draws it.
+ *
+ * embrasure.ts survives because the owner's OTHER statement survives: steps do
+ * lead up to some of the tower's windows. Its only remaining candidate carrier
+ * is a short branch off a stair landing, which [VIDEO] shows behind a barred
+ * gate on the roof climb. No source gives that branch a length, a bearing or a
+ * gradient, so PASSAGE_OPENING.branchAtEnds ships empty and this module waits
+ * (CLAUDE.md rule 1). Deleting it would erase the only trace of the testimony.
+ */
+
+describe('which windows get steps: under this layout, none, and here is why', () => {
+  const windows = CHAMBER_WINDOWS
   const planned = windows.map((w) => {
     const { above, floorY } = innerSillAbove(w)
     return {
@@ -34,10 +49,28 @@ describe('which windows get steps', () => {
     }
   })
 
-  it('gives steps to some openings and not to most', () => {
-    const withSteps = planned.filter((p) => p.plan)
-    expect(withSteps.length).toBeGreaterThan(0)
-    expect(withSteps.length).toBeLessThan(windows.length / 2)
+  it('gives none to the one opening left in a chamber wall', () => {
+    // its inner sill stands about 1.2 m up, which is a window you look out of
+    expect(planned.filter((p) => p.plan)).toEqual([])
+    expect(innerSillAbove(windows[0]).above).toBeLessThan(PLAYER.eyeHeight)
+  })
+
+  it('gives none to an opening at the end of a passage either, by the same rule', () => {
+    /*
+     * Not a choice and not a special case: planEmbrasure() decides on height
+     * alone, and PASSAGE_OPENING puts a slit's sill one slab above the landing it
+     * opens off, so the climb it would have to make is negative. The brief's "no
+     * steps up to a window that is no longer there" is satisfied arithmetically,
+     * with zero receivers rather than by deleting the rule.
+     */
+    for (const o of SHIPPED_ENDS) {
+      const aboveLanding = o.centreY - o.innerHeight / 2 - o.landingY
+      expect(aboveLanding).toBeLessThan(PLAYER.eyeHeight)
+      expect(
+        planEmbrasure(aboveLanding, o.landingY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth),
+        o.id,
+      ).toBeNull()
+    }
   })
 
   it('gives them to exactly the openings whose inner sill is above eye height', () => {
@@ -93,7 +126,7 @@ describe('embrasure treads', () => {
      * An embrasure that reached the outer face would be a hole through the wall,
      * not a recess. Checked at the thinnest place any of them sits.
      */
-    for (const w of windowData.windows as WindowSpec[]) {
+    for (const w of CHAMBER_WINDOWS) {
       const { above, floorY } = innerSillAbove(w)
       const p = planEmbrasure(above, floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)
       if (!p) continue
@@ -111,18 +144,27 @@ describe('the wall lets you into the embrasure', () => {
    * they were not. Measured then: the walker pressed against solid wall 1.7 m
    * short of the steps, with the steps drawn plainly in front of it.
    */
-  const embrasures = (windowData.windows as WindowSpec[])
-    .map((w) => {
-      const { above, floorY } = innerSillAbove(w)
+  /*
+   * SYNTHETIC, because the shipped data no longer produces one. The invariant is
+   * about wallColliders(), not about this tower's window list: a recess cut in
+   * the shell must be matched by an opening in the collider band, or you can see
+   * into a hole you cannot enter. It has to keep holding for whatever carrier the
+   * owner's "steps lead up to some of the windows" turns out to have.
+   */
+  const embrasures = [
+    { azimuthDeg: 200, sillAbove: 2.95, floorY: FLOORS[4].floorY },
+    { azimuthDeg: 250, sillAbove: 2.6, floorY: FLOORS[6].floorY },
+  ]
+    .map(({ azimuthDeg, sillAbove, floorY }) => {
       const plan = planEmbrasure(
-        above,
+        sillAbove,
         floorY,
         PLAYER.eyeHeight,
         E.riserTarget,
         E.going,
         E.platformDepth,
       )
-      return plan ? { w, plan, floorY } : null
+      return plan ? { w: { id: `synthetic-${azimuthDeg}`, azimuthDeg }, plan, floorY } : null
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
 
@@ -175,66 +217,35 @@ describe('the wall lets you into the embrasure', () => {
   })
 })
 
-describe('an embrasure and a stair passage cannot share the wall', () => {
-  /*
-   * THE FAULT THIS EXISTS FOR, measured by walking the model.
-   *
-   * With the recesses built and the stair starting at azimuth 200, the climb
-   * stopped dead: 14 treads of 22 on the 2→3 flight, at azimuth 153, and 17 of
-   * 39 on 4→6, at azimuth 131. Every flight completed the moment the recesses
-   * were taken out. The flights stack in one sector and the widest sweeps 160°,
-   * so from 200 they covered the arc from 213 down to about 40 — and the whole
-   * slit column sits between azimuth 123 and 143.
-   *
-   * Two numbers in conflict, and the tie breaks the way it did for the window
-   * bearing: STAIR.startAzimuthDeg is a [PLACEHOLDER] and the window azimuths are
-   * photographs, so the placeholder moved. This test is what stops it moving
-   * back, or a window drifting into the stair, without anyone noticing until they
-   * try to walk up.
-   */
-  const flights = planAllFlights(STAIR, WALL_LIFTS, innerRadiusAt)
-
-  const embrasures = (windowData.windows as WindowSpec[])
-    .map((w) => {
-      const { above, floorY } = innerSillAbove(w)
-      const plan = planEmbrasure(
-        above,
-        floorY,
-        PLAYER.eyeHeight,
-        E.riserTarget,
-        E.going,
-        E.platformDepth,
-      )
-      return plan ? { w, plan, floorY } : null
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
-
-  it('leaves no tread of any flight inside a recess', () => {
-    const clashes: string[] = []
-    for (const { w, plan, floorY } of embrasures) {
-      const halfDeg = ((E.width + 0.12) / 2 / innerRadiusAt(plan.platformY)) * (180 / Math.PI)
-      const top = plan.platformY + PLAYER.eyeHeight
-      const face = innerRadiusAt(plan.platformY)
-      flights.forEach((steps, fi) => {
-        for (const s of steps) {
-          const dAz = Math.abs(((s.azimuthDeg - w.azimuthDeg + 540) % 360) - 180)
-          if (dAz > halfDeg + STAIR.width / 2) continue
-          // the passage runs from a tread-depth under the tread to the vault
-          const bed = s.treadY - treadDepth(flightRiser(steps))
-          const crown = s.treadY + PLAYER.stairHeadroom
-          if (crown < floorY || bed > top) continue
-          if (s.midRadius + STAIR.width / 2 < face) continue
-          if (s.midRadius - STAIR.width / 2 > face + plan.depth) continue
-          clashes.push(
-            `${w.id} (az ${w.azimuthDeg}, ${floorY.toFixed(2)}–${top.toFixed(2)}) meets flight ${fi} ` +
-              `at az ${s.azimuthDeg.toFixed(1)}, y ${s.treadY.toFixed(2)}`,
-          )
-        }
-      })
-    }
-    expect(clashes).toEqual([])
-  })
-})
+/*
+ * THE DESCRIBE THAT USED TO STAND HERE HAS HAD ITS PREMISE TURNED INSIDE OUT,
+ * and it is replaced by this note rather than deleted, because the reasoning is
+ * the record.
+ *
+ * It was called "an embrasure and a stair passage cannot share the wall", and it
+ * existed because of a measured fault: with the recesses built and the stair
+ * starting at azimuth 200, the climb stopped dead — 14 treads of 22 on the 2→3
+ * flight at azimuth 153, and 17 of 39 on 4→6 at azimuth 131. Every flight
+ * completed the moment the recesses were taken out. The flights stack in one
+ * sector and the widest sweeps 160°, so from 200 they covered the arc from 213
+ * down to about 40, and the whole slit column sat between azimuth 123 and 143.
+ *
+ * The tie was broken the way it was for the window bearing: STAIR.startAzimuthDeg
+ * is a [PLACEHOLDER] and the window azimuths were photographs, so the placeholder
+ * moved, to 100.
+ *
+ * [OWNER] 2026-08-10 inverts the premise. An opening is not a competitor for the
+ * stair's wall — it IS the stair's wall, cut radially through the outer cheek of
+ * a passage over its landing. "They cannot share the wall" has become "they
+ * must", and the argument that moved the placeholder AWAY from the windows is
+ * void, because the placeholder now decides where the windows are. Written up in
+ * full at STAIR.startAzimuthDeg.
+ *
+ * What replaces the test: passageOpenings.test.ts asserts that every opening's
+ * mouth fits inside its own landing's arc with a jamb to spare, and
+ * towerShell.test.ts still checks there is floor under every tread of every
+ * flight — which was always the real guard against a reveal eating the stair.
+ */
 
 describe('worn treads', () => {
   it('is deterministic — the same step always wears the same way', () => {
@@ -263,61 +274,37 @@ describe('worn treads', () => {
 })
 
 describe('a recess may not cut across a neighbour reveal', () => {
-  const reveals = (windowData.windows as WindowSpec[]).map((w) => {
-    const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
-    const face = innerRadiusAt(centre)
-    return {
-      id: w.id,
-      azimuthDeg: w.azimuthDeg,
-      halfWidthDeg: (w.innerWidth / 2 / Math.max(0.5, face)) * (180 / Math.PI),
-      bottomY: centre - w.innerHeight / 2,
-      topY: centre + w.innerHeight / 2,
-    }
+  /*
+   * SYNTHETIC INPUTS, reconstructing the clash that WAS in the built model.
+   *
+   * The case is worth keeping exactly: upper-2's step blocks stood inside
+   * upper-1's reveal, at radius 6.63 and 7.08 on the line of sight through that
+   * opening. The two slits were 4 deg apart on the drum and a recess subtends
+   * about 14 deg, so one could not help crossing the other.
+   *
+   * The two openings it names no longer exist as geometry, so the figures are
+   * written down here rather than read out of windows.json. The RULE is what is
+   * under test and it is not about those two slits: any two openings close
+   * enough in bearing will do it, and the owner's "steps lead up to some of the
+   * windows" may yet put two recesses near each other on a stair landing.
+   */
+  const reveals = [
+    { id: 'neighbour', azimuthDeg: 132, halfWidthDeg: 11.6, bottomY: 17.8, topY: 20.2 },
+  ]
+  const recess = (azimuthDeg: number) => ({
+    id: 'recess',
+    azimuthDeg,
+    halfWidthDeg: 13.9,
+    bottomY: 16.91,
+    topY: 20.0,
   })
 
   it('catches the clash that was in the built model', () => {
-    /*
-     * upper-2's step blocks stood inside upper-1's reveal — measured at radius
-     * 6.63 and 7.08 on the line of sight through that opening. The two slits are
-     * 4° apart and a recess subtends about 14°, so one cannot help crossing the
-     * other.
-     */
-    const w = (windowData.windows as WindowSpec[]).find((x) => x.id === 'upper-2')!
-    const { above, floorY } = innerSillAbove(w)
-    const plan = planEmbrasure(above, floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)!
-    const face = innerRadiusAt(plan.platformY)
-    const mouth = w.innerWidth + 0.24
-    expect(
-      embrasureFoulsReveal(
-        {
-          id: w.id,
-          azimuthDeg: w.azimuthDeg,
-          halfWidthDeg: (mouth / 2 / face) * (180 / Math.PI),
-          bottomY: floorY,
-          topY: plan.platformY + PLAYER.eyeHeight + 0.45,
-        },
-        reveals,
-      ),
-    ).not.toBeNull()
+    // 4 deg apart, a 27.8 deg recess against a 23.2 deg reveal: unavoidable
+    expect(embrasureFoulsReveal(recess(136), reveals)).not.toBeNull()
   })
 
   it('lets an isolated recess through', () => {
-    const w = (windowData.windows as WindowSpec[]).find((x) => x.id === 'lower-2')!
-    const { above, floorY } = innerSillAbove(w)
-    const plan = planEmbrasure(above, floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)!
-    const face = innerRadiusAt(plan.platformY)
-    const mouth = w.innerWidth + 0.24
-    expect(
-      embrasureFoulsReveal(
-        {
-          id: w.id,
-          azimuthDeg: w.azimuthDeg,
-          halfWidthDeg: (mouth / 2 / face) * (180 / Math.PI),
-          bottomY: floorY,
-          topY: plan.platformY + PLAYER.eyeHeight + 0.45,
-        },
-        reveals,
-      ),
-    ).toBeNull()
+    expect(embrasureFoulsReveal(recess(230), reveals)).toBeNull()
   })
 })
