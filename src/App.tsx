@@ -867,8 +867,17 @@ export default function App() {
         file asks of every other number. Move the exposure and every light in the
         model moves with it; that is the point of having one.
       */}
+      {/*
+        `shadows="percentage"` rather than `shadows`, and it changes nothing you
+        can see. Bare `shadows` makes r3f ask for PCFSoftShadowMap, which three
+        r185 has deprecated: it warns and silently substitutes PCFShadowMap, once
+        per frame, so the console filled with a notice about a setting that was
+        never taking effect. Asking for PCFShadowMap by name is what the renderer
+        is already doing — rule 5 wants the console clean, and a warning nobody
+        can act on is how a real one gets missed.
+      */}
       <Canvas
-        shadows
+        shadows="percentage"
         gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1 }}
         camera={{ position: [36, 24, 36], fov: 50, near: 0.1, far: 600 }}
       >
