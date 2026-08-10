@@ -376,7 +376,7 @@ describe('the shell is closed at every stair doorway end', () => {
      * is the buttress that answers there, further out than the drum face.
      */
     const leaked: string[] = []
-    for (const o of SHIPPED_ENDS.filter((x) => x.blockedBy === 'buttress')) {
+    for (const o of SHIPPED_ENDS.filter((x) => x.blindBecause === 'buttress')) {
       const r = firstStoneAt(o.azimuthDeg, o.centreY)
       if (r < TOWER.outerRadius - 0.01) {
         leaked.push(`${o.id} (az ${o.azimuthDeg.toFixed(1)}): opened at r ${r.toFixed(4)}`)

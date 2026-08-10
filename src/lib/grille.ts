@@ -29,8 +29,12 @@ export function barOffsets(span: number, barSide: number, count: number): number
    * uprights with two or three rails across.
    *
    * A count also survives the openings being different sizes, which a gap does
-   * not: the arched window is more than twice the width of a slit, and a fixed
-   * gap silently gives it a different character.
+   * not: the arched window was more than twice the width of a slit, and a fixed
+   * gap silently gave it a different character. That window went out of the model
+   * on 2026-08-10 and every opening is a slit now — but the leva width control
+   * still scales them, and the ends the owner has yet to rule on may not all be
+   * the same size when he does, so the argument stands and the example is kept
+   * as the one that was measured.
    */
   const pitch = (span - barSide) / (count + 1)
   const out: number[] = []

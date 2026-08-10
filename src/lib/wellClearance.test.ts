@@ -52,13 +52,16 @@ describe('the downpipe stands clear of everything a visitor walks through', () =
     /*
      * NEARLY A DUPLICATE OF THE STAIR TEST NOW, and it is kept anyway.
      *
-     * Every opening but one is an end of a flight since [OWNER] 2026-08-10, so
-     * "clear of the reveals" is mostly implied by "clear of the arc the stair
-     * sweeps" below. The exception is the arched window, which has a bearing of
-     * its own and is the only thing this can still catch on its own — and the
-     * implication runs the wrong way to rely on: a reveal reaches OUT from the
-     * passage cheek to the drum face, so an opening can foul the chase at a
-     * radius the passage never occupies.
+     * EVERY opening is an end of a flight since [OWNER] 2026-08-10 — the arched
+     * window, which had a bearing of its own and was the one thing this could
+     * catch that the stair test could not, went out with `chamberOpenings` when
+     * he restated the rule. So "clear of the reveals" is now largely implied by
+     * "clear of the arc the stair sweeps" below. Kept because the implication
+     * runs the wrong way to rely on: a reveal reaches OUT from the passage cheek
+     * to the drum face, so an opening can foul the chase at a radius the passage
+     * never occupies — and because which ends are cut is a [PLACEHOLDER] that
+     * moves the day the owner answers, at which point this may start catching
+     * something again.
      *
      * The premise the old version rested on is also gone and should not be
      * quietly reused: WELL.azimuthDeg = 230 was chosen partly because "the slit

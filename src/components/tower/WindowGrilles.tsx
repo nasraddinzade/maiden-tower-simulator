@@ -54,21 +54,27 @@ export function WindowGrilles({
       if (bars.length === 0) continue
       const d = azimuthToVector(w.azimuthDeg)
       /*
-       * WHICH END OF THE REVEAL, and it is not the same for both kinds.
+       * WHICH END OF THE REVEAL, and it was not the same for both kinds.
        *
        * A slit's wrought gate stands at the OUTER end of the reveal, just short
-       * of the slit itself. In the later arched window the grille is at the far
+       * of the slit itself. In the later arched window the grille was at the far
        * end instead — the room face — with lock plate and keeper on the right
-       * jamb and a glazed casement behind it. One rule for both would be wrong on
-       * one of them.
+       * jamb and a glazed casement behind it. One rule for both would have been
+       * wrong on one of them.
        *
        * Two of the four blind readings placed the slit gate at the inner end and
        * criticised the model for having it outside. The re-check found the model
-       * right and the readings wrong, which is the only reason this ends up as a
+       * right and the readings wrong, which is the only reason this ended up as a
        * per-opening field rather than a global flip.
        *
-       * The second value used to be spelled 'room'. It is 'revealEnd' now: for a
-       * slit the far end of the reveal is a stair landing, and the field has to
+       * EVERY OPENING TAKES THE FIRST BRANCH NOW. The arched window went out with
+       * `chamberOpenings` on 2026-08-10 when the owner restated that the storeys
+       * carry no windows, so 'revealEnd' is a value nothing in the model has. The
+       * branch stays because the reading behind it is a reading of a photograph,
+       * and a photograph does not stop being evidence when a model changes.
+       *
+       * The second value used to be spelled 'room'. It is 'revealEnd' because for
+       * a slit the far end of the reveal is a stair landing, and the field has to
        * name the surface rather than the space behind it.
        */
       const radius =

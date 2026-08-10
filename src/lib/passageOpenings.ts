@@ -9,6 +9,17 @@
  *   — on the storeys, openings are ONLY at the beginning and the end of the
  *   stair passages; on the storeys themselves there are no windows at all.
  *
+ * AND THE SAME DAY, ASKED AGAIN AND ANSWERING IN MORE DETAIL:
+ *
+ *   "на ярусах самих окон нет. только когда заходишь в проем чтобы подняться в
+ *    некоторых местах и вначале входа на лестницу и в конце есть окна а в
+ *    некоторых местах или в начале или в конце входа на лестиницу"
+ *
+ *   — on the storeys themselves there are no windows. Only once you step into
+ *   the passage to climb: in SOME places there is one at the beginning of the
+ *   stair entrance and one at the end; in others only at the beginning, or only
+ *   at the end.
+ *
  * [OWNER]. He is Azerbaijani, he has walked the building, and this is testimony
  * rather than a survey — but it outranks every photographic reading in this
  * repository, all of which are inferences from exterior frames about a thing
@@ -18,7 +29,16 @@
  * own azimuth or its own height. Both are properties of the stair: a slit sits
  * at the end of a passage, so it is wherever that end is. src/data/windows.json
  * keeps what the stair cannot say — how big the hole is, how its head is
- * finished, which ends are open — and nothing else.
+ * finished, and WHICH ENDS ARE OPEN.
+ *
+ * THAT LAST ONE IS DATA AND NOT A RULE, and the second statement is why. "In
+ * some places both, in others only one" is not a pattern anything here can
+ * derive: it is a list of twelve facts about twelve ends, and the only source
+ * for it is a person who has climbed the stair. So `OpeningFitting.open` is the
+ * datum, it ships as [PLACEHOLDER] on every end because nobody has yet been
+ * asked end by end, and the daylight geometry below has been demoted from the
+ * source of truth to a CHECK that reports a conflict — see planPassageOpenings()
+ * and testimonyConflicts().
  *
  * Three-js-free on purpose (CLAUDE.md rule 6): every judgement here is arithmetic
  * and every one of them is tested.
@@ -132,15 +152,29 @@ export interface OpeningFitting {
   /** Matches passageEndId(). */
   id: string
   /**
-   * Whether this end carries an opening.
+   * WHETHER THIS END CARRIES AN OPENING. Per-end fact; testimony is the source.
    *
-   * `null` is [PLACEHOLDER] — "nobody has ruled on this one" — and is what every
-   * end ships as. The planner then decides by the rules below, which can only
-   * ever REMOVE an opening (no daylight, no wall above it); `false` forces one
-   * shut and `true` cannot force one open where the geometry says it lights
-   * nothing.
+   * `null` is [PLACEHOLDER] — nobody has been asked about THIS end — and it is
+   * what all twelve ship as. It is not a shorthand for "no" and not a shorthand
+   * for "let the geometry decide": it means the record is empty, and the model
+   * says so out loud rather than pretending the gap is closed.
+   *
+   * This used to be called `built`, and the rename is the change. `built` was an
+   * output word — what the model cuts — and it let a geometric rule quietly
+   * supply the answer for every end. [OWNER] 2026-08-10 says the answer varies
+   * end by end ("in some places both, in others only one"), so it is an input,
+   * and an input nobody has filled in yet.
    */
-  built: boolean | null
+  open: boolean | null
+  /**
+   * Whose word `open` is, e.g. "[OWNER] 2026-08-10". `null` while `open` is.
+   *
+   * Required, so that an end cannot be opened or shut by nobody. See
+   * validateEndRecord(): a value with no source is the failure this field
+   * exists to make impossible, because it is exactly how a guess becomes a fact
+   * three commits later.
+   */
+  openSaidBy: string | null
   outerWidth: number
   outerHeight: number
   /** Upper bound, not a size: see fitReveal(). */
@@ -172,6 +206,8 @@ export interface PassageOpeningCfg {
 /** An opening, fully placed. */
 export interface PassageOpening extends PassageEndAnchor {
   id: string
+  /** `2-3`, `4-6` — the flight both of whose ends share it. */
+  passage: string
   azimuthDeg: number
   centreY: number
   /** Radius where the reveal STOPS — the passage's outer cheek, not the room. */
@@ -183,12 +219,31 @@ export interface PassageOpening extends PassageEndAnchor {
   head?: 'flat' | 'round' | 'pointed'
   barrierAt?: 'outer' | 'revealEnd'
   solsticeAligned: boolean
-  /** True when this end is actually cut. */
-  built: boolean
-  /** Why not, where not. */
-  blockedBy?: 'buttress' | 'parapet' | 'closedInData'
+  /** THE RECORD, carried through untouched. `null` is [PLACEHOLDER]. */
+  open: boolean | null
+  /** Whose word `open` is, where there is one. */
+  openSaidBy?: string
+  /**
+   * THE CHECK, and no longer the source of truth: could an opening here reach
+   * daylight at all, and is there wall to cut it in?
+   */
+  reachesDaylight: boolean
+  /** What the check found in the way. */
+  blindBecause?: 'buttress' | 'parapet'
   /** Metres of solid buttress a radial ray must cross here. 0 is daylight. */
   buttressDepth: number
+  /** True when this end is actually cut. */
+  built: boolean
+  /**
+   * Which authority `built` came from. 'record' where the datum decided it,
+   * 'placeholder' where the record is empty and the check stood in for it.
+   */
+  decidedBy: 'record' | 'placeholder'
+  /**
+   * The record says this end is open and the check says it is blind. Reported,
+   * never resolved quietly — see testimonyConflicts().
+   */
+  conflict?: 'openButBlind'
   /** True where the recorded inner width did not fit the landing's arc. */
   clampedWidth: boolean
   /** True where the recorded inner height did not fit under the vault. */
@@ -370,6 +425,33 @@ export interface PlanPassageOpeningsInput {
  * explicit that this is not a preference: pushing the slit outward to the cap is
  * what would be needed to bring the lower ends out of the buttress's shadow, and
  * that would be choosing a placement for its result.
+ *
+ * WHICH ENDS ARE OPEN IS NOT DECIDED HERE ANY MORE, and that is the change of
+ * 2026-08-10's second statement.
+ *
+ * It used to be: an end is open unless the pier or the parapet is in the way.
+ * That reads as geometry doing honest work, and it is not — it is a RULE
+ * standing in for a FACT. The owner's second statement says the fact varies from
+ * passage to passage, so no rule of any shape can produce it, and the rule this
+ * file had produces a layout his sentence excludes: five passages open at the
+ * head only, one open at the foot only, and NOT ONE open at both, when "both" is
+ * the first case he names.
+ *
+ * So `open` decides and this arithmetic only checks:
+ *
+ *   open === false   shut, on the record's authority.
+ *   open === true    cut, IF the check finds daylight. If it does not, nothing
+ *                    is cut and a CONFLICT is raised — an opening into ten
+ *                    metres of pier lights nothing, which the brief forbids
+ *                    outright, and quietly cutting it would be worse than
+ *                    quietly dropping it. Neither is done quietly.
+ *   open === null    [PLACEHOLDER]. The check stands in, `decidedBy` says so,
+ *                    and testimonyConflicts() keeps saying the record is empty.
+ *
+ * WHAT MUST NOT BE DONE ABOUT THE MISMATCH: STAIR.startAzimuthDeg is 100 and is
+ * itself a [PLACEHOLDER]. Turning it until the feet clear the buttress would
+ * make the owner's sentence come true by moving the building, which is CLAUDE.md
+ * rule 7 exactly. The mismatch is published instead.
  */
 export function planPassageOpenings(input: PlanPassageOpeningsInput): PassageOpening[] {
   const { anchors, fittings, liftLabel, cfg, buttress, outerRadius } = input
@@ -390,30 +472,28 @@ export function planPassageOpenings(input: PlanPassageOpeningsInput): PassageOpe
       centreY > input.buttressTopY ? 0 : buttressDepthAt(azimuthDeg, buttress, outerRadius)
 
     /*
-     * Two rules can take an opening away, and both are geometry rather than
-     * choice. Nothing can ADD one: an end the data closes stays closed.
+     * THE CHECK. Two things can make an end blind, and both are measurements of
+     * the model rather than opinions about the building:
      *
      *  - the pier. A radial reveal on a bearing the beak covers ends inside ten
-     *    metres of solid stone. The brief forbids openings that light nothing.
+     *    metres of solid stone.
      *  - the parapet. The roof climb's head lands on the deck, and there is no
      *    wall over it to put a slit in — it is a door onto the roof already.
      */
-    let built = f.built !== false
-    let blockedBy: PassageOpening['blockedBy']
-    if (f.built === false) {
-      built = false
-      blockedBy = 'closedInData'
-    } else if (buttressDepth > 0) {
-      built = false
-      blockedBy = 'buttress'
-    } else if (centreY + f.outerHeight / 2 > input.towerTopY) {
-      built = false
-      blockedBy = 'parapet'
-    }
+    let blindBecause: PassageOpening['blindBecause']
+    if (buttressDepth > 0) blindBecause = 'buttress'
+    else if (centreY + f.outerHeight / 2 > input.towerTopY) blindBecause = 'parapet'
+    const reachesDaylight = blindBecause === undefined
+
+    const decidedBy: PassageOpening['decidedBy'] = f.open === null ? 'placeholder' : 'record'
+    const built = f.open === false ? false : reachesDaylight
+    const conflict: PassageOpening['conflict'] =
+      f.open === true && !reachesDaylight ? 'openButBlind' : undefined
 
     out.push({
       ...a,
       id,
+      passage: `${from}-${to}`,
       azimuthDeg,
       centreY,
       revealEndRadius: a.cheekRadius,
@@ -424,15 +504,140 @@ export function planPassageOpenings(input: PlanPassageOpeningsInput): PassageOpe
       head: f.head,
       barrierAt: f.barrierAt,
       solsticeAligned: f.solsticeAligned,
-      built,
-      blockedBy,
+      open: f.open,
+      openSaidBy: f.openSaidBy ?? undefined,
+      reachesDaylight,
+      blindBecause,
       buttressDepth,
+      built,
+      decidedBy,
+      conflict,
       clampedWidth: fitted.clampedWidth,
       clampedHeight: fitted.clampedHeight,
       note: f.note,
     })
   }
   return out
+}
+
+// ————————————————— the record against the model, said out loud —————————————————
+
+/** How the two ends of one passage come out. The owner's own vocabulary. */
+export type PassagePattern = 'both' | 'beginningOnly' | 'endOnly' | 'neither'
+
+export interface PassageEndPair {
+  passage: string
+  flightIndex: number
+  /** The foot — "вначале входа на лестницу", the beginning of the climb. */
+  beginning: boolean
+  /** The head — "в конце", the end of it. */
+  end: boolean
+  pattern: PassagePattern
+}
+
+/**
+ * Each passage reduced to the shape the owner described it in.
+ *
+ * He named three cases: both ends, beginning only, end only. `neither` is the
+ * fourth and he did not name it, which is a fact about the model to report and
+ * not a rule to enforce — a passage with no opening at all is what the check
+ * produces when the pier stands at one end and the parapet at the other.
+ */
+export function passageEndPairs(all: PassageOpening[]): PassageEndPair[] {
+  const byPassage = new Map<string, PassageEndPair>()
+  for (const o of all) {
+    const e = byPassage.get(o.passage) ?? {
+      passage: o.passage,
+      flightIndex: o.flightIndex,
+      beginning: false,
+      end: false,
+      pattern: 'neither' as PassagePattern,
+    }
+    if (o.end === 'foot') e.beginning = o.built
+    else e.end = o.built
+    byPassage.set(o.passage, e)
+  }
+  const out = [...byPassage.values()]
+  for (const e of out) {
+    e.pattern = e.beginning && e.end ? 'both' : e.beginning ? 'beginningOnly' : e.end ? 'endOnly' : 'neither'
+  }
+  return out
+}
+
+/** Ends the record opens and the geometry cannot light. */
+export function openButBlindEnds(all: PassageOpening[]): PassageOpening[] {
+  return all.filter((o) => o.conflict === 'openButBlind')
+}
+
+/** Ends nobody has ruled on. Twelve of twelve, as this ships. */
+export function unresolvedEnds(all: PassageOpening[]): PassageOpening[] {
+  return all.filter((o) => o.open === null)
+}
+
+/**
+ * Everywhere the model and the testimony disagree, as sentences.
+ *
+ * REPORTS, DOES NOT REPAIR. This is the function the dev console prints and the
+ * tests assert against, and both exist for the same reason: the answer to "which
+ * ends are open" is missing from the record, the model is standing in for it
+ * with a geometric check, and the check produces a layout the owner's own words
+ * exclude. Any of that can be fixed by asking him twelve questions
+ * (see windows.json → openEndsQuestion). None of it may be fixed by turning
+ * STAIR.startAzimuthDeg until the sentence comes true.
+ */
+export function testimonyConflicts(all: PassageOpening[]): string[] {
+  const lines: string[] = []
+
+  for (const o of openButBlindEnds(all)) {
+    lines.push(
+      `${o.id}: the record says this end is open (${o.openSaidBy ?? 'no source'}) but a radial ` +
+        `reveal at azimuth ${o.azimuthDeg.toFixed(1)}° is blind — ` +
+        (o.blindBecause === 'buttress'
+          ? `${o.buttressDepth.toFixed(1)} m of solid buttress`
+          : 'parapet above it, not wall') +
+        '. Nothing is cut. Either the end is not this one, or STAIR.startAzimuthDeg is wrong.',
+    )
+  }
+
+  /*
+   * [OWNER] 2026-08-10: "в некоторых местах и вначале входа на лестницу и в
+   * конце есть окна" — in SOME places there is one at the beginning AND one at
+   * the end. So at least one passage has to come out `both`. None does, and it
+   * is not a near miss: the five feet that would make it stand at azimuth
+   * 108.7–110.2 with the buttress root arc running 72.7–113.5 [OSM].
+   */
+  const pairs = passageEndPairs(all)
+  if (pairs.length > 0 && !pairs.some((p) => p.pattern === 'both')) {
+    lines.push(
+      `no passage has an opening at both ends: ${pairs
+        .map((p) => `${p.passage} ${p.pattern}`)
+        .join(', ')}. [OWNER] 2026-08-10 says some passages do. Which ones is ` +
+        'unrecorded (windows.json → openEndsQuestion); the fallback check cannot ' +
+        'produce one, and STAIR.startAzimuthDeg must not be turned until it can.',
+    )
+  }
+
+  const unresolved = unresolvedEnds(all)
+  if (unresolved.length > 0) {
+    lines.push(
+      `${unresolved.length} of ${all.length} passage ends carry no ruling on whether they are ` +
+        `open (${unresolved.map((o) => o.id).join(', ')}). The daylight check is standing in.`,
+    )
+  }
+
+  return lines
+}
+
+/** Problems with one end's record, before any geometry is involved. */
+export function validateEndRecord(f: OpeningFitting): string[] {
+  const errs: string[] = []
+  if (f.open !== null && !f.openSaidBy) {
+    errs.push(`${f.id}: open is ${f.open} with no source — say who says so`)
+  }
+  if (f.open === null && f.openSaidBy) {
+    errs.push(`${f.id}: a source is recorded but open is still [PLACEHOLDER]`)
+  }
+  return errs
 }
 
 // ————————————————————————— scoring the photographs —————————————————————————

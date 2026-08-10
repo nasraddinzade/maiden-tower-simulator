@@ -686,14 +686,22 @@ describe('an opening is finished at the top the way its data says', () => {
     /*
      * The count is no longer written down here. It was "all nine", which was the
      * number of rows in windows.json; the shipped set is now derived — the ends
-     * of the flights that reach daylight, plus the arched insertion — and a
-     * literal would go stale the first time STAIR.startAzimuthDeg moves. What
-     * this asserts is what it is for: every head shape in the set is exercised.
+     * of the flights the model opens — and a literal would go stale the first
+     * time STAIR.startAzimuthDeg moves or the owner answers windows.json's
+     * openEndsQuestion.
+     *
+     * TWO HEAD SHAPES IN THE SET, NOT THREE, AND THE THIRD IS STILL BUILT. The
+     * pointed head belonged to the arched insertion, which went out with
+     * `chamberOpenings` on 2026-08-10 — see windows.json → chamberOpeningsHistory.
+     * The shape is a reading of a photograph and does not stop being one because
+     * the model no longer cuts it, so windowProfile() still makes it and the
+     * profile tests above still exercise it; what is asserted here is that the
+     * shipped set has none, which is the fact that changed.
      */
     const full = buildShellGeometry({ ...PARAMS, windows: WINDOW_CUTS })
     expect(full.stats.degenerateCount).toBe(0)
     expect(WINDOW_CUTS.filter((w) => w.head === 'round').length).toBeGreaterThan(0)
     expect(WINDOW_CUTS.filter((w) => w.head === 'flat').length).toBeGreaterThan(0)
-    expect(WINDOW_CUTS.filter((w) => w.head === 'pointed').length).toBe(1)
+    expect(WINDOW_CUTS.filter((w) => w.head === 'pointed')).toEqual([])
   })
 })

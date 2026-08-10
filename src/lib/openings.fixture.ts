@@ -30,13 +30,14 @@ import { planAllFlights, stairPassageSections } from './staircase'
 import {
   passageEndAnchors,
   planPassageOpenings,
+  type OpeningFitting,
   type PassageOpening,
 } from './passageOpenings'
-import { windowCentreY, type ChamberWindowSpec } from './windows'
 import type { WindowCut } from './towerShell'
 import windowData from '../data/windows.json'
 
-export const CHAMBER_WINDOWS = windowData.chamberOpenings as unknown as ChamberWindowSpec[]
+/** The editable half of each end, as the app reads it. */
+export const OPENING_FITTINGS = windowData.passageOpenings as OpeningFitting[]
 
 export const SHIPPED_FLIGHTS = planAllFlights(stairSettings(), WALL_LIFTS, innerRadiusAt)
 
@@ -54,7 +55,7 @@ export const SHIPPED_ENDS: PassageOpening[] = planPassageOpenings({
   anchors: passageEndAnchors(SHIPPED_FLIGHTS, SHIPPED_TUBES, (i, end) =>
     end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY,
   ),
-  fittings: windowData.passageOpenings as never,
+  fittings: OPENING_FITTINGS,
   liftLabel: (i) => ({
     from: WALL_LIFTS[i].fromFloorNumber,
     to: WALL_LIFTS[i].toFloorNumber,
@@ -66,35 +67,24 @@ export const SHIPPED_ENDS: PassageOpening[] = planPassageOpenings({
   towerTopY: TOWER.topY,
 })
 
-/** Exactly what the shell is cut with: the built ends plus the arched window. */
-export const SHIPPED_CUTS: WindowCut[] = [
-  ...SHIPPED_ENDS.filter((o) => o.built).map((o) => ({
-    id: o.id,
-    azimuthDeg: o.azimuthDeg,
-    centreY: o.centreY,
-    outerWidth: o.outerWidth,
-    outerHeight: o.outerHeight,
-    innerWidth: o.innerWidth,
-    innerHeight: o.innerHeight,
-    revealEndRadius: o.revealEndRadius,
-    head: o.head,
-    barrierAt: o.barrierAt,
-    clipAgainstStairBearing: false,
-  })),
-  ...CHAMBER_WINDOWS.map((w) => {
-    const centreY = windowCentreY(w, TOWER.groundY, TOWER.height)
-    return {
-      id: w.id,
-      azimuthDeg: w.azimuthDeg,
-      centreY,
-      outerWidth: w.outerWidth,
-      outerHeight: w.outerHeight,
-      innerWidth: w.innerWidth,
-      innerHeight: w.innerHeight,
-      revealEndRadius: innerRadiusAt(centreY),
-      head: w.head,
-      barrierAt: w.barrierAt,
-      clipAgainstStairBearing: true,
-    }
-  }),
-]
+/**
+ * Exactly what the shell is cut with.
+ *
+ * Every one of them is now an end of a flight. The arched insertion that used to
+ * be appended here went out with `chamberOpenings` on 2026-08-10 — see
+ * src/data/windows.json → chamberOpeningsHistory — so this list and SHIPPED_ENDS
+ * differ only by the ends that are not cut.
+ */
+export const SHIPPED_CUTS: WindowCut[] = SHIPPED_ENDS.filter((o) => o.built).map((o) => ({
+  id: o.id,
+  azimuthDeg: o.azimuthDeg,
+  centreY: o.centreY,
+  outerWidth: o.outerWidth,
+  outerHeight: o.outerHeight,
+  innerWidth: o.innerWidth,
+  innerHeight: o.innerHeight,
+  revealEndRadius: o.revealEndRadius,
+  head: o.head,
+  barrierAt: o.barrierAt,
+  clipAgainstStairBearing: false,
+}))

@@ -16,7 +16,9 @@ import type { WindowCut } from '../../lib/towerShell'
  *
  * NO COLLIDER. The frame sits on the outer face, where nobody can stand.
  *
- * One merged geometry for all nine.
+ * One merged geometry for the whole set, however many that turns out to be —
+ * which is not a fixed number any more: every opening is the end of a flight, and
+ * which ends carry one is [PLACEHOLDER] data the owner has still to fill in.
  */
 export function WindowSurrounds({
   windows,

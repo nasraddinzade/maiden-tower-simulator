@@ -219,12 +219,14 @@ export interface WindowCut {
   /**
    * Whether the stone the stair is carried on is protected from this cutter.
    *
-   * True only for a CHAMBER opening — see stairBearingClip(). A slit at the end
-   * of a passage IS part of that passage, so the clash the clip arbitrates does
-   * not exist for it, and it is excluded on that principle rather than on any
-   * effect: at the shipped numbers the clip and a slit miss each other by 0.27 m
-   * and the flag changes nothing either way. The measurement, and what would
-   * make it start to matter, are written up on stairBearingClip().
+   * FALSE ON EVERYTHING THE MODEL NOW CUTS, and that is a fact about the tower
+   * rather than a default. It was true only for a CHAMBER opening — see
+   * stairBearingClip() — and after [OWNER] 2026-08-10 there are none: a slit at
+   * the end of a passage IS part of that passage, so the clash the clip
+   * arbitrates does not exist for it. It is excluded on that principle rather
+   * than on any effect: at the shipped numbers the clip and a slit miss each
+   * other by 0.27 m and the flag changes nothing either way. The measurement,
+   * and what would make it start to matter, are on stairBearingClip().
    */
   clipAgainstStairBearing?: boolean
 }
@@ -623,13 +625,29 @@ export function doorwayCutter(d: StairDoorway): THREE.BufferGeometry {
  * The stone the stair stands on, as a CLIPPER FOR THE WINDOW TOOLS rather than
  * a solid unioned into the building.
  *
- * IT APPLIES TO CHAMBER OPENINGS ONLY, and after 2026-08-10 there is exactly one
- * of those: the later arched window. The premise has inverted for everything
- * else. This clip exists because a window and a stair were competitors for the
- * same stone — two unmeasured azimuths colliding — and the owner's statement
- * makes the tower's slits PART OF the stair, so the argument no longer applies
- * to them. Hence WindowCut.clipAgainstStairBearing, and the function is kept
- * because its argument is still exactly right for the window it still governs.
+ * IT APPLIES TO CHAMBER OPENINGS ONLY, AND THERE ARE NONE LEFT. This clip exists
+ * because a window and a stair were competitors for the same stone — two
+ * unmeasured azimuths colliding — and the owner's statement makes the tower's
+ * slits PART OF the stair, so the argument does not apply to them. Hence
+ * WindowCut.clipAgainstStairBearing; and on 2026-08-10 the last opening it
+ * governed, the later arched window, was withdrawn when he restated that the
+ * storeys carry no windows at all.
+ *
+ * SO IS THIS DEAD CODE? Not yet, and the distinction is worth being exact about,
+ * because other machinery went out in the same change for being dead — see
+ * src/lib/windows.ts. Those functions took a `heightFraction`, which is a
+ * property only an opening positioned in its own right can have; they had no
+ * possible input. This one takes a stair passage and a cutter, both of which
+ * exist and are built every frame, and its argument — a window opening does not
+ * remove the stone a stair is carried on — is structural and true of any
+ * building. What it lacks is a caller, and windows.json → chamberOpeningsHistory
+ * names exactly what would supply one.
+ *
+ * It is therefore kept and made LAZY: buildShellGeometry() assembles these
+ * brushes only if some cutter asks for them, which today none does, so the six
+ * sweeps and six prep() passes it used to cost on every rebuild are gone. If a
+ * later reader finds this note unchanged and still no caller, delete it — a
+ * standing "might be needed" is how a repository fills with furniture.
  *
  * WHAT THE FLAG COSTS TODAY IS NOTHING, AND THAT IS MEASURED, NOT ASSUMED. The
  * first draft of this note claimed that clipping a passage slit "would take out
@@ -1027,23 +1045,34 @@ export function buildShellGeometry(p: ShellParams): {
    * Window openings — each a truncated pyramid, narrow face outward, so the
    * reveal flares into the room exactly as [ref] describes.
    *
-   * CHAMBER openings are clipped against the stone the stair is carried on; a
-   * slit at the end of a passage is not — see WindowCut.clipAgainstStairBearing
-   * and the note on stairBearingClip().
+   * An opening that is NOT part of the stair is clipped against the stone the
+   * stair is carried on; a slit at the end of a passage is part of it and is not
+   * — see WindowCut.clipAgainstStairBearing and the note on stairBearingClip().
+   *
+   * BUILT ON DEMAND, because since 2026-08-10 nothing demands it. The clip used
+   * to be assembled unconditionally: six passage sweeps, six prep() passes and
+   * six Brushes on every shell rebuild, and after the last chamber opening was
+   * withdrawn not one cutter asked for any of them. Kept lazy rather than
+   * deleted, for the reason on stairBearingClip().
    */
-  const bearing = (p.stairPassage ?? [])
-    .map((flight) => stairBearingClip(flight))
-    .filter((g): g is THREE.BufferGeometry => g !== null)
-    .map((g) => {
-      const b = new Brush(prep(g))
-      b.updateMatrixWorld(true)
-      return b
-    })
+  let bearing: Brush[] | null = null
+  const stairBearingBrushes = (): Brush[] => {
+    if (bearing) return bearing
+    bearing = (p.stairPassage ?? [])
+      .map((flight) => stairBearingClip(flight))
+      .filter((g): g is THREE.BufferGeometry => g !== null)
+      .map((g) => {
+        const b = new Brush(prep(g))
+        b.updateMatrixWorld(true)
+        return b
+      })
+    return bearing
+  }
   for (const w of p.windows ?? []) {
     let tool = new Brush(prep(windowCutter(w)))
     tool.updateMatrixWorld(true)
     if (w.clipAgainstStairBearing) {
-      for (const clip of bearing) {
+      for (const clip of stairBearingBrushes()) {
         tool = evaluator.evaluate(tool, clip, SUBTRACTION)
         tool.updateMatrixWorld(true)
       }

@@ -551,13 +551,33 @@ export const STAIR: {
    * anything. It stays at 100 until the owner or a tape says otherwise.
    *
    * WHAT 100 COSTS, measured on the built model rather than argued: the six
-   * flight feet stand on landings centred at azimuth 108.7–110.2 (and 121.9 for
+   * flight feet stand on landings centred at azimuth 108.7–110.2 (and 121.8 for
    * the roof climb, whose landing pays for its interior landing in arc). The
    * buttress root arc is 72.7–113.5 [OSM], so five of those six ends look into
-   * 9.7–10.4 m of solid pier and carry no opening at all. The heads, at 5.7, 8.8,
-   * 16.9, 19.4, 21.6 and 310.2, are all clear of it, but the last of them is the
-   * roof landing and has parapet above it rather than wall. Six slits, therefore,
-   * against eight in the photographs.
+   * 10.21–10.55 m of solid pier and carry no opening at all. The heads, at 5.7,
+   * 8.8, 16.9, 19.3, 21.6 and 310.1, are all clear of it, but the last of them is
+   * the roof landing and has parapet above it rather than wall. Six slits,
+   * therefore, against eight in the photographs.
+   *
+   * AND SINCE 2026-08-10 IT COSTS SOMETHING THAT IS NOT A COUNT. Asked a second
+   * time, the owner described the openings end by end: «в некоторых местах и
+   * вначале входа на лестницу и в конце есть окна а в некоторых местах или в
+   * начале или в конце» — some passages have one at the beginning of the climb
+   * AND one at the end, others at one end only. At 100 the model has five
+   * passages open at the head only and one at the foot only, and NOT ONE open at
+   * both. Worse, no answer he could give would fix it: every passage has at least
+   * one end that is blind here, so marking any passage open at both ends
+   * necessarily produces an opening into solid stone. The arithmetic is in
+   * passageOpenings.test.ts and it is asserted, so it fails if it silently
+   * changes shape.
+   *
+   * FOUR DEGREES OF TURN WOULD CARRY THE FEET CLEAR AND MAKE HIS SENTENCE TRUE.
+   * DO NOT. This value is a [PLACEHOLDER] — no source fixes it, the entrance
+   * orientation it hangs off is itself unresolved, and the argument that put it
+   * at 100 has already inverted once (see below). Turning a placeholder until a
+   * statement about the building comes true is fitting the geometry to the claim,
+   * which is CLAUDE.md rule 7. It moves when somebody measures it or when the
+   * owner answers the question below — not to silence a warning.
    *
    * QUESTION FOR THE OWNER: standing in a chamber facing the entrance, is the
    * doorway onto the stair to your left or to your right?
@@ -829,6 +849,11 @@ export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair
  * See src/lib/passageOpenings.ts for what follows from that and src/data/
  * windows.json for what it costs the photographic record.
  *
+ * WHICH ends are open is NOT here and must not be put here. His second statement
+ * the same day says it varies from passage to passage, so it is twelve facts
+ * rather than a rule, and a rule in the config is exactly the shape it must not
+ * take. It lives per end in windows.json, as [PLACEHOLDER] until he answers.
+ *
  * Nothing here is a measurement, and two of the four are not even estimates —
  * they are CSG hygiene, which is why they are named for what they do rather than
  * for a part of the building.
@@ -928,6 +953,13 @@ export const PASSAGE_OPENING = {
  * same frame — a barred gate at the outer end of a reveal, with the passage
  * behind it — but it is a different sentence about the same photograph, and
  * re-using the old wording silently would hide that the premise moved.
+ *
+ * The other half of that per-opening rule — a grille at the far end of the
+ * reveal, at the room face, with a lock plate, a keeper on the right jamb and a
+ * glazed casement — was carried by the arched window alone, and that window went
+ * out on 2026-08-10. 'revealEnd' is now a value nothing uses. It stays in the
+ * type because it records a reading of a photograph, and a photograph does not
+ * stop being evidence when a model changes.
  */
 export const WINDOW_GRILLE = {
   /** Square bar, side in metres. [ESTIMATE] */
@@ -961,9 +993,19 @@ export const WINDOW_GRILLE = {
  * openings' own heights and returned three of nine — lower-2, upper-1, upper-2.
  *
  * On 2026-08-10 the same owner said there are no openings in the chamber walls
- * at all. That does not contradict the steps; it relocates them. The receivers
- * are zero now (an opening at the end of a passage has its sill 0.30 m above the
- * landing, so planEmbrasure() returns null for every one), and the layer is off.
+ * at all, and said it again when the one exception the model had kept — the
+ * later arched window — was put to him. That does not contradict the steps; it
+ * relocates them. The receivers are zero now (an opening at the end of a passage
+ * has its sill 0.30 m above the landing, so planEmbrasure() returns null for
+ * every one), and the layer is off.
+ *
+ * A CONSTRAINT DISCOVERED WHILE CHECKING THAT, and recorded before anything is
+ * built on it: these dimensions give a recess 4.20 m deep for a sill 2.95 m up,
+ * whatever height it is at, and the wall thins from 4.855 m at storey 1 to
+ * 3.820 m at storey 8. Such a recess fits inside the masonry up to storey 5 and
+ * breaks through the outer face from storey 6 — by 0.09 m at storey 6 and 0.38 m
+ * at storey 8. The old test never asked, because the one chamber window it ran
+ * over sat at storey 4. Pinned in embrasure.test.ts.
  *
  * A CONFLICT THAT HAS TURNED INTO A CORROBORATION, which is a thing that has to
  * be recorded rather than quietly re-used. This note used to hold, as a conflict,
@@ -1059,10 +1101,13 @@ export const ENTRANCE_ARCHIVOLT = {
 /**
  * NOT BUILT WHERE THERE IS NO DAYLIGHT. A surround is dressed stone on the drum
  * face; on a bearing the buttress covers, the "drum face" is 10 m inside a solid
- * pier and the frame would be masonry buried in masonry. The planner already
- * withholds such openings (see PassageOpening.built), so today nothing reaches
- * this block that should not — but the guard belongs with the rule, because the
- * first nudge of STAIR.startAzimuthDeg changes which ends are covered.
+ * pier and the frame would be masonry buried in masonry. The planner never marks
+ * such an end built (see PassageOpening.built and reachesDaylight), so today
+ * nothing reaches this block that should not — but the guard belongs with the
+ * rule, because the first nudge of STAIR.startAzimuthDeg changes which ends are
+ * covered, and because since 2026-08-10 the owner may yet say that one of the
+ * ends inside the pier carries an opening, which is reported as a conflict
+ * rather than cut.
  */
 export const WINDOW_SURROUND = {
   /** m — how far the sill stands proud of the wall face. [ESTIMATE] */

@@ -29,6 +29,7 @@ import {
 import {
   passageEndAnchors,
   planPassageOpenings,
+  testimonyConflicts,
   type OpeningFitting,
 } from './lib/passageOpenings'
 import { Staircase } from './components/tower/Staircase'
@@ -36,7 +37,6 @@ import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
-import { windowCentreY, type ChamberWindowSpec } from './lib/windows'
 import { WindowGrilles } from './components/tower/WindowGrilles'
 import { WindowSurrounds } from './components/tower/WindowSurrounds'
 import { CourseBands } from './components/tower/CourseBands'
@@ -125,8 +125,17 @@ const LANDING_Y_OF = (i: number, end: 'foot' | 'head'): number =>
 /** The editable half of each passage opening — see src/data/windows.json. */
 const OPENING_FITTINGS = windowData.passageOpenings as OpeningFitting[]
 
-/** The one opening left in a chamber wall: the modern arched insertion. */
-const CHAMBER_WINDOWS = windowData.chamberOpenings as unknown as ChamberWindowSpec[]
+/**
+ * THERE IS NO CHAMBER OPENING LEFT TO BUILD, and this is where the last one was.
+ *
+ * [OWNER], 2026-08-10, twice: «на ярусах самих окон нет». The first time, the
+ * later arched window on storey 4 was kept anyway, on the argument that a modern
+ * insertion sits outside a rule about how the building works. That argument was
+ * put to him; he restated the rule instead of accepting the exception, and went
+ * on to describe the openings end by end without an exception for anything. The
+ * record of what the window was, why it was believed to be a later insertion and
+ * what would bring it back is in src/data/windows.json → chamberOpeningsHistory.
+ */
 
 function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook }: SceneProps) {
   const { showShell, showWireframe, showScaleRef, cutaway } = useControls('View', {
@@ -385,24 +394,32 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
         // measurement on stairBearingClip().
         clipAgainstStairBearing: false,
       }))
-    for (const w of CHAMBER_WINDOWS) {
-      const centreY = windowCentreY(w, TOWER.groundY, TOWER.height)
-      cuts.push({
-        id: w.id,
-        azimuthDeg: w.azimuthDeg,
-        centreY,
-        ...scale(w.outerWidth, w.innerWidth),
-        outerHeight: w.outerHeight,
-        innerHeight: w.innerHeight,
-        // a chamber opening's reveal really does end at the room face
-        revealEndRadius: innerRadiusAt(centreY),
-        head: w.head,
-        barrierAt: w.barrierAt,
-        clipAgainstStairBearing: true,
-      })
-    }
     return cuts
   }, [openings, windowCtl.cutWindows, windowCtl.widthScale, windowCtl.flareScale])
+
+  /*
+   * THE FINDINGS NOBODY MAY WALK PAST, printed where the person editing the model
+   * is looking.
+   *
+   * Two of them, and both are the same kind of thing: a place where the record is
+   * empty or where the record and the model disagree. Neither is repaired here —
+   * the repair for both is six questions to the owner (windows.json →
+   * openEndsQuestion), and the repair that must NOT be made is turning
+   * STAIR.startAzimuthDeg until the disagreement goes away (CLAUDE.md rule 7).
+   *
+   * It fires on every load as this ships, because all twelve ends are
+   * [PLACEHOLDER] and because no passage comes out open at both ends, which is
+   * the first case the owner names. That is deliberate: a warning that appears
+   * once and then is fixed teaches nothing, and this one is the state of the
+   * evidence rather than a bug. Dev only — it is a note to whoever is building
+   * the model, not to a visitor.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    for (const line of testimonyConflicts(openings)) {
+      console.warn(`[passage openings] ${line}`)
+    }
+  }, [openings])
 
   const apertures = useMemo(() => buildApertures(windows ?? []), [windows])
   useEffect(() => onApertures(apertures), [apertures, onApertures])

@@ -10,7 +10,7 @@ import {
   type OpeningAperture,
 } from './sun'
 import { SITE } from '../config/tower'
-import { SHIPPED_CUTS, SHIPPED_ENDS, CHAMBER_WINDOWS } from './openings.fixture'
+import { SHIPPED_CUTS, SHIPPED_ENDS } from './openings.fixture'
 import { buildApertures } from '../components/sun/SunBeams'
 
 const { latitude: LAT, longitude: LON } = SITE
@@ -189,7 +189,6 @@ describe('Islamov’s winter-solstice claim, tested rather than assumed', () => 
 
   it('has no opening pre-flagged as the solstice one', () => {
     expect(SHIPPED_ENDS.some((o) => o.solsticeAligned)).toBe(false)
-    expect(CHAMBER_WINDOWS.some((w) => w.solsticeAligned)).toBe(false)
   })
 
   it('asks the question of a SHALLOWER reveal than it used to, which changes the answer', () => {
@@ -200,16 +199,17 @@ describe('Islamov’s winter-solstice claim, tested rather than assumed', () => 
      * acceptance cone widens. The bearings moved too, by more than 100°. Phase 8
      * will report a different set of lit openings, and that is the finding to
      * publish rather than a discrepancy to remove (CLAUDE.md rule 7).
+     *
+     * EVERY aperture now, with no exception to filter out. The arched window was
+     * the one opening whose reveal still crossed to a room face, and it went with
+     * `chamberOpenings` on 2026-08-10; the loop below used to have to skip it.
      */
-    const slits = apertures.filter((a) => a.id !== 'arched-later')
-    for (const a of slits) {
+    expect(apertures.length).toBeGreaterThan(0)
+    for (const a of apertures) {
       const depth = a.outerRadius - a.revealEndRadius
-      expect(depth).toBeGreaterThan(2.4)
-      expect(depth).toBeLessThan(3.6)
+      expect(depth, a.id).toBeGreaterThan(2.4)
+      expect(depth, a.id).toBeLessThan(3.6)
     }
-    // the arched window is the one opening that still crosses to a room
-    const arched = apertures.find((a) => a.id === 'arched-later')!
-    expect(arched.outerRadius - arched.revealEndRadius).toBeGreaterThan(4)
   })
 
   it('reports a definite, reproducible answer at solstice sunrise', () => {
@@ -232,8 +232,8 @@ describe('Islamov’s winter-solstice claim, tested rather than assumed', () => 
 
   it('never lets the midday summer sun down a slit', () => {
     const sun = sunPosition(new Date(2026, 5, 21, 12, 40), LAT, LON)
-    expect(
-      openingsLit(sun, apertures.filter((a) => a.id !== 'arched-later')),
-    ).toEqual([])
+    // the exception this used to carry — the arched window, twice the width of a
+    // slit and shallower for its size — is not in the model any more
+    expect(openingsLit(sun, apertures)).toEqual([])
   })
 })

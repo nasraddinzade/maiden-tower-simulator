@@ -9,27 +9,21 @@ import {
 } from '../config/tower'
 import { wallColliders, type WallColliderParams } from './collision'
 import { PLAYER } from '../config/player'
-import { SHIPPED_ENDS, CHAMBER_WINDOWS } from './openings.fixture'
-import { windowCentreY, windowStoreyIndex, type ChamberWindowSpec } from './windows'
+import { SHIPPED_ENDS } from './openings.fixture'
+import windowData from '../data/windows.json'
 
 const E = WINDOW_EMBRASURE
-const floorYs = FLOORS.map((f) => f.floorY)
-
-function innerSillAbove(w: ChamberWindowSpec) {
-  const centre = windowCentreY(w, TOWER.groundY, TOWER.height)
-  const storey = windowStoreyIndex(w, floorYs, TOWER.groundY, TOWER.height)
-  return { above: centre - w.innerHeight / 2 - floorYs[storey], floorY: floorYs[storey] }
-}
 
 /**
  * THE LAYER HAS NO RECEIVERS AND THE MATHS IS STILL TESTED. Read this before
  * concluding the file is dead code.
  *
- * [OWNER], 2026-08-10: the tower's openings are at the beginning and the end of
- * the stair passages, and the storeys themselves have none. A stepped recess in
- * a chamber wall needs an opening in a chamber wall to climb to; there is one
- * left, the modern arched window, and its sill is already at hand height. So the
- * layer builds nothing and App.tsx no longer draws it.
+ * [OWNER], 2026-08-10, twice: the tower's openings are at the beginning and the
+ * end of the stair passages, and the storeys themselves have none. A stepped
+ * recess in a chamber wall needs an opening in a chamber wall to climb to, and
+ * after the second statement there is not one left — the modern arched window
+ * went with `chamberOpenings`. So the layer builds nothing and App.tsx no longer
+ * draws it.
  *
  * embrasure.ts survives because the owner's OTHER statement survives: steps do
  * lead up to some of the tower's windows. Its only remaining candidate carrier
@@ -40,22 +34,17 @@ function innerSillAbove(w: ChamberWindowSpec) {
  */
 
 describe('which windows get steps: under this layout, none, and here is why', () => {
-  const windows = CHAMBER_WINDOWS
-  const planned = windows.map((w) => {
-    const { above, floorY } = innerSillAbove(w)
-    return {
-      id: w.id,
-      plan: planEmbrasure(above, floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth),
-    }
+  it('has no chamber opening left to give them to', () => {
+    /*
+     * The count that used to be here was "one, and it gets none because its sill
+     * is at hand height". It is zero now, and the distinction matters: the layer
+     * is empty because there is nothing in a chamber wall at all, not because
+     * the one thing there was happened to be low enough to look out of.
+     */
+    expect(windowData.chamberOpenings).toEqual([])
   })
 
-  it('gives none to the one opening left in a chamber wall', () => {
-    // its inner sill stands about 1.2 m up, which is a window you look out of
-    expect(planned.filter((p) => p.plan)).toEqual([])
-    expect(innerSillAbove(windows[0]).above).toBeLessThan(PLAYER.eyeHeight)
-  })
-
-  it('gives none to an opening at the end of a passage either, by the same rule', () => {
+  it('gives none to an opening at the end of a passage either, by the rule and not by fiat', () => {
     /*
      * Not a choice and not a special case: planEmbrasure() decides on height
      * alone, and PASSAGE_OPENING puts a slit's sill one slab above the landing it
@@ -73,31 +62,32 @@ describe('which windows get steps: under this layout, none, and here is why', ()
     }
   })
 
-  it('gives them to exactly the openings whose inner sill is above eye height', () => {
-    for (const { id, plan } of planned) {
-      const w = windows.find((x) => x.id === id)!
-      const { above } = innerSillAbove(w)
-      expect(Boolean(plan), `${id}: inner sill ${above.toFixed(2)} m above the floor`).toBe(
+  it('gives them to an opening whose inner sill IS above eye height, so the rule still bites', () => {
+    /*
+     * SYNTHETIC, and it has to be: with zero receivers in the model, a test that
+     * only ever sees `null` cannot tell "the rule declines" from "the rule is
+     * broken". These three heights are the ones the chamber openings used to
+     * produce — 2.95, 2.60 and 1.20 m of inner sill above the floor — kept as
+     * numbers rather than read out of a file that no longer holds them.
+     */
+    for (const above of [2.95, 2.6, 1.2]) {
+      const plan = planEmbrasure(
+        above,
+        FLOORS[4].floorY,
+        PLAYER.eyeHeight,
+        E.riserTarget,
+        E.going,
+        E.platformDepth,
+      )
+      expect(Boolean(plan), `inner sill ${above.toFixed(2)} m above the floor`).toBe(
         above - PLAYER.eyeHeight > E.riserTarget / 2,
       )
-    }
-  })
-
-  it('brings the eye to the inner sill, which is the whole point of the steps', () => {
-    for (const { id, plan } of planned) {
       if (!plan) continue
-      const w = windows.find((x) => x.id === id)!
-      const { above, floorY } = innerSillAbove(w)
-      const eyeOnPlatform = plan.platformY + PLAYER.eyeHeight
-      expect(eyeOnPlatform, id).toBeCloseTo(floorY + above, 9)
-    }
-  })
-
-  it('keeps the risers walkable and even', () => {
-    for (const { id, plan } of planned) {
-      if (!plan) continue
-      expect(plan.riser, `${id} riser`).toBeGreaterThan(0.1)
-      expect(plan.riser, `${id} riser`).toBeLessThan(0.3)
+      // it brings the eye to the inner sill, which is the whole point of the steps
+      expect(plan.platformY + PLAYER.eyeHeight).toBeCloseTo(FLOORS[4].floorY + above, 9)
+      // and the risers stay walkable and even
+      expect(plan.riser).toBeGreaterThan(0.1)
+      expect(plan.riser).toBeLessThan(0.3)
     }
   })
 })
@@ -121,18 +111,35 @@ describe('embrasure treads', () => {
     expect(last.outerRadius - last.innerRadius).toBeCloseTo(E.platformDepth, 9)
   })
 
-  it('stays inside the masonry it is cut into', () => {
+  it('stays inside the masonry only in the lower half of the tower, and here is where it stops', () => {
     /*
-     * An embrasure that reached the outer face would be a hole through the wall,
-     * not a recess. Checked at the thinnest place any of them sits.
+     * AN ANSWER THAT USED TO BE UNASKED, AND IT IS NOT THE ANSWER THE OLD TEST
+     * IMPLIED.
+     *
+     * The old version ran over the chamber-opening list, which held exactly one
+     * window, at storey 4. It passed, and it was read as "an embrasure stays
+     * inside the wall". Asked of every storey the answer is no: a 2.95 m sill
+     * needs seven risers and 4.20 m of depth whatever height it is at, while the
+     * wall thins from 4.855 m at storey 1 to 3.820 m at storey 8. It fits up to
+     * storey 5 and breaks through the outer face from storey 6 up, by 0.09 m at
+     * storey 6 and 0.38 m at storey 8.
+     *
+     * Recorded rather than fixed, because there is nothing yet to fix: the layer
+     * has no receivers (see the top of this file) and no source gives the branch
+     * off a landing a depth. When PASSAGE_OPENING.branchAtEnds is finally filled
+     * in, this is the constraint it has to satisfy, and it is now on record
+     * instead of being discovered by a hole in the drum.
      */
-    for (const w of CHAMBER_WINDOWS) {
-      const { above, floorY } = innerSillAbove(w)
-      const p = planEmbrasure(above, floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)
+    const fits: number[] = []
+    const holes: number[] = []
+    for (const f of FLOORS) {
+      const p = planEmbrasure(2.95, f.floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)
       if (!p) continue
       const face = innerRadiusAt(p.platformY)
-      expect(face + p.depth, w.id).toBeLessThan(TOWER.outerRadius)
+      ;(face + p.depth < TOWER.outerRadius ? fits : holes).push(f.floorNumber)
     }
+    expect(fits).toEqual([1, 2, 3, 4, 5])
+    expect(holes).toEqual([6, 7, 8])
   })
 })
 

@@ -75,8 +75,8 @@
     ],
     "against": [
       "No source identifies which window is meant, which makes the claim hard to test.",
-      "Tested in this model: at sunrise on 21 December the closest match is the slit at the foot of the roof climb, about 1° off, with the arched window about 2° off. Neither settles anything. The arched window is a documented later insertion; and since the owner's statement of 2026-08-10 every slit is the end of a stair flight, so its bearing is set by STAIR.startAzimuthDeg — a placeholder no source fixes. That 1° is a consequence of a placeholder, not a result. Before the change the nearest original slit missed by roughly 8°.",
-      "The window azimuths here were recovered from photographs and carry about ±20° of systematic error, so the result settles the question neither way."
+      "Tested in this model: at sunrise on 21 December the closest match is the slit at the foot of the climb to the roof, about 1° off. It is the only candidate left — the later arched window, which came second at about 2°, was removed from the model on 2026-08-10 when the owner restated that the storeys carry no windows at all. That 1° is a consequence of a placeholder, not a result. Before the change the nearest slit missed by roughly 8°.",
+      "The bearing of every opening in the model is set by where the stair starts, and no source fixes that: it is a placeholder. Worse for this test, whether that particular opening exists at all is unrecorded — the owner says some flights have a window at the beginning of the climb and some do not, and which ones has not been asked. The model falls back on a geometric check and says so. The result settles the question neither way."
     ]
   },
 

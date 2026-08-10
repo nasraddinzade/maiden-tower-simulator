@@ -10,9 +10,13 @@
  * something it never looked at: this counts cupolas, floors, the stair and the
  * water system. It does NOT count the window grilles, the dressed surrounds, the
  * course bands, or anything else built per OPENING. Going from nine openings to
- * six on 2026-08-10 therefore passed the ceilings in silence — and so would going
- * from six to thirteen. Add those parts here before the opening count is used to
- * argue about performance either way.
+ * six on 2026-08-10 therefore passed the ceilings in silence, and so did the
+ * seventh cut leaving the shell when the arched window was withdrawn later the
+ * same day — and so would going from six to thirteen. The count is now
+ * downstream of a
+ * [PLACEHOLDER] that the owner is expected to answer end by end (windows.json →
+ * openEndsQuestion), so it is going to move again. Add those parts here before
+ * the opening count is used to argue about performance either way.
  */
 
 import * as THREE from 'three'
