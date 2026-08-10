@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from '@react-three/rapier'
 import { Ray } from '@dimforge/rapier3d-compat'
-import { PLAYER } from '../../config/player'
+import { LAMP, PLAYER } from '../../config/player'
 import { FLOORS } from '../../config/tower'
 import { applyGravity, applyLook, moveVelocity, teleportTarget, type MoveInput } from '../../lib/playerMovement'
 import { useKeyboard } from '../../hooks/useKeyboard'
@@ -29,6 +29,7 @@ export interface FirstPersonPlayerProps {
    * to see. A carried light is also what the 2007 reference photographs show.
    */
   lamp?: boolean
+  /** Candela. Defaults to LAMP, which is solved rather than chosen — see there. */
   lampIntensity?: number
 }
 
@@ -46,7 +47,7 @@ export function FirstPersonPlayer({
   startFloorIndex = 0,
   startAt,
   lamp = true,
-  lampIntensity = 26,
+  lampIntensity = LAMP.intensity,
 }: FirstPersonPlayerProps) {
   const { camera, gl } = useThree()
   const { world } = useRapier()
@@ -311,8 +312,8 @@ export function FirstPersonPlayer({
           position={[0, PLAYER.eyeHeight - PLAYER.height / 2, 0]}
           color="#ffd9a8"
           intensity={lampIntensity}
-          distance={14}
-          decay={1.9}
+          distance={LAMP.cutoffDistance}
+          decay={LAMP.decay}
         />
       )}
     </RigidBody>

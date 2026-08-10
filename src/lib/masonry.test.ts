@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   COURSE_HEIGHT,
   LIMESTONE_INTERIOR,
+  LIMESTONE_INTERIOR_MORTAR,
   LIMESTONE_LIGHT,
   LIMESTONE_MORTAR,
   MEASURED_ALBEDO_RATIO,
   courseBand,
   diamondIntensityAt,
   diamondPattern,
+  linearLuminance,
 } from './masonry'
 import { TOWER } from '../config/tower'
 
@@ -36,8 +38,41 @@ describe('measured palette', () => {
     expect(luminance(LIMESTONE_INTERIOR)).toBeLessThan(luminance(LIMESTONE_LIGHT))
   })
 
+  /*
+   * The pair the old tests never put together.
+   *
+   * They checked LIGHT against MORTAR, and INTERIOR against LIGHT, and both
+   * passed while the shader was mixing INTERIOR against MORTAR — a pair no
+   * assertion ever named. It was inverted: the exterior-sampled joint is
+   * lighter than the interior stone, so indoors the bed lines were brighter
+   * than the courses they separate.
+   *
+   * And they compared sRGB codes while the shader mixes in linear light, which
+   * is a different number for the same colours (1.39 in codes, 1.95 in linear).
+   * A guard is only a guard if it watches the value that is applied.
+   */
+  it('darkens the joint on BOTH faces of the wall, in the space the shader mixes', () => {
+    const outside = linearLuminance(LIMESTONE_LIGHT) / linearLuminance(LIMESTONE_MORTAR)
+    const inside = linearLuminance(LIMESTONE_INTERIOR) / linearLuminance(LIMESTONE_INTERIOR_MORTAR)
+    expect(outside).toBeGreaterThan(1)
+    expect(inside).toBeGreaterThan(1)
+    // the interior joint is derived from the measured flat-light ratio, so the
+    // coursing contrast it produces is the exterior's, not a second invention
+    expect(inside).toBeCloseTo(outside, 1)
+  })
+
+  it('states the measured ratio in the space it was measured in', () => {
+    // sampled off photographs, so sRGB codes is where 1.39 lives
+    const codes = luminance(LIMESTONE_INTERIOR) / luminance(LIMESTONE_INTERIOR_MORTAR)
+    expect(codes).toBeCloseTo(MEASURED_ALBEDO_RATIO, 1)
+    // and it is a different number once linearised — the reason for the test above
+    expect(linearLuminance(LIMESTONE_LIGHT) / linearLuminance(LIMESTONE_MORTAR)).toBeGreaterThan(
+      MEASURED_ALBEDO_RATIO + 0.3,
+    )
+  })
+
   it('is a limestone hue — warm, desaturated, not grey and not orange', () => {
-    for (const hex of [LIMESTONE_LIGHT, LIMESTONE_MORTAR, LIMESTONE_INTERIOR]) {
+    for (const hex of [LIMESTONE_LIGHT, LIMESTONE_MORTAR, LIMESTONE_INTERIOR, LIMESTONE_INTERIOR_MORTAR]) {
       const n = parseInt(hex.slice(1), 16)
       const r = (n >> 16) & 255
       const g = (n >> 8) & 255

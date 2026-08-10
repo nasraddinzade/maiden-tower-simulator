@@ -33,6 +33,69 @@ export const LIMESTONE_INTERIOR = '#6d6152'
 /** Albedo contrast between course and joint, as measured in flat light. */
 export const MEASURED_ALBEDO_RATIO = 1.39
 
+/** sRGB transfer, one channel: display code 0…1 → linear light. */
+export function srgbToLinear(c: number): number {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+
+/** The three channels of a hex colour as linear light. */
+export function linearChannels(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16)
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255].map(srgbToLinear) as [
+    number,
+    number,
+    number,
+  ]
+}
+
+/**
+ * Luminance IN LINEAR LIGHT — the space three mixes colours in, and therefore
+ * the space the coursing contrast actually happens in.
+ *
+ * This distinction is not pedantry. The palette above was read off photographs
+ * as sRGB codes, and a contrast quoted in codes is not the contrast the shader
+ * applies: LIGHT/MORTAR is 1.39 in codes and 1.95 in linear. Anything that
+ * checks the palette has to say which space it means.
+ */
+export function linearLuminance(hex: string): number {
+  const [r, g, b] = linearChannels(hex)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Scale every channel of a hex colour down by `ratio`, in sRGB code space. */
+export function darkenSrgb(hex: string, ratio: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    .map((c) => Math.max(0, Math.min(255, Math.round(c / ratio))))
+    .map((c) => c.toString(16).padStart(2, '0'))
+  return `#${ch.join('')}`
+}
+
+/**
+ * Mortar joint INSIDE the tower. [DERIVED] — see the question below.
+ *
+ * The shader used to put LIMESTONE_MORTAR on both faces of the wall, and that
+ * is a measured number used where it was not measured: the mortar was sampled
+ * from EXTERIOR photographs, and it is lighter than the interior stone. In
+ * linear light the exterior pair runs course/joint = 1.95, while interior stone
+ * against exterior mortar runs 0.82 — the joint came out BRIGHTER than the
+ * course, so every bed line inside the tower had its contrast inverted. It read
+ * as a pale scratch instead of a shadow.
+ *
+ * What is kept here is the one thing that was measured — the flat-light ratio
+ * between a course face and its joint — applied to the interior stone in the
+ * space it was measured in (sRGB codes, which is what a photograph gives). The
+ * hue is not invented: it is the interior stone's own hue, darkened. It lands
+ * at linear 1.96 against the interior stone, i.e. the same coursing contrast
+ * the outside has, which is the claim being made and the only one.
+ *
+ * FOR THE OWNER: nobody has measured this. If you have an interior frame with a
+ * clean joint in it, sample it and replace this with a [MEASURED] hex — the
+ * interior may well have a different mortar from the outside face, and this
+ * derivation cannot know that.
+ */
+export const LIMESTONE_INTERIOR_MORTAR = darkenSrgb(LIMESTONE_INTERIOR, MEASURED_ALBEDO_RATIO)
+
 /**
  * Height of one masonry course.
  *

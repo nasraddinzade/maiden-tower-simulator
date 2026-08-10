@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { ACESFilmicToneMapping } from 'three'
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
@@ -17,7 +18,7 @@ import {
   WELL,
   innerRadiusAt,
 } from './config/tower'
-import { PLAYER } from './config/player'
+import { LAMP, PLAYER } from './config/player'
 import {
   headroomStepsFor,
   planAllFlights,
@@ -485,9 +486,16 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
 
   const hotspots = useControls('Hotspots', { showHotspots: true })
 
+  /*
+   * The slider's default has to BE the derived value, not a number that happens
+   * to look like it. This control is passed straight to the walker, so whatever
+   * sits here overrides the component's default — which is how the hand-tuned 26
+   * survived every later attempt to reason about the lamp. Range and step follow
+   * the derived value so the panel stays useful around it.
+   */
   const lampCtl = useControls('Lamp', {
     lamp: true,
-    lampIntensity: { value: 26, min: 0, max: 80, step: 1 },
+    lampIntensity: { value: LAMP.intensity, min: 0, max: LAMP.intensity * 6, step: 0.05 },
   })
 
   const [viewerStorey, setViewerStorey] = useState(0)
@@ -848,7 +856,22 @@ export default function App() {
           degenerate: {stats.degenerateCount}
         </div>
       )}
-      <Canvas shadows camera={{ position: [36, 24, 36], fov: 50, near: 0.1, far: 600 }}>
+      {/*
+        THE SCENE'S WHITE POINT IS DECLARED HERE, and it used not to be.
+        These two values were r3f's defaults, never written down, and every light
+        in the model was tuned against them by eye: the sun at ~1, the hand lamp
+        at 26. That is a fifteenfold spread agreed with nothing, and it is how the
+        interior could be blown out while the exterior was correct. Naming them
+        does not change a pixel — ACES at exposure 1 is exactly what was running —
+        but it makes the reference an intensity is a ratio TO, which is what this
+        file asks of every other number. Move the exposure and every light in the
+        model moves with it; that is the point of having one.
+      */}
+      <Canvas
+        shadows
+        gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1 }}
+        camera={{ position: [36, 24, 36], fov: 50, near: 0.1, far: 600 }}
+      >
         {/* Physics is here from Phase 4 so the steps carry colliders; the
             first-person controller that walks on them arrives in Phase 6. */}
         {/* Physics runs only in walk mode: colliders and the solver cost

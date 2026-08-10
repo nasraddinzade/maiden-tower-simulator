@@ -1,5 +1,11 @@
 import * as THREE from 'three'
-import { COURSE_HEIGHT, LIMESTONE_INTERIOR, LIMESTONE_LIGHT, LIMESTONE_MORTAR } from '../lib/masonry'
+import {
+  COURSE_HEIGHT,
+  LIMESTONE_INTERIOR,
+  LIMESTONE_INTERIOR_MORTAR,
+  LIMESTONE_LIGHT,
+  LIMESTONE_MORTAR,
+} from '../lib/masonry'
 import { TOWER } from '../config/tower'
 
 export interface MasonryOptions {
@@ -93,7 +99,14 @@ export function createMasonryMaterial(opts: MasonryOptions = {}): MasonryMateria
     uColourNoise: { value: opts.colourNoise ?? 0.12 },
     uTowerHeight: { value: TOWER.height },
     uLight: { value: new THREE.Color(interior ? LIMESTONE_INTERIOR : LIMESTONE_LIGHT) },
-    uMortar: { value: new THREE.Color(LIMESTONE_MORTAR) },
+    /*
+     * The joint belongs to the face it is on. Both branches used to take the
+     * exterior mortar, which is lighter than the interior stone — so `mix(uMortar,
+     * uLight, band)` ran backwards indoors and every bed line came out as a pale
+     * streak. See LIMESTONE_INTERIOR_MORTAR for the derivation and the question
+     * left for the owner.
+     */
+    uMortar: { value: new THREE.Color(interior ? LIMESTONE_INTERIOR_MORTAR : LIMESTONE_MORTAR) },
   }
   material.masonryUniforms = uniforms
 
