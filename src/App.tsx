@@ -450,12 +450,41 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
    * lines of prose in the console on every load, and a wall of text is read
    * exactly as often as no text at all. What prints is the fault, the current
    * value, the question verbatim in Russian, and where the argument lives.
+   *
+   * THE THIRD ONE JOINED THEM LATER THE SAME DAY and it is the largest of the
+   * three. Shown the reference frame in the comparison panel with the slits
+   * circled, he said the windows stand to the LEFT of the beak «в таком вот
+   * распорядке и отдалении друг от друга» — endorsing the photographed
+   * arrangement and spacing, which the model contradicts by nine openings
+   * against eight, 97° of column separation against 35, and six openings that
+   * cannot be seen from in front of the beak at any distance. Measured in
+   * windows.json → photographicLadder.remeasured and modelAsBuilt; candidates in
+   * → reconciliation; nothing geometric touched. It asks about the BUILDING —
+   * how far round from the beak the windows stand — and not about a parameter.
+   *
+   * AND A FOURTH, WHICH IS THE SAME EVIDENCE MEASURED RUNG BY RUNG. Fitting the
+   * drum's top rim arc rather than assuming a camera distance closes the vertical
+   * half of that disagreement — down from the crown in drum radii the photographed
+   * ladder and the model's landings agree to half a metre — and sharpens the
+   * horizontal half: the bearing does not drift between the two columns, it steps
+   * 43° in the single rung between storey 4 and storey 5. That is the storey he
+   * himself calls exceptional, so the question is about the STAIR and not the
+   * windows. windows.json → photographedPattern and → sectorStepQuestion.
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return
+    const unanswered: Array<readonly string[]> = []
     for (const q of [windowData.headShapeQuestion, windowData.sillHeightQuestion]) {
-      if (q.climbs.some((c) => c.answer !== null)) continue
-      console.warn(`[openings — unanswered]\n${q.ask.join('\n')}`)
+      if (q.climbs.every((c) => c.answer === null)) unanswered.push(q.ask)
+    }
+    if (windowData.beakSideQuestion.answer === null) {
+      unanswered.push(windowData.beakSideQuestion.ask)
+    }
+    if (Object.values(windowData.sectorStepQuestion.answers).every((a) => a === null)) {
+      unanswered.push(windowData.sectorStepQuestion.ask)
+    }
+    for (const ask of unanswered) {
+      console.warn(`[openings — unanswered]\n${ask.join('\n')}`)
     }
   }, [])
 

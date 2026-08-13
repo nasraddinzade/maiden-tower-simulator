@@ -737,6 +737,159 @@ export function ladderResidual(
   }
 }
 
+// ——————————— the photographed pattern, re-measured from the frames ———————————
+
+/**
+ * ONE RUNG OF THE LADDER THE EXTERIOR FRAMES ACTUALLY SHOW, in the one unit
+ * that borrows no datum from anybody: DRUM RADII, COUNTED DOWN FROM THE CROWN.
+ *
+ * `photographicLadder` above states the same eight slits as fractions of the
+ * tower's HEIGHT, and that is why its numbers and these do not agree. A fraction
+ * of the height needs two things the frames do not supply: where the ground is,
+ * and how tall the tower is above it. On the beak side the ground is not where
+ * [ICOMOS]'s 29.5 m is measured from — the frames put the drum's visible foot
+ * 4.2–4.4 radii below the crown, which is 34.7–36.3 m if the drum is the
+ * documented 16.5 m across, so the old fractions were divided by a span some
+ * six metres too long and every slit came out too low on the tower.
+ *
+ * Below-crown-in-radii needs neither. The crown is visible in every frame and
+ * the radius is what the camera fit measures the drum to be, so the same number
+ * can be computed for the model — (topY − centreY) / outerRadius — with nothing
+ * assumed on either side. That is the whole reason this shape exists.
+ */
+export interface PhotographedRung {
+  /** Which storey's landing level this rung stands at. See patternResidual(). */
+  storey: number
+  /** (crown − rung) ÷ drum radius. Measured, not derived from any storey table. */
+  belowCrownRadii: number
+  /**
+   * ° from the camera's own bearing, in one named frame. NOT an azimuth: no
+   * frame in this corpus fixes its own bearing better than about ±20°, so only
+   * DIFFERENCES between rungs in the same frame are worth anything.
+   */
+  deltaDeg: number
+}
+
+/** What the frames measure, as a whole. Every field is a measurement. */
+export interface PhotographedPattern {
+  /** The frames it was measured on. Named, so a reading can be re-run. */
+  frames: string[]
+  count: number
+  rungs: PhotographedRung[]
+  /** ° between the two columns' mean bearings. */
+  separationDeg: number
+  /** ° of spread in that figure across frames and camera distances. */
+  separationSpreadDeg: number
+  /** ° the bearing jumps between two adjacent rungs, and above which storey. */
+  bearingJumpDeg: number
+  bearingJumpAboveStorey: number
+  /** ° the upper column drifts over its four rungs. */
+  upperColumnDriftDeg: number
+  /** ° of spread in the lower column — how nearly it is one vertical generator. */
+  lowerColumnSpreadDeg: number
+  /** Drum radii between rungs, over the storeys both patterns have. */
+  rungPitchRadii: number
+  /** How near a model level must come to count as the same rung. */
+  matchToleranceRadii: number
+}
+
+/**
+ * Where the model puts an opening, measured the same way: down from the crown,
+ * in drum radii. Distinct levels only — three landings carry two openings each,
+ * and a pair 92° apart is ONE rung of a ladder seen in elevation, not two.
+ */
+export function crownRelativeLevels(
+  all: PassageOpening[],
+  topY: number,
+  outerRadius: number,
+): number[] {
+  const seen: number[] = []
+  for (const o of all) {
+    if (!o.built) continue
+    const v = (topY - o.centreY) / outerRadius
+    if (!seen.some((w) => Math.abs(w - v) < 1e-6)) seen.push(v)
+  }
+  return seen.sort((a, b) => a - b)
+}
+
+/**
+ * How far the built layout stands from the pattern the frames measure.
+ *
+ * REPORTS, DOES NOT ASSERT, exactly like ladderResidual() — and it exists
+ * beside that function rather than replacing it because they are scored on
+ * different rulers and both rulers should stay visible. ladderResidual() asks
+ * how the model compares with the reading that was in the file; this asks how it
+ * compares with the frames re-measured through a fitted camera. Where they
+ * disagree the disagreement is about the RULER, and that is worth being able to
+ * see rather than having quietly replaced.
+ */
+export function patternResidual(
+  all: PassageOpening[],
+  pattern: PhotographedPattern,
+  topY: number,
+  outerRadius: number,
+): {
+  count: number
+  countResidual: number
+  levels: number[]
+  matched: Array<{ storey: number; photographed: number; model: number; residual: number }>
+  /** Photographed rungs with no model level near them. The real gap. */
+  unmatchedStoreys: number[]
+  worstMatchedResidual: number
+  /** Drum radii per storey, over the storeys both patterns reach. */
+  pitchRadii: number
+  photographedPitchRadii: number
+  pitchResidualRadii: number
+} {
+  const levels = crownRelativeLevels(all, topY, outerRadius)
+  const matched: Array<{ storey: number; photographed: number; model: number; residual: number }> = []
+  const unmatchedStoreys: number[] = []
+  for (const r of pattern.rungs) {
+    let best: number | undefined
+    for (const v of levels) {
+      if (best === undefined || Math.abs(v - r.belowCrownRadii) < Math.abs(best - r.belowCrownRadii)) {
+        best = v
+      }
+    }
+    if (best === undefined || Math.abs(best - r.belowCrownRadii) > pattern.matchToleranceRadii) {
+      unmatchedStoreys.push(r.storey)
+      continue
+    }
+    matched.push({
+      storey: r.storey,
+      photographed: r.belowCrownRadii,
+      model: best,
+      residual: best - r.belowCrownRadii,
+    })
+  }
+
+  /*
+   * PITCH OVER THE STOREYS BOTH PATTERNS REACH, and taken end to end rather than
+   * as a mean of gaps. End to end is immune to a rung the model does not have —
+   * the storey-5 exit sits between two matched levels and drops out of the
+   * subtraction — and to the ±0.03 radii of scatter on any single rung, which a
+   * mean of seven small differences would carry straight through.
+   */
+  const hi = matched.reduce((a, b) => (b.storey > a.storey ? b : a), matched[0])
+  const lo = matched.reduce((a, b) => (b.storey < a.storey ? b : a), matched[0])
+  const span = hi && lo ? hi.storey - lo.storey : 0
+  const pitchRadii = span > 0 ? (lo.model - hi.model) / span : 0
+  const photographedPitchRadii = span > 0 ? (lo.photographed - hi.photographed) / span : 0
+
+  const built = all.filter((o) => o.built).length
+  return {
+    count: built,
+    countResidual: built - pattern.count,
+    levels,
+    matched,
+    unmatchedStoreys,
+    worstMatchedResidual: matched.reduce((m, r) => Math.max(m, Math.abs(r.residual)), 0),
+    pitchRadii,
+    photographedPitchRadii,
+    pitchResidualRadii: pitchRadii - photographedPitchRadii,
+  }
+}
+
 /** Problems that should stop an opening being cut. Data, not exceptions. */
 export function validatePassageOpening(o: PassageOpening): string[] {
   /*
