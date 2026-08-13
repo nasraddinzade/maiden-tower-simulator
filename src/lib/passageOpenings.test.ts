@@ -353,61 +353,88 @@ describe('the record of which ends are open', () => {
     expect(text).toMatch(/И ТАМ И ТАМ/)
   })
 
-  it('holds the two faults he named on 2026-08-13 open as questions, not as changes', () => {
+  it('leaves the two faults he named on 2026-08-13 where the evidence leaves them', () => {
     /*
      * [OWNER] 2026-08-13 said two more things are wrong — the shape of the heads,
      * and the height of the sill above the landing — and did NOT say what either
-     * should be. Neither value has been touched. Both are written down as
-     * questions phrased by the climb, because `head-4-6` is a name this repository
-     * invented and he has climbed a stair.
+     * should be. Until 2026-08-14 neither value had been touched and this test
+     * asserted that both were still open.
      *
-     * This test exists so the questions cannot rot into decoration: the moment an
-     * answer arrives, `answer` stops being null and this fails, which is the
-     * prompt to go and change the value it names.
+     * HIS OWN WALKTHROUGH FOOTAGE THEN ANSWERED ONE OF THEM AND NOT THE OTHER,
+     * which is why the two are no longer asserted the same way:
+     *
+     *   HEAD SHAPE — answered. Every opening on the route has a flat stone lintel
+     *   over it except one two-centred pointed window at the head of the 3→4
+     *   climb, and no opening anywhere has a semicircular head. Read four times
+     *   over the frames independently, agreeing. So the values MOVED, and the
+     *   record of whose word moved them has to be in the file.
+     *
+     *   SILL — not answered, and cannot be from these frames: there is no scale
+     *   object in any of them. The value is untouched. What the footage did take
+     *   away is the BOUND, which is asserted below.
+     *
+     * The questions still cannot rot into decoration: every `answer` is null and
+     * the moment one stops being null this fails, which is the prompt to go and
+     * change the value it names.
      */
     const climbs = windowData.openEndsQuestion.passages.map((p) => p.climb)
+    const ids = FITTINGS.map((f) => f.id).sort()
     for (const q of [windowData.headShapeQuestion, windowData.sillHeightQuestion]) {
       // same six climbs, in the same words, so three questions read as one survey
       expect(q.climbs.map((c) => c.climb)).toEqual(climbs)
-      expect(q.climbs.flatMap((c) => c.sets).sort()).toEqual(FITTINGS.map((f) => f.id).sort())
+      expect(q.climbs.flatMap((c) => c.sets).sort()).toEqual(ids)
       for (const c of q.climbs) expect(c.answer, c.climb).toBeNull()
       // asked in Russian, which is the language every statement came in
       expect(q.note.join(' ')).toMatch(/[а-яА-ЯёЁ]{4}/)
-      /*
-       * `ask` is the short form App.tsx prints. It has to name all six climbs by
-       * the climb and carry the verbatim question, or the console version stops
-       * being the question and becomes a reminder that one exists somewhere.
-       */
+      // `ask` is the short form App.tsx prints; it must still carry a sentence he
+      // can answer, verbatim, and stay short enough to read at the console
       const ask = q.ask.join('\n')
       expect(ask).toMatch(/«[^»]+»/)
-      for (const c of ['2→3', '3→4', '4→6', '6→7', '7→8', '8→крыша']) {
-        expect(ask, c).toContain(c)
-      }
-      // short enough to read next to ROOF_QUESTION's 28 lines
       expect(q.ask.length).toBeLessThan(20)
     }
 
-    // and the values they ask about are still exactly what they were
-    expect(PASSAGE_OPENING.sillAboveLanding).toBe(
-      windowData.sillHeightQuestion.current.sillAboveLanding,
-    )
+    // HEAD SHAPE: moved, and by a named authority. An id-level change with no
+    // source on it is exactly how a reading becomes a fact three commits later.
+    expect(windowData.headShapeQuestion.answeredBy).toMatch(/\[VIDEO\]/)
     for (const c of windowData.headShapeQuestion.climbs) {
       for (const id of c.sets) {
         expect(FITTINGS.find((f) => f.id === id)!.head, id).toBeDefined()
       }
     }
+
+    // SILL: narrowed by the same footage, and the value it asks about untouched.
+    expect(windowData.sillHeightQuestion.narrowedBy).toMatch(/\[VIDEO\]/)
+    expect(PASSAGE_OPENING.sillAboveLanding).toBe(
+      windowData.sillHeightQuestion.current.sillAboveLanding,
+    )
   })
 
-  it('keeps the sill question honest about the bound that makes it answerable', () => {
+  it('withdraws the sill bound the footage took the premise out from under', () => {
     /*
-     * The sill is bounded above by the vault, not by taste: headroom 2.30 less the
-     * 1.90 m opening leaves 0.40 m, and the file says so. If either number ever
-     * moves, the question's stated bound goes stale and the answers he gives
-     * against it stop meaning what they meant.
+     * THE ARITHMETIC WAS NEVER WRONG AND THE PREMISE UNDER IT WAS. The sill used
+     * to be bounded above by the vault: PLAYER.stairHeadroom 2.30 less the 1.90 m
+     * opening leaves 0.40 m, so a sill had to sit in 0…0.40 or its head stood
+     * inside the vault. That subtraction assumed the whole opening is cut in the
+     * wall OF THE LANDING it opens off.
+     *
+     * [VIDEO] 2026-08-14 says it is not. The opening stands at the far end of the
+     * passage, over treads that are still climbing — up/218 shows two steps rising
+     * inside the embrasure to the sill, down/124 shows three, up/168 shows the sill
+     * block two courses above the tread under it. Nothing about the clear height
+     * over the landing constrains a sill reached that way, so the bound is
+     * withdrawn rather than raised: `boundedAboveBy` is null and says why.
+     *
+     * The subtraction itself is still pinned, because it is what makes the
+     * withdrawal legible — and because if headroom or the opening height ever
+     * moves, the paragraph explaining the withdrawal goes stale with it.
      */
-    const bound = PLAYER.stairHeadroom - FITTINGS[0].outerHeight
-    expect(bound).toBeCloseTo(windowData.sillHeightQuestion.current.boundedAboveBy, 6)
-    expect(PASSAGE_OPENING.sillAboveLanding).toBeLessThan(bound)
+    const wouldBeBound = PLAYER.stairHeadroom - FITTINGS[0].outerHeight
+    expect(wouldBeBound).toBeCloseTo(0.4, 6)
+    expect(windowData.sillHeightQuestion.current.boundedAboveBy).toBeNull()
+    expect(windowData.sillHeightQuestion.current.boundNote).toMatch(/\[VIDEO\]|footage|climbing/)
+
+    // and refuting a bound is not measuring a sill: the shipped value is unmoved
+    expect(PASSAGE_OPENING.sillAboveLanding).toBeCloseTo(0.3, 9)
   })
 })
 

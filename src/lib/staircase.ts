@@ -13,14 +13,22 @@
 /**
  * Which way the stair turns as you climb, seen from above.
  *
- * UNRESOLVED. The Phase-4 spec assumes 'clockwise' and asks for it to be checked
- * against reference-photos/interior/. It cannot be: the two photographs of the
- * HISTORIC stair-in-wall disagree — in `Qız qalası mərtəbələrarası pilləkən.JPG`
- * the treads' narrow ends read as being on the right, while the Dreamstime frame
- * reads as curving the other way. (The other spiral photographs in the set show
- * the MODERN visitor stair, which winds about a central newel and tells us
- * nothing about the original.) Left as a parameter until someone who has walked
- * it confirms — see the note on STAIR.winding in config/tower.ts.
+ * NO LONGER UNRESOLVED, and not yet settled either. The Phase-4 spec assumed
+ * 'clockwise' and asked for it to be checked against reference-photos/interior/.
+ * That could not be done: the two photographs of the HISTORIC stair-in-wall
+ * disagree — in `Qız qalası mərtəbələrarası pilləkən.JPG` the treads' narrow ends
+ * read as being on the right, while the Dreamstime frame reads as curving the
+ * other way. (The other spiral photographs in the set show the MODERN visitor
+ * stair, which winds about a central newel and tells us nothing about the
+ * original.)
+ *
+ * [2026-08-14] The owner's walkthrough footage replaces both of them. Read four
+ * times independently, three of the readings resolve the tread wedge and all
+ * three put the narrow end on the CLIMBER'S LEFT — which is 'counterclockwise'
+ * here, and is what STAIR.winding already said. Frames, the handrail argument
+ * and the reason this is still called a strong reading rather than a measurement
+ * are all on STAIR.winding in config/tower.ts. It stays a parameter, and the
+ * leva switch stays live, until someone who has walked it says the word.
  */
 export type Winding = 'clockwise' | 'counterclockwise'
 
@@ -378,6 +386,14 @@ export interface PassageSection {
    * It is NOT a claim that the tower's roof is open over its stair. It is a claim
    * about this model's own arithmetic, which cannot roof that stretch at all. See
    * ROOF_QUESTION in config/tower.ts.
+   *
+   * [2026-08-14] AND THE TOWER'S ROOF IS NOT OPEN OVER ITS STAIR. The owner's roof
+   * footage shows the stair arriving at deck level through a door, under a modern
+   * head-house, with the parapet running on unbroken past it (roof/007, up/250).
+   * So this flag is now known to be false of the building as well as true of the
+   * model. It stays because the model still cannot roof that stretch: the paving
+   * has to cross the wall for the breach to close, and the paving cannot cross the
+   * wall until the parapet has a thickness, which no source gives.
    */
   openToSky?: boolean
 }
@@ -438,11 +454,19 @@ export function stairPassageSections(
    * the cut goes clean through the parapet ring for about 50° of arc and the
    * final steps come out under open sky. That breach is REAL — it is in the
    * built shell, you can stand on the deck and look into it. Clamping the cutter
-   * neither closes it nor excuses it. Whether the tower's roof is like that is a
-   * question about the building that no source in docs/ answers; it is written
-   * out for the owner at ROOF_QUESTION in config/tower.ts, and until he answers,
-   * moving the deck, the parapet or the headroom to make the picture tidy would
-   * be fitting a measured stack to a view (CLAUDE.md rule 1).
+   * neither closes it nor excuses it.
+   *
+   * WHETHER THE TOWER'S ROOF IS LIKE THAT WAS ANSWERED ON 2026-08-14 AND THE
+   * ANSWER IS NO. The owner's roof footage shows the paving crossing the whole
+   * thickness of the wall to a thin parapet on the outer edge, the parapet
+   * unbroken all the way round, and the stair arriving at deck level through a
+   * door under a modern head-house (roof/007, roof/016, up/250). The breach is
+   * therefore a known defect rather than a suspected one — and it still cannot be
+   * closed here, because closing it means carrying the paving out over the wall
+   * and nothing gives the parapet a thickness to carry it to. Until that one
+   * number arrives, moving the deck, the parapet or the headroom to make the
+   * picture tidy would be fitting a measured stack to a view (CLAUDE.md rule 1).
+   * ROOF_QUESTION in config/tower.ts is now that single question.
    */
   masonryTopY: number,
   sideClearance = PASSAGE_SIDE_CLEARANCE,

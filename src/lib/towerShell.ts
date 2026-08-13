@@ -864,7 +864,12 @@ function sectionProfile(s: PassageSection, arched: boolean, arcSegments = 5): Ar
    * over the last stretch of the roof climb — but now it is drawn on purpose,
    * from arithmetic that is written down (26.749 + 2.300 against a top of
    * 27.500), instead of falling out of a cutter that reached 1.55 m into the air
-   * and never said so. Whether the tower is like that is ROOF_QUESTION.
+   * and never said so. Whether the tower is like that was ROOF_QUESTION, and the
+   * owner's roof footage answered it on 2026-08-14: it is not. The paving crosses
+   * the wall, the parapet is unbroken, the stair comes out at deck level through a
+   * door (roof/007, roof/016, up/250). This trench survives because closing it
+   * needs the parapet's thickness and nothing gives it — see ROOF_QUESTION, which
+   * is now that one question and nothing else.
    */
   // radius of the two generating arcs — zero flattens the vault onto the straight
   const arcRadius = s.openToSky ? 0 : span

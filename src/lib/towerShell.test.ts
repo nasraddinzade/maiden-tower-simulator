@@ -692,18 +692,33 @@ describe('an opening is finished at the top the way its data says', () => {
      * time STAIR.startAzimuthDeg moves or the owner answers windows.json's
      * openEndsQuestion.
      *
-     * TWO HEAD SHAPES IN THE SET, NOT THREE, AND THE THIRD IS STILL BUILT. The
-     * pointed head belonged to the arched insertion, which went out with
-     * `chamberOpenings` on 2026-08-10 — see windows.json → chamberOpeningsHistory.
-     * The shape is a reading of a photograph and does not stop being one because
-     * the model no longer cuts it, so windowProfile() still makes it and the
-     * profile tests above still exercise it; what is asserted here is that the
-     * shipped set has none, which is the fact that changed.
+     * ONE HEAD SHAPE IN THE SET SINCE 2026-08-14, and the other two are still
+     * built. This used to assert some round heads and no pointed one, on a
+     * [PHOTO] reading of one exterior frame. The owner's walkthrough footage,
+     * read four times independently, finds a flat stone lintel over every opening
+     * on the route, exactly one two-centred pointed arch, and NOT ONE semicircular
+     * head — see windows.json → footageReading.headShapes. 'round' is still made
+     * by windowProfile() and still exercised by the profile tests above, because
+     * the building does have semicircular arches: over the DOORWAYS out of the
+     * chambers and over the entrance portal, which is very likely what the single
+     * exterior frame was showing.
+     *
+     * AND THE POINTED ONE IS ABSENT FOR A REASON WORTH PINNING. The tower's only
+     * pointed head is head-3-4, and that end is exactly the end the daylight check
+     * withholds: the derived layout puts it at azimuth 105.5 facing 10.64 m of
+     * solid buttress. The footage shows an open glazed window there, looking out
+     * over cypresses, a multi-lane road and people walking (down/138). A window
+     * cannot look through a beak, so the absence asserted below is a defect of the
+     * layout showing through the cut list, not a fact about the building —
+     * windows.json → footageReading.placeInTheWall has the three candidates and
+     * none of them is this repository's to choose.
      */
     const full = buildShellGeometry({ ...PARAMS, windows: WINDOW_CUTS })
     expect(full.stats.degenerateCount).toBe(0)
-    expect(WINDOW_CUTS.filter((w) => w.head === 'round').length).toBeGreaterThan(0)
-    expect(WINDOW_CUTS.filter((w) => w.head === 'flat').length).toBeGreaterThan(0)
+    expect(WINDOW_CUTS.filter((w) => w.head === 'round')).toEqual([])
+    expect(WINDOW_CUTS.filter((w) => w.head === 'flat').length).toBe(WINDOW_CUTS.length)
+    // the one pointed head in the tower is the one end this layout refuses to cut
     expect(WINDOW_CUTS.filter((w) => w.head === 'pointed')).toEqual([])
+    expect(SHIPPED_CUTS.some((w) => w.id === 'head-3-4')).toBe(false)
   })
 })

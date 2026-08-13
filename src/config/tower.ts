@@ -421,45 +421,85 @@ export const TOWER = {
  * south-east side, over the pier rather than away from it, and the last 3.4° of
  * it (110.1–113.5) stands above the buttress head.
  *
- * IT IS NOT REPAIRABLE FROM WHAT WE HAVE. Rebuilding the roof needs the paving's
- * outward reach and the edge parapet's thickness and height, and
- * docs/maiden-tower-reference.md contains not one line about the roof. Inventing
- * a terrace is precisely the error CLAUDE.md rule 1 calls the worst in this
- * project, so the model keeps the roof it can defend and says out loud that it
- * is probably wrong.
+ * ═════════════════════════════════════════════════════════════════════════
+ * 2026-08-14: THE SHAPE IS NOW KNOWN AND ONE NUMBER IS NOT. Read this before
+ * the paragraphs above, which are the record of what was suspected.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * The owner's roof footage answers every SHAPE question above, and answers all
+ * of them against the model. Frame numbers and the full reading are in
+ * windows.json → footageReading.roof; in short:
+ *
+ *   THE PAVING CROSSES THE WHOLE WALL to a THIN parapet standing on the outer
+ *   edge of the drum. roof/016 shows large flat slabs running up to the inner
+ *   face of the parapet, the parapet three or four courses under one wide flat
+ *   coping, and past the coping's outer edge nothing at all — the city, straight
+ *   down. There is no second shelf of wall-top out there. So the [PHOTO] reading
+ *   above was right and the residue-of-the-budget ring is wrong.
+ *
+ *   THE PARAPET IS NOT BREACHED BY THE STAIR. Two readings walked all 32 roof
+ *   frames and found no break anywhere on the circuit; roof/007 and up/250 show
+ *   it running on unbroken past the stair head.
+ *
+ *   THE STAIR ARRIVES AT DECK LEVEL THROUGH A DOOR. roof/007: a stainless
+ *   threshold set flush IN the paving with the treads starting straight behind
+ *   it. Over the stairwell stands a MODERN wedge of sawn ashlar raked to the
+ *   pitch of the stair and capped by an inclined glazed light (up/250). An
+ *   opening in the deck with a head-house over it — the first answer, not the
+ *   second.
+ *
+ * SO FAULT A IS NOT A DOUBT ANY MORE, IT IS A KNOWN DEFECT. The 50° trench, the
+ * last 1.55 m of the climb open to the sky, the 0.190 m fin and the book-thick
+ * lintel from azimuth 180 to 163 are all consequences of a deck that stops at
+ * the room face, and the building does not do that. Note what the paragraph
+ * above predicted before there was any footage: "it would go away by itself if
+ * the paving crossed the wall". It would.
+ *
+ * IT IS STILL NOT REPAIRABLE, and now for exactly one reason instead of three.
+ * The paving's outward reach is settled (the full thickness) and the parapet's
+ * height is measured (PARAPET, 0.75 ± 0.06 m [VIDEO]). The parapet's THICKNESS
+ * is not: no frame shows its outer face and the deck together, so it can only be
+ * called thin against the 3.7 m of wall it stands on, and docs/maiden-tower-
+ * reference.md contains not one line about the roof. Choosing a thickness to get
+ * a terrace that looks right is precisely the error CLAUDE.md rule 1 calls the
+ * worst in this project. One number, and the roof can be rebuilt.
  *
  * Printed to the dev console on every load, with the passage-opening conflicts
  * and for the same reason: a question nobody is looking at is not open, it is
  * lost.
  */
 export const ROOF_QUESTION = [
-  'ROOF — [PLACEHOLDER]. Two questions for the owner; nothing above the 8th storey',
-  'can be trusted until they are answered. Ask in Russian, verbatim:',
+  'ROOF — [PLACEHOLDER] in shape until 2026-08-14, when your own roof footage',
+  'settled the shape. What the model still cannot build is ONE NUMBER. Ask in',
+  'Russian, verbatim:',
   '',
-  '  1. «Крыша: докуда доходит мощение террасы — до самого наружного края стены,',
-  '      или обрывается раньше и дальше идёт что-то другое? И какой парапет по',
-  '      краю: какой он толщины и какой высоты от настила, если встать рядом?',
-  '      Годится рулетка или один кадр, где парапет виден сбоку рядом с человеком.»',
+  '  «Парапет на крыше: какой он ТОЛЩИНЫ? Обопрись на него ладонью — он в ладонь,',
+  '   в две ладони, в локоть? Или один кадр сверху вниз на накрывку, где рядом',
+  '   лежит что-то знакомого размера — телефон, ключи.»',
   '',
-  '     — where does the terrace paving reach, and what parapet stands at its edge?',
-  '       The model has the paving stopping at the inner wall face and calls the',
-  '       whole 3.7 m top of the wall a 0.75 m parapet. The photograph disagrees.',
+  '     — how THICK is the roof parapet? Its height is already measured (0.75 ±',
+  '       0.06 m [VIDEO]) and the paving is now known to run the full thickness of',
+  '       the wall out to it. Thickness is the last thing missing, and with it the',
+  '       whole terrace can be rebuilt.',
   '',
-  '  2. «Поднимаясь последним маршем на крышу, вы выходите через проём (люк) в',
-  '      мощении и оказываетесь посреди площадки — или через разрыв в парапете, то',
-  '      есть последние несколько ступеней уже под открытым небом? Если второе — за',
-  '      сколько ступеней до верха кончается свод над головой?»',
+  'WHAT THE FOOTAGE ALREADY ANSWERED, so nobody asks it again:',
+  '  · the paving reaches the OUTER edge of the wall — roof/016, roof/001, up/230;',
+  '  · the parapet is thin, on the outer edge, 3–4 courses under one flat coping,',
+  '    with scuppers through its base at deck level — roof/016;',
+  '  · it is NOT broken where the stair comes out — roof/007, up/250, and no break',
+  '    anywhere in 32 roof frames;',
+  '  · the stair reaches the deck through a DOOR AT DECK LEVEL, over an opening in',
+  '    the paving, under a modern ashlar head-house with a glazed raking cap —',
+  '    roof/007, up/250. Not a break in the parapet, and not open sky.',
   '',
-  '     — do you come out through an opening in the deck, or through a break in the',
-  '       parapet with the last steps under open sky? [VIDEO] 429–449 s ends with',
-  '       him stepping onto the deck and does not show what is over his head.',
-  '',
-  'The model currently builds the second answer, by accident rather than on',
-  'evidence: 26.749 (deck) + 2.300 (PLAYER.stairHeadroom) = 29.049 against a top',
-  'of 27.500, so the last 1.55 m of the climb CANNOT be roofed by this stack. Do',
-  'not close the breach by lowering the deck, raising the parapet or shortening',
-  'the headroom — all four numbers are measured or derived from measured, and',
-  'moving any of them fits the building to the picture (rule 1).',
+  'The model still builds the wrong one of those, and the defect is now known',
+  'rather than suspected: 26.749 (deck) + 2.300 (PLAYER.stairHeadroom) = 29.049',
+  'against a top of 27.500, so the last 1.55 m of the climb cannot be roofed by',
+  'this stack and the cutter opens ~50° of the ring to the sky. Do NOT close the',
+  'breach by lowering the deck, raising the parapet or shortening the headroom —',
+  'all four numbers are measured or derived from measured, and moving any of them',
+  'fits the building to the picture (rule 1). It closes when the paving crosses',
+  'the wall, and the paving crosses the wall when the parapet has a thickness.',
 ] as const
 
 // —————————————————————————————— buttress —————————————————————————————
@@ -594,24 +634,43 @@ export const STAIR: {
   endLandingLength: number
 } = {
   /**
-   * From photographs of the tread wedges; contradicts the spec's assumed
-   * clockwise, and src/lib/staircase.ts still marks the question UNRESOLVED.
+   * Axis on the CLIMBER'S LEFT, so the helix runs counterclockwise seen from
+   * above. Unchanged since 2026-08-06; what changed on 2026-08-14 is what it
+   * rests on.
    *
-   * IT IS NO LONGER AN INTERIOR QUESTION EITHER. Flipping it mirrors every
-   * flight, which since 2026-08-10 mirrors every exterior slit onto the other
-   * side of the drum — the switch is live in the leva panel and moves the
-   * façade. An unresolved parameter now drives the one thing in this project
-   * that was genuinely measured off photographs.
+   * IT USED TO REST on two historic interior stills that contradicted each
+   * other, which is why src/lib/staircase.ts called the question UNRESOLVED. It
+   * now rests on the owner's own walkthrough footage, read four times
+   * independently: three of the readings resolve the tread wedge and all three
+   * put the narrow ends on the climber's left — up/059, up/060, up/093, up/112,
+   * up/117, up/119, up/152 on the climb, and down/173 on the descent, where left
+   * and right reverse and the reader reversed them. The stainless handrail is on
+   * the climber's right on every stone flight, which is the WIDE side of a
+   * winder because the narrow side has nothing to stand on; up/119 shows a man
+   * climbing with his right hand on it, walking the wide half of the treads. Not
+   * one frame in 492 reads the other way.
    *
-   * That cuts both ways and the tempting half must be said out loud: it means
-   * an exterior frame could in principle SETTLE the winding, by asking which
-   * sense puts the slits where they are seen. Using it that way today would be
-   * fitting an unresolved value to bearings the window file itself calls ±20°
-   * systematic, on top of a start azimuth that is a placeholder. Two unknowns,
-   * one observation. Not settled here.
+   * NOT CALLED SETTLED, and the honest reason is the size of the effect. Across
+   * a 0.9 m flight at a mid-radius of 4–5 m the taper is a few per cent, read
+   * off treads dished hollow by wear, in handheld wide-angle frames with no
+   * scale — a camera off the passage's axis can fake that in either direction.
+   * The fourth reading looked only at the last climb to the roof and measured
+   * equal treads at both walls, which is not a counter-reading: that flight is
+   * straight and has no wedge (windows.json → footageReading.straightRoofFlight).
+   * Three readings leaning one way and none the other is strong evidence, not a
+   * measurement, so the question stays in the queue — demoted, and with the
+   * frames named so nobody starts again from the two stills.
    *
-   * QUESTION FOR THE OWNER: climbing a passage in the wall, is the tower's axis
-   * on your left or on your right?
+   * IT STILL MIRRORS THE WHOLE FAÇADE. Flipping it moves every exterior slit
+   * onto the other side of the drum; the switch is live in the leva panel. And
+   * the tempting shortcut is still forbidden: an exterior frame could in
+   * principle settle the winding by asking which sense puts the slits where they
+   * are seen, but doing that fits an unresolved value to bearings this project
+   * calls ±20° systematic, on top of a start azimuth that is testimony given by
+   * eye. Two unknowns, one observation.
+   *
+   * QUESTION FOR THE OWNER, still open: climbing a passage in the wall, is the
+   * tower's axis on your left or on your right?
    */
   winding: 'counterclockwise',
   riserTarget: 0.2, // m — spec band 0.18–0.22; the real riser is rounded to fit each storey
@@ -934,6 +993,20 @@ function buildLifts(): StairLift[] {
      * equal length means and because nothing in the footage argues for an uneven
      * split. If anyone ever counts the risers before and after the turn, this is
      * one number to change.
+     *
+     * [2026-08-14] AND THE RUN ABOVE THE LANDING IS STRAIGHT, WHICH THIS LIFT IS
+     * NOT. Three independent readings of the frames say the last climb runs
+     * straight under a barrel vault between parallel cheeks (up/222–224,
+     * down/003–011), and one of them made the direct test: consecutive nosings in
+     * up/223 measure the same tread depth at both walls, so there is no wedge and
+     * it is not a winder. The other six stone flights are short winders that
+     * turn. Nothing is changed here, because making it straight needs a direction
+     * and a length that no source gives, and because the roof exit's bearing is
+     * what the roof breach and head-8-9 both hang off — it is not a local edit.
+     * Recorded so it is not rediscovered: windows.json →
+     * footageReading.straightRoofFlight. The same frames also show there is no
+     * upper LANDING at the top: up/225 and roof/007 put the last tread directly
+     * at the threshold in the deck, where STAIR.endLandingLength lays a platform.
      */
     lift(
       'wallStair',
@@ -972,24 +1045,49 @@ export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair
  */
 export const PASSAGE_OPENING = {
   /**
-   * m — masonry between the landing floor and the slit's sill. [PLACEHOLDER].
+   * m — masonry between the landing floor and the slit's sill. [PLACEHOLDER],
+   * and since 2026-08-14 a placeholder whose REASONING is refuted as well as its
+   * value. It is still what the model builds, because nothing has replaced it.
    *
-   * NO SOURCE GIVES IT, and the temptation is to reach for the photographs: the
-   * eight measured slit centres, re-referred to the nearest landing below them,
-   * imply sills from −0.43 to +2.08 m. A 2.5 m spread is not a measurement of
-   * anything, and taking its median would be dressing a guess as a reading.
+   * WHAT THE WALKTHROUGH FOOTAGE SHOWS, all four readings of it agreeing and
+   * none dissenting. The sill is never at the level of the landing you step onto
+   * out of the chamber. There are always several risers in between: the opening
+   * stands at the top of the first short run of treads (up/168 — the sill block
+   * about two courses above the tread under it), or steps climb to it inside the
+   * embrasure (up/218 — two shallow ones; down/124 — three large ones). So the
+   * building does not put one course of stone under a slit and the 0.30 is not a
+   * description of it.
    *
-   * So this is a CONSTRUCTION rule instead, and its whole virtue is that it
-   * introduces no new number: one slab thickness of stone under the sill, the
-   * same course the floors are built of. It is bounded above by geometry rather
-   * than by taste — the clear light over a landing is PLAYER.stairHeadroom, and
-   * a 1.9 m opening leaves at most 0.40 m under it, so any sill in 0…0.40 fits
-   * and anything more does not. One slab, 0.30, sits inside that band — which is
-   * luck rather than corroboration, and if the slab thickness ever moves this
-   * needs re-checking against the same bound.
+   * AND THE BOUND GOES WITH IT, which matters more than the value. The old note
+   * bounded this above at 0.40 m — PLAYER.stairHeadroom 2.30 less the 1.90 m
+   * opening — and that arithmetic assumed the opening is cut in the wall OF THE
+   * LANDING. It is not: it is at the far end of the passage, over treads that
+   * are still climbing, so the clear height over the landing does not constrain
+   * it at all. A model that clamps to 0.40 is enforcing a premise the footage
+   * has taken away. Nothing is clamped differently yet, because unclamping it
+   * without a measurement would just move the invention somewhere else.
    *
-   * QUESTION FOR THE OWNER: standing on the landing at the end of a passage, does
-   * the slit start at knee height, at the waist, at the chest?
+   * WHAT THE FOOTAGE CANNOT GIVE: metres. There is no scale object in any of the
+   * 492 frames — no tape, no door of known size, no rule against a wall. Every
+   * figure in the readings is a riser count times an ASSUMED riser, or a
+   * proportion of a person at unknown distance through a wide-angle phone lens.
+   * Rule 1 forbids all of it, and here it is working against a conclusion rather
+   * than for one.
+   *
+   * NOR CAN THE EXTERIOR PHOTOGRAPHS, and that record is kept because it is the
+   * other half of why 0.30 is still here: the eight measured slit centres,
+   * re-referred to the nearest landing below them, imply sills from −0.43 to
+   * +2.08 m. A 2.5 m spread is not a measurement of anything, and taking its
+   * median would be dressing a guess as a reading. The 0.30 was chosen instead as
+   * a CONSTRUCTION rule whose whole virtue was that it introduced no new number —
+   * one slab thickness of stone under the sill, the same course the floors are
+   * built of. That virtue survives the footage; the description does not.
+   *
+   * QUESTION FOR THE OWNER, and it has changed shape: not "knee, waist or
+   * chest" — that measures from the treads directly under the sill, and the
+   * model needs it from the landing at the chamber door. Ask instead how many
+   * STEPS there are between the two, and how high the sill is at the window
+   * itself. See windows.json → sillHeightQuestion.ask and → footageReading.sill.
    */
   sillAboveLanding: FLOOR_SLAB,
   /** m — the same course of stone over the head. [PLACEHOLDER]; see above. */
@@ -1020,6 +1118,17 @@ export const PASSAGE_OPENING = {
    * 3.1 m over a vault 2.30 m high. It is a separate tunnel, and no source gives
    * its length, its bearing or its gradient. Rule 1.
    *
+   * [2026-08-14] THE ONE FRAME BECAME MANY AND THEY ALL AGREE — the reading above
+   * was made from a single passage of the roof climb and it generalises. up/087:
+   * a locked barred gate two steps up off a landing, with a deep embrasure behind
+   * it. up/218: two shallow stone steps climbing inside the embrasure to the sill,
+   * with a barred screen across its mouth. up/143: the fork itself at the foot of
+   * a flight — the main run bearing away and a short branch of two or three steps
+   * continuing straight on to a slit, with the handrail fixed to the wall between
+   * them. Still shipped EMPTY for the same reason as before: none of those frames
+   * gives a length, a bearing or a gradient, and counting risers in them means
+   * assuming the riser.
+   *
    * QUESTION FOR THE OWNER: do those steps climb from the stair landing up to the
    * slit, or from the room into a recess in the wall?
    */
@@ -1027,7 +1136,9 @@ export const PASSAGE_OPENING = {
   /**
    * Deliberately NOT modelled, recorded so nobody assumes it was overlooked:
    * three barred branches to slits, [VIDEO] 429–449 s, 6/3/3 steps. Geometry for
-   * them exists in no source.
+   * them exists in no source, and the 2026-08-14 reading of the whole climb found
+   * the same arrangement at the foot of every stone flight rather than at three
+   * of them — see windows.json → footageReading.corroborated.
    */
   unmodelledBranches: 3,
 } as const

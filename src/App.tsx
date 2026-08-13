@@ -507,10 +507,16 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
    * This one is not a conflict between two statements — it is a hole in the
    * record with a visible consequence: the roof climb's last 1.55 m cannot be
    * roofed by the measured stack, so the cutter takes the parapet ring away over
-   * about 50° of arc and the final steps come out under the sky. Whether the
-   * building does that is unknown and unknowable from docs/. Printed once per
-   * load so that whoever next stands on the deck and sees the breach finds the
-   * question already written rather than reaching for a plausible terrace.
+   * about 50° of arc and the final steps come out under the sky.
+   *
+   * [2026-08-14] THE SHAPE IS NO LONGER UNKNOWN AND THE QUESTION SHRANK TO ONE
+   * NUMBER. His roof footage shows the paving crossing the whole wall to a thin
+   * parapet on the outer edge, the parapet unbroken, and the stair arriving at
+   * deck level through a door under a modern head-house. So the breach is a known
+   * defect now, and what is printed is the last thing missing: how thick the
+   * parapet is. Still printed once per load, so that whoever next stands on the
+   * deck and sees the breach finds the question already written rather than
+   * reaching for a plausible terrace.
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return
