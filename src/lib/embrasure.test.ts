@@ -238,8 +238,13 @@ describe('the wall lets you into the embrasure', () => {
  * down to about 40, and the whole slit column sat between azimuth 123 and 143.
  *
  * The tie was broken the way it was for the window bearing: STAIR.startAzimuthDeg
- * is a [PLACEHOLDER] and the window azimuths were photographs, so the placeholder
- * moved, to 100.
+ * was a [PLACEHOLDER] and the window azimuths were photographs, so the placeholder
+ * moved, to 100. On 2026-08-13 it moved again, to BUTTRESS.azimuthDeg + 90 =
+ * 196.7, on [OWNER]'s own account of where the stair stands relative to the beak
+ * — within 3.3° of the 200 this paragraph records as the fault. That is not the
+ * fault returning: the recesses it collided with no longer exist, because the
+ * same witness withdrew the chamber openings on 2026-08-10 and this whole layer
+ * with them.
  *
  * [OWNER] 2026-08-10 inverts the premise. An opening is not a competitor for the
  * stair's wall — it IS the stair's wall, cut radially through the outer cheek of

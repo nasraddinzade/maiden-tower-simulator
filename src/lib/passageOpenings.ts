@@ -448,10 +448,20 @@ export interface PlanPassageOpeningsInput {
  *   open === null    [PLACEHOLDER]. The check stands in, `decidedBy` says so,
  *                    and testimonyConflicts() keeps saying the record is empty.
  *
- * WHAT MUST NOT BE DONE ABOUT THE MISMATCH: STAIR.startAzimuthDeg is 100 and is
- * itself a [PLACEHOLDER]. Turning it until the feet clear the buttress would
- * make the owner's sentence come true by moving the building, which is CLAUDE.md
- * rule 7 exactly. The mismatch is published instead.
+ * WHAT MUST NOT BE DONE ABOUT A MISMATCH, and it is left standing although the
+ * particular mismatch it was written about has gone: turning STAIR.startAzimuthDeg
+ * until a statement of the owner's comes true is fitting the building to the
+ * claim, which is CLAUDE.md rule 7 exactly. A mismatch is published instead.
+ *
+ * [2026-08-13] The mismatch that stood here — no passage open at both ends, when
+ * "both" is the first case he names — is gone, and how it went is the only thing
+ * that makes its absence acceptable. He was asked a DIFFERENT question, about
+ * where the stair stands relative to the buttress seen from above, and answered a
+ * quarter turn clockwise. STAIR.startAzimuthDeg is derived from that now
+ * (BUTTRESS.azimuthDeg + 90), five feet came out of the pier, and three passages
+ * came out open at both ends. Nobody searched for an angle that produced it; had
+ * it produced the contradiction again, the contradiction would have shipped
+ * again. Read it as corroboration, never as a target.
  */
 export function planPassageOpenings(input: PlanPassageOpeningsInput): PassageOpening[] {
   const { anchors, fittings, liftLabel, cfg, buttress, outerRadius } = input
@@ -602,9 +612,14 @@ export function testimonyConflicts(all: PassageOpening[]): string[] {
   /*
    * [OWNER] 2026-08-10: "в некоторых местах и вначале входа на лестницу и в
    * конце есть окна" — in SOME places there is one at the beginning AND one at
-   * the end. So at least one passage has to come out `both`. None does, and it
-   * is not a near miss: the five feet that would make it stand at azimuth
-   * 108.7–110.2 with the buttress root arc running 72.7–113.5 [OSM].
+   * the end. So at least one passage has to come out `both`.
+   *
+   * This fired for three days and stopped on 2026-08-13, when the stair moved a
+   * quarter turn on his separate testimony about the buttress and three passages
+   * came out `both`. The check is kept, and kept in this shape, because it is now
+   * the guard on an agreement rather than the report of a disagreement: if
+   * anybody turns the stair, flips the winding or fills in the record such that
+   * no passage has openings at both ends again, this says so on the next load.
    */
   const pairs = passageEndPairs(all)
   if (pairs.length > 0 && !pairs.some((p) => p.pattern === 'both')) {

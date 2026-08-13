@@ -64,6 +64,64 @@ export function channelRings(
 }
 
 /**
+ * One storey's length of the chase the downpipe stands in.
+ *
+ * Structurally a towerShell.WallChase, and deliberately not typed as one: this
+ * module is three-js-free (CLAUDE.md rule 6) and WallChase lives in the module
+ * that builds cutting geometry. App.tsx passes these straight in.
+ */
+export interface DownpipeChase {
+  azimuthDeg: number
+  /** Width across the room-side face, metres. */
+  width: number
+  bottomY: number
+  topY: number
+  /** How far it bites into the masonry. */
+  depth: number
+  /** Which storey this length belongs to, 0-based — for reporting, not geometry. */
+  floorIndex: number
+}
+
+/**
+ * WHERE THE DOWNPIPE'S CHASE ACTUALLY IS, extracted so that exactly one place
+ * knows.
+ *
+ * It was built inline in App.tsx and re-derived, azimuth-only and with no height
+ * at all, in wellClearance.test.ts. That cost a false alarm on 2026-08-13: when
+ * the stair turned a quarter of the drum, the reveal at foot-8-9 came within
+ * 0.2° of the chase's bearing and the test failed — on a pair standing 2 m apart
+ * vertically, the chase stopping at the storey-7 springing and the reveal
+ * beginning at the storey-8 landing. A guard that cannot see the second
+ * dimension reports a clash that is not there, and the cure for that is not to
+ * relax it but to give it the dimension.
+ *
+ * The extent is [ref]'s, not a choice: the collecting channels run storeys 2–7,
+ * the wellhead is on storey 3 [VIDEO], and the pipe runs from the highest
+ * channel down into it — so the chase exists from the wellhead's storey up to
+ * the top of the channel range, floor to springing on each.
+ */
+export function downpipeChases(
+  floors: Array<{ index: number; floorY: number; cupolaSpringY: number }>,
+  range: readonly [number, number],
+  startsAtFloorIndex: number,
+  azimuthDeg: number,
+  pipeDiameter: number,
+): DownpipeChase[] {
+  const [from, to] = range
+  return floors
+    .filter((f) => f.index >= Math.max(startsAtFloorIndex, from - 1) && f.index <= to)
+    .map((f) => ({
+      azimuthDeg,
+      // wide enough to stand the pipe in with a shoulder either side
+      width: pipeDiameter * 2.2,
+      bottomY: f.floorY,
+      topY: f.cupolaSpringY,
+      depth: pipeDiameter * 1.6,
+      floorIndex: f.index,
+    }))
+}
+
+/**
  * Profile of the well shaft: a funnel collar at the mouth narrowing to the bore.
  * Returned as (radius, y) pairs ready to be revolved.
  *

@@ -11,6 +11,7 @@ import {
   stairSettings,
 } from '../config/tower'
 import { planAllFlights, stairDoorways } from './staircase'
+import { downpipeChases } from './waterSystem'
 import { SHIPPED_CUTS } from './openings.fixture'
 
 const flights = planAllFlights(stairSettings(), WALL_LIFTS, innerRadiusAt)
@@ -36,9 +37,15 @@ describe('the downpipe stands clear of everything a visitor walks through', () =
   it('is not in a stair doorway', () => {
     /*
      * IT WAS. The chase is cut down the room-side face and the stair's head
-     * doorways come out at about az 15 since the flights moved to start at 100,
-     * so a visitor leaving the stair on storey 3 walked into a 0.30 m pipe
-     * standing across the opening. The owner photographed it.
+     * doorways came out at about az 15 when the flights started at 100, so a
+     * visitor leaving the stair on storey 3 walked into a 0.30 m pipe standing
+     * across the opening. The owner photographed it.
+     *
+     * [2026-08-13] The stair turned a quarter of the drum and the doorways came
+     * round with it: the feet are at about 191 and the roof climb's at 205.0,
+     * which is the closest anything gets to the chase at 230 — 14.5° clear. The
+     * fault this test was written for has not recurred, but the margin has gone
+     * from three figures of arc to two, so it is now doing real work.
      */
     const clashes: string[] = []
     for (const d of doorways) {
@@ -69,14 +76,70 @@ describe('the downpipe stands clear of everything a visitor walks through', () =
      * quietly reused: WELL.azimuthDeg = 230 was chosen partly because "the slit
      * columns stand between 123 and 170". No slit stands there now. The value
      * survives its own re-check on other grounds; see the note in config.
+     *
+     * IT NOW ASKS ABOUT HEIGHT, AND IT HAD TO. On 2026-08-13 the stair turned a
+     * quarter of the drum and this test failed on foot-8-9 — azimuth 218.5
+     * against a chase at 230, the two overlapping by 0.2° once both half-widths
+     * are counted. They do not touch: the chase's topmost length ends at the
+     * storey-7 springing, 21.79, and that reveal starts at 23.77, so there is
+     * 1.98 m of masonry between them. The old version compared bearings alone and
+     * borrowed one half-angle from storey 3 for every opening in the tower, so it
+     * could not see that. Giving it the second dimension is a correction, not a
+     * relaxation — and downpipeChases() is now the one place either side is
+     * derived, because App.tsx and this file used to build the chase separately.
      */
+    const chases = downpipeChases(
+      FLOORS,
+      WATER.channelFloorRange,
+      WELL.startsAtFloorIndex,
+      WELL.azimuthDeg,
+      WATER.downpipeDiameter,
+    )
+    expect(chases.map((c) => c.floorIndex)).toEqual([2, 3, 4, 5, 6])
+
     const clashes: string[] = []
     for (const w of SHIPPED_CUTS) {
-      const half = chaseHalfDeg(FLOORS[WELL.startsAtFloorIndex].floorY)
       const wHalf = (w.innerWidth / 2 / w.revealEndRadius) * (180 / Math.PI)
-      if (sep(WELL.azimuthDeg, w.azimuthDeg) < half + wHalf) clashes.push(w.id)
+      const sill = w.centreY - w.outerHeight / 2
+      const head = w.centreY + w.outerHeight / 2
+      for (const c of chases) {
+        if (head < c.bottomY || sill > c.topY) continue
+        const half = chaseHalfDeg((c.bottomY + c.topY) / 2)
+        if (sep(c.azimuthDeg, w.azimuthDeg) < half + wHalf) {
+          clashes.push(`${w.id} against the chase on storey ${c.floorIndex + 1}`)
+        }
+      }
     }
     expect(clashes).toEqual([])
+  })
+
+  it('clears the nearest reveal in bearing by 11° and in height by 1.9 m', () => {
+    /*
+     * The margin the test above passes on, written down, because "no clash" hides
+     * how close the near miss is. foot-8-9 is 11.5° from the chase's bearing
+     * against a combined half-width of 11.7° — i.e. they DO overlap in plan, and
+     * only the vertical gap keeps them apart. If the downpipe were ever carried a
+     * storey higher, or that opening's landing lowered, this becomes a real
+     * collision and not a bookkeeping one.
+     */
+    const worst = SHIPPED_CUTS.map((w) => ({
+      id: w.id,
+      gap: sep(WELL.azimuthDeg, w.azimuthDeg),
+    })).reduce((a, b) => (b.gap < a.gap ? b : a))
+    expect(worst.id).toBe('foot-8-9')
+    expect(worst.gap).toBeGreaterThan(11)
+    expect(worst.gap).toBeLessThan(12)
+
+    const chases = downpipeChases(
+      FLOORS,
+      WATER.channelFloorRange,
+      WELL.startsAtFloorIndex,
+      WELL.azimuthDeg,
+      WATER.downpipeDiameter,
+    )
+    const top = Math.max(...chases.map((c) => c.topY))
+    const sill = SHIPPED_CUTS.find((w) => w.id === 'foot-8-9')!.centreY - 1.9 / 2
+    expect(sill - top).toBeGreaterThan(1.9)
   })
 
   it('is not in the entrance passage', () => {

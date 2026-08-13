@@ -39,6 +39,7 @@ import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WallChase, WindowCut } from './lib/towerShell'
+import { downpipeChases } from './lib/waterSystem'
 import { WindowGrilles } from './components/tower/WindowGrilles'
 import { WindowSurrounds } from './components/tower/WindowSurrounds'
 import { CourseBands } from './components/tower/CourseBands'
@@ -180,7 +181,14 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
     goingTarget: { value: STAIR.goingTarget, min: 0.2, max: 0.45, step: 0.01, label: 'going m' },
     stairWidth: { value: STAIR.width, min: 0.5, max: 1.6, step: 0.05, label: 'flight width m' },
     wallClearance: { value: STAIR.wallClearance, min: 0, max: 1, step: 0.05, label: 'wall gap m' },
-    startAzimuthDeg: { value: STAIR.startAzimuthDeg, min: 0, max: 360, step: 1, label: 'start az°' },
+    /*
+     * Step 0.1, not 1, since 2026-08-13. The shipped value is no longer a round
+     * placeholder — it is BUTTRESS.azimuthDeg + 90, i.e. 196.7 — and a control
+     * that snaps to whole degrees cannot be dragged back to the value the config
+     * ships. A slider you cannot return to its default is a slider that silently
+     * loses the derivation the moment anybody touches it.
+     */
+    startAzimuthDeg: { value: STAIR.startAzimuthDeg, min: 0, max: 360, step: 0.1, label: 'start az°' },
     cutStairwells: true,
   })
 
@@ -314,23 +322,17 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
    * springing, with the pipe inside it. [ref] has the pipe coming out of the
    * niches, and this is the niche.
    */
-  const wallChases = useMemo<WallChase[]>(() => {
-    const [from, to] = WATER.channelFloorRange
-    const out: WallChase[] = []
-    for (let i = WELL.startsAtFloorIndex; i <= to && i < FLOORS.length; i++) {
-      if (i < from - 1) continue
-      const f = FLOORS[i]
-      out.push({
-        azimuthDeg: WELL.azimuthDeg,
-        // wide enough to stand the pipe in with a shoulder either side
-        width: WATER.downpipeDiameter * 2.2,
-        bottomY: f.floorY,
-        topY: f.cupolaSpringY,
-        depth: WATER.downpipeDiameter * 1.6,
-      })
-    }
-    return out
-  }, [])
+  const wallChases = useMemo<WallChase[]>(
+    () =>
+      downpipeChases(
+        FLOORS,
+        WATER.channelFloorRange,
+        WELL.startsAtFloorIndex,
+        WELL.azimuthDeg,
+        WATER.downpipeDiameter,
+      ),
+    [],
+  )
 
   // Phase-5 spec: openings come from src/data/windows.json so they can be edited
   // without a rebuild. Every value there is photo-derived, not surveyed.
@@ -407,18 +409,23 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
    * THE FINDINGS NOBODY MAY WALK PAST, printed where the person editing the model
    * is looking.
    *
-   * Two of them, and both are the same kind of thing: a place where the record is
-   * empty or where the record and the model disagree. Neither is repaired here —
-   * the repair for both is six questions to the owner (windows.json →
-   * openEndsQuestion), and the repair that must NOT be made is turning
-   * STAIR.startAzimuthDeg until the disagreement goes away (CLAUDE.md rule 7).
+   * A place where the record is empty, or where the record and the model
+   * disagree. Not repaired here — the repair is six questions to the owner
+   * (windows.json → openEndsQuestion), and the repair that must NOT be made is
+   * turning STAIR.startAzimuthDeg until a disagreement goes away (rule 7).
    *
-   * It fires on every load as this ships, because all twelve ends are
-   * [PLACEHOLDER] and because no passage comes out open at both ends, which is
-   * the first case the owner names. That is deliberate: a warning that appears
-   * once and then is fixed teaches nothing, and this one is the state of the
-   * evidence rather than a bug. Dev only — it is a note to whoever is building
-   * the model, not to a visitor.
+   * ONE OF ITS TWO LINES WENT QUIET ON 2026-08-13, and the note is kept rather
+   * than trimmed because the quiet is the news. Until then this also printed "no
+   * passage has an opening at both ends", which contradicted [OWNER] 2026-08-10
+   * and which no answer of his could have repaired. The stair moved a quarter
+   * turn on his own testimony about the beak and three passages came out open at
+   * both ends. The warning was not silenced; it stopped being true.
+   *
+   * What still fires on every load is the census: all twelve ends are
+   * [PLACEHOLDER] and the daylight check is standing in for every one of them.
+   * That is deliberate — a warning that appears once and is then fixed teaches
+   * nothing, and this one is the state of the evidence rather than a bug. Dev
+   * only: it is a note to whoever is building the model, not to a visitor.
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -426,6 +433,31 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
       console.warn(`[passage openings] ${line}`)
     }
   }, [openings])
+
+  /*
+   * AND THE TWO FAULTS HE NAMED WITHOUT CORRECTING, which are questions and not
+   * conflicts, and which would otherwise exist only as JSON nobody opens.
+   *
+   * [OWNER] 2026-08-13: the shape of the openings' heads is wrong, and the sill
+   * height above the landing is wrong. He did not say what either should be, so
+   * neither value has been touched — the heads are still [PHOTO]-from-one-frame
+   * and the sill is still a 0.30 m constructional rule with no source at all.
+   * Printed for the same reason as the roof: a question nobody is looking at is
+   * not open, it is lost.
+   *
+   * `ask`, NOT `note`, and the difference is the whole point. The notes run to
+   * forty lines apiece; printed in full beside ROOF_QUESTION they put a hundred
+   * lines of prose in the console on every load, and a wall of text is read
+   * exactly as often as no text at all. What prints is the fault, the current
+   * value, the question verbatim in Russian, and where the argument lives.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    for (const q of [windowData.headShapeQuestion, windowData.sillHeightQuestion]) {
+      if (q.climbs.some((c) => c.answer !== null)) continue
+      console.warn(`[openings — unanswered]\n${q.ask.join('\n')}`)
+    }
+  }, [])
 
   /*
    * AND THE ROOF, which belongs in the same place for the same reason.

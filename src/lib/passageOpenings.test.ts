@@ -185,17 +185,46 @@ describe('the daylight check is a check and no longer the answer', () => {
     expect(buttressDepthAt(BUTTRESS.azimuthDeg, BUTTRESS, TOWER.outerRadius)).toBeGreaterThan(10)
   })
 
-  it('finds the five flight feet that stare into the pier blind', () => {
+  it('finds the two lowest heads that stare into the pier blind', () => {
+    /*
+     * IT WAS FIVE FEET UNTIL 2026-08-13, and the swap is the whole of the
+     * owner's quarter turn. At startAzimuthDeg 100 the feet stood at azimuth
+     * 108.7–110.2, inside a root arc running 72.7–113.5 [OSM], and every one of
+     * them looked into 10.21–10.55 m of pier. At 196.7 they stand at 205.4–218.5
+     * and are clear; two heads take their place, both on the low flights, at
+     * 9.88 m and 10.64 m.
+     */
     const blind = BASE.openings.filter((o) => o.blindBecause === 'buttress')
-    expect(blind.map((o) => o.id)).toEqual([
-      'foot-2-3',
-      'foot-3-4',
-      'foot-4-6',
-      'foot-6-7',
-      'foot-7-8',
-    ])
-    // not marginal: every one of them looks into ten metres of solid stone
+    expect(blind.map((o) => o.id)).toEqual(['head-2-3', 'head-3-4'])
+    // not marginal: both look into most of ten metres of solid stone
     for (const o of blind) expect(o.buttressDepth).toBeGreaterThan(9)
+    // and every foot is clear, which is what he said and not what was aimed at
+    for (const o of BASE.openings.filter((x) => x.end === 'foot')) {
+      expect(o.buttressDepth, o.id).toBe(0)
+    }
+  })
+
+  it('opens head-6-7 by one tenth of a degree, and that must not pass unsaid', () => {
+    /*
+     * THE KNIFE EDGE. The pier's daylight edge is at azimuth 113.5 [OSM] and
+     * head-6-7's landing centre comes out at 113.63 — 0.13° clear, which is 14 mm
+     * on the drum face. Nothing about that opening is decided by evidence about
+     * the building; it is decided by the fourth significant figure of a satellite
+     * trace, and one turn of the leva slider either way deletes or restores it.
+     *
+     * Pinned so it cannot become invisible. If a survey ever moves
+     * BUTTRESS.azimuthDeg or the root arc, this fails, and it SHOULD: whoever
+     * moves it has to look at what happened to this end.
+     */
+    const o = BASE.openings.find((x) => x.id === 'head-6-7')!
+    expect(o.built).toBe(true)
+    expect(o.buttressDepth).toBe(0)
+    const edge = BUTTRESS.azimuthDeg - BUTTRESS.skewDeg + BUTTRESS.rootArcDeg / 2
+    expect(edge).toBeCloseTo(113.5, 1)
+    expect(o.azimuthDeg - edge).toBeGreaterThan(0)
+    expect(o.azimuthDeg - edge).toBeLessThan(0.2)
+    // the next one up is barely better
+    expect(BASE.openings.find((x) => x.id === 'head-7-8')!.azimuthDeg - edge).toBeLessThan(3)
   })
 
   it('finds the roof landing blind, with parapet above it and not wall', () => {
@@ -205,32 +234,46 @@ describe('the daylight check is a check and no longer the answer', () => {
     expect(roof.centreY + roof.outerHeight / 2).toBeGreaterThan(TOWER.topY)
   })
 
-  it('cuts six while the record is empty, and says every one is the fallback’s doing', () => {
+  it('cuts nine while the record is empty, and says every one is the fallback’s doing', () => {
+    /*
+     * SIX BEFORE 2026-08-13, and the owner's separate complaint was that the
+     * tower has TOO FEW openings. Nine is what the quarter turn produces. It is
+     * still the FALLBACK's count and not the building's — every one of the twelve
+     * ends is [PLACEHOLDER] and the daylight check is standing in for all of them.
+     */
     expect(BUILT.map((o) => o.id)).toEqual([
-      'head-2-3',
-      'head-3-4',
+      'foot-2-3',
+      'foot-3-4',
+      'foot-4-6',
       'head-4-6',
+      'foot-6-7',
       'head-6-7',
+      'foot-7-8',
       'head-7-8',
       'foot-8-9',
     ])
     for (const o of BUILT) expect(o.buttressDepth).toBe(0)
-    // and none of these six is anybody's word — the count is a property of the
+    // and none of these nine is anybody's word — the count is a property of the
     // check standing in, not of the tower
     for (const o of BASE.openings) expect(o.decidedBy).toBe('placeholder')
   })
 
   it('will not cut an opening into ten metres of pier even when the record says open', () => {
-    const openings = withFittings(said({ 'foot-2-3': true }))
-    const o = openings.find((x) => x.id === 'foot-2-3')!
+    const openings = withFittings(said({ 'head-3-4': true }))
+    const o = openings.find((x) => x.id === 'head-3-4')!
     expect(o.built).toBe(false)
     expect(o.conflict).toBe('openButBlind')
     expect(o.decidedBy).toBe('record')
   })
 
   it('lets the record close an end the check would open', () => {
-    const openings = withFittings(said({ 'head-6-7': false }))
-    const o = openings.find((x) => x.id === 'head-6-7')!
+    /*
+     * foot-2-3, not head-6-7 as this used to read. head-6-7 clears the pier by
+     * 0.13°, so a test written on it would be asserting the behaviour of the
+     * record against an end whose daylight is itself a coin toss.
+     */
+    const openings = withFittings(said({ 'foot-2-3': false }))
+    const o = openings.find((x) => x.id === 'foot-2-3')!
     expect(o.built).toBe(false)
     expect(o.reachesDaylight).toBe(true)
     expect(o.decidedBy).toBe('record')
@@ -241,8 +284,8 @@ describe('the daylight check is a check and no longer the answer', () => {
   })
 
   it('lets the record open an end the check agrees with, on the record’s authority', () => {
-    const openings = withFittings(said({ 'head-2-3': true }))
-    const o = openings.find((x) => x.id === 'head-2-3')!
+    const openings = withFittings(said({ 'foot-2-3': true }))
+    const o = openings.find((x) => x.id === 'foot-2-3')!
     expect(o.built).toBe(true)
     expect(o.decidedBy).toBe('record')
     expect(o.openSaidBy).toBe('[OWNER] test')
@@ -309,68 +352,149 @@ describe('the record of which ends are open', () => {
     expect(text).toMatch(/ТОЛЬКО в конце/)
     expect(text).toMatch(/И ТАМ И ТАМ/)
   })
+
+  it('holds the two faults he named on 2026-08-13 open as questions, not as changes', () => {
+    /*
+     * [OWNER] 2026-08-13 said two more things are wrong — the shape of the heads,
+     * and the height of the sill above the landing — and did NOT say what either
+     * should be. Neither value has been touched. Both are written down as
+     * questions phrased by the climb, because `head-4-6` is a name this repository
+     * invented and he has climbed a stair.
+     *
+     * This test exists so the questions cannot rot into decoration: the moment an
+     * answer arrives, `answer` stops being null and this fails, which is the
+     * prompt to go and change the value it names.
+     */
+    const climbs = windowData.openEndsQuestion.passages.map((p) => p.climb)
+    for (const q of [windowData.headShapeQuestion, windowData.sillHeightQuestion]) {
+      // same six climbs, in the same words, so three questions read as one survey
+      expect(q.climbs.map((c) => c.climb)).toEqual(climbs)
+      expect(q.climbs.flatMap((c) => c.sets).sort()).toEqual(FITTINGS.map((f) => f.id).sort())
+      for (const c of q.climbs) expect(c.answer, c.climb).toBeNull()
+      // asked in Russian, which is the language every statement came in
+      expect(q.note.join(' ')).toMatch(/[а-яА-ЯёЁ]{4}/)
+      /*
+       * `ask` is the short form App.tsx prints. It has to name all six climbs by
+       * the climb and carry the verbatim question, or the console version stops
+       * being the question and becomes a reminder that one exists somewhere.
+       */
+      const ask = q.ask.join('\n')
+      expect(ask).toMatch(/«[^»]+»/)
+      for (const c of ['2→3', '3→4', '4→6', '6→7', '7→8', '8→крыша']) {
+        expect(ask, c).toContain(c)
+      }
+      // short enough to read next to ROOF_QUESTION's 28 lines
+      expect(q.ask.length).toBeLessThan(20)
+    }
+
+    // and the values they ask about are still exactly what they were
+    expect(PASSAGE_OPENING.sillAboveLanding).toBe(
+      windowData.sillHeightQuestion.current.sillAboveLanding,
+    )
+    for (const c of windowData.headShapeQuestion.climbs) {
+      for (const id of c.sets) {
+        expect(FITTINGS.find((f) => f.id === id)!.head, id).toBeDefined()
+      }
+    }
+  })
+
+  it('keeps the sill question honest about the bound that makes it answerable', () => {
+    /*
+     * The sill is bounded above by the vault, not by taste: headroom 2.30 less the
+     * 1.90 m opening leaves 0.40 m, and the file says so. If either number ever
+     * moves, the question's stated bound goes stale and the answers he gives
+     * against it stop meaning what they meant.
+     */
+    const bound = PLAYER.stairHeadroom - FITTINGS[0].outerHeight
+    expect(bound).toBeCloseTo(windowData.sillHeightQuestion.current.boundedAboveBy, 6)
+    expect(PASSAGE_OPENING.sillAboveLanding).toBeLessThan(bound)
+  })
 })
 
-describe('the fallback layout contradicts what the owner described', () => {
+/**
+ * THE CONTRADICTION THIS BLOCK WAS WRITTEN TO PIN HAS GONE, AND HOW IT WENT IS
+ * THE ONLY THING THAT MAKES THAT ACCEPTABLE.
+ *
+ * Until 2026-08-13 these tests asserted a DISAGREEMENT: [OWNER] 2026-08-10 said
+ * some passages carry an opening at both ends, the fallback produced none, and no
+ * answer he could give was honourable because every passage had a blind end. The
+ * comment on the old version said in terms that agreement must arrive with a
+ * reason and never as a side effect of nudging STAIR.startAzimuthDeg.
+ *
+ * It arrived with a reason. He was asked a DIFFERENT question — where the stair
+ * entrance stands relative to the beak, looking down — and answered a quarter
+ * turn clockwise. That is testimony about the stair, not about the openings, and
+ * the layout it produces happens to have three passages open at both ends and
+ * three at one end only, which is the shape of his earlier sentence.
+ *
+ * READ THAT AS CORROBORATION AND NOT AS A RESULT. Nobody searched for an angle
+ * that made the sentence true: 196.7 is 106.7 + 90 and the 90 is his word
+ * "right". Had it come out contradicting him again, it would have shipped
+ * contradicting him again. The tests below therefore pin the AGREEMENT the same
+ * way they used to pin the disagreement — so that if it silently reverses,
+ * something says so.
+ */
+describe('the fallback layout now has the shape the owner described', () => {
   const pairs = passageEndPairs(BASE.openings)
 
-  it('gives five passages an opening at the end only and one at the beginning only', () => {
+  it('gives three passages an opening at both ends and three at the beginning only', () => {
     expect(pairs.map((p) => `${p.passage} ${p.pattern}`)).toEqual([
-      '2-3 endOnly',
-      '3-4 endOnly',
-      '4-6 endOnly',
-      '6-7 endOnly',
-      '7-8 endOnly',
+      '2-3 beginningOnly',
+      '3-4 beginningOnly',
+      '4-6 both',
+      '6-7 both',
+      '7-8 both',
       '8-9 beginningOnly',
     ])
   })
 
-  it('gives NO passage an opening at both ends, which is the first case he names', () => {
+  it('has at last an example of the case he names first, and it was not aimed at', () => {
     /*
-     * THE FINDING. «в некоторых местах и вначале … и в конце есть окна» requires
-     * at least one. The fallback produces none, and it cannot: the five feet that
-     * would supply one stand at azimuth 108.7–110.2 inside a root arc running
-     * 72.7–113.5 [OSM].
+     * «в некоторых местах и вначале … и в конце есть окна а в некоторых местах
+     * или в начале или в конце» — some passages have both, others one end only.
+     * Both halves of that sentence now have examples in the model, which no
+     * setting of the old start azimuth could produce (see the enumeration below).
      *
-     * This test asserts the DISAGREEMENT, deliberately. It will fail the day the
-     * layout starts agreeing — which is the point: agreement must arrive with a
-     * reason (the owner's answer, or a sourced start azimuth), never as a side
-     * effect of somebody nudging STAIR.startAzimuthDeg, which is a [PLACEHOLDER]
-     * and would be being tuned to make a sentence come true (CLAUDE.md rule 7).
+     * `endOnly` has none, and that is left standing as the residual rather than
+     * smoothed away: he names the case, and the two heads that would supply it —
+     * head-2-3 and head-3-4 — are inside the pier.
      */
-    expect(pairs.filter((p) => p.pattern === 'both')).toEqual([])
-    const feet = BASE.openings.filter((o) => o.end === 'foot' && o.blindBecause === 'buttress')
-    expect(feet).toHaveLength(5)
-    expect(Math.min(...feet.map((o) => o.azimuthDeg))).toBeGreaterThan(108)
-    expect(Math.max(...feet.map((o) => o.azimuthDeg))).toBeLessThan(111)
+    expect(pairs.filter((p) => p.pattern === 'both').map((p) => p.passage)).toEqual([
+      '4-6',
+      '6-7',
+      '7-8',
+    ])
+    expect(pairs.filter((p) => p.pattern === 'endOnly')).toEqual([])
+    expect(pairs.filter((p) => p.pattern === 'neither')).toEqual([])
   })
 
-  it('reports both findings as sentences, for the dev console and for the record', () => {
+  it('stops reporting the both-ends finding, and keeps reporting the empty record', () => {
     const lines = testimonyConflicts(BASE.openings)
-    expect(lines.some((l) => l.includes('no passage has an opening at both ends'))).toBe(true)
+    // the finding this file was built around is answered, and silence is correct
+    expect(lines.some((l) => l.includes('no passage has an opening at both ends'))).toBe(false)
+    // what is NOT answered: nobody has ruled on a single one of the twelve
     expect(lines.some((l) => l.includes('12 of 12'))).toBe(true)
-    // and it names the thing that must NOT be turned to make the first one go away
-    expect(lines.join(' ')).toMatch(/STAIR\.startAzimuthDeg/)
   })
 
   it('reports an open-but-blind end loudly rather than resolving it either way', () => {
-    const openings = withFittings(said({ 'foot-3-4': true }))
-    expect(openButBlindEnds(openings).map((o) => o.id)).toEqual(['foot-3-4'])
-    const line = testimonyConflicts(openings).find((l) => l.startsWith('foot-3-4'))!
+    const openings = withFittings(said({ 'head-3-4': true }))
+    expect(openButBlindEnds(openings).map((o) => o.id)).toEqual(['head-3-4'])
+    const line = testimonyConflicts(openings).find((l) => l.startsWith('head-3-4'))!
     expect(line).toContain('m of solid buttress')
     expect(line).toContain('Nothing is cut')
     expect(line).toContain('STAIR.startAzimuthDeg')
   })
 
-  it('drops the placeholder census once the record is filled in, and keeps the rest', () => {
+  it('falls silent once the record is filled in, which it never could before', () => {
     /*
-     * Proof that the report is not merely always-on noise: answer all twelve and
-     * the "nobody has ruled" line goes. What does NOT go is the finding about
-     * `both`, because that one is about the building and not about the file.
+     * Proof that the report is not always-on noise. Answer all twelve and every
+     * line goes — where before 2026-08-13 one line could not go, because the
+     * layout itself contradicted the testimony and no answer repaired it.
      *
-     * The answer used here is the fallback's own layout, which is the only
-     * complete answer that raises no per-end conflict — see the next test for
-     * why that is a damning fact rather than a convenient one.
+     * The answer used here is the fallback's own layout, which is still the only
+     * complete answer that raises no per-end conflict. That is no longer a
+     * damning fact, only an unsurprising one: the fallback cuts exactly the ends
+     * the geometry can light.
      */
     const complete = FITTINGS.map((f) => ({
       ...f,
@@ -380,28 +504,21 @@ describe('the fallback layout contradicts what the owner described', () => {
     const openings = withFittings(complete)
     for (const o of openings) expect(o.decidedBy).toBe('record')
     expect(openings.filter((o) => o.built).map((o) => o.id)).toEqual(BUILT.map((o) => o.id))
-    const lines = testimonyConflicts(openings)
-    expect(lines.some((l) => l.includes('carry no ruling'))).toBe(false)
-    expect(lines.some((l) => l.includes('no passage has an opening at both ends'))).toBe(true)
+    expect(testimonyConflicts(openings)).toEqual([])
   })
 
-  it('cannot be satisfied by ANY answer at this start azimuth, and that is the finding', () => {
+  it('can honour “both ends” on three of the six, and names the three it cannot', () => {
     /*
-     * THE SHARPEST FORM OF THE CONTRADICTION, proved by enumeration rather than
-     * argued.
+     * THE SAME ENUMERATION AS BEFORE, WITH THE OPPOSITE RESULT — and it is kept
+     * in that form deliberately, because the old version's value was that it
+     * proved impossibility by exhaustion rather than by argument.
      *
-     * For a passage to come out `both`, the owner has to open its foot AND its
-     * head. Take each of the six in turn and mark both ends open: every single
-     * one raises an openButBlind conflict, because at STAIR.startAzimuthDeg = 100
-     * five of the six feet are inside the buttress and the sixth passage's head
-     * is under the parapet. There is no answer he can give that the model can
-     * honour.
-     *
-     * So the thing that has to move is the placeholder bearing, not the
-     * testimony. It must move because somebody measures it or because he says
-     * which way the stair turns — never because it silences this test. Turning it
-     * four degrees would clear the feet and make all of this quiet, and that is
-     * precisely the fit CLAUDE.md rule 7 forbids.
+     * Mark both ends of each passage open in turn. Three come through clean. The
+     * three that do not are the two lowest climbs, whose heads look into the
+     * pier, and the roof climb, whose head is on the deck with parapet over it
+     * rather than wall. If he answers «и там и там» for 2→3 or 3→4, the model
+     * will refuse to cut and will say why — which is the right behaviour and the
+     * next real question about this tower.
      */
     const impossible: string[] = []
     for (const p of passageEndPairs(BASE.openings)) {
@@ -412,21 +529,14 @@ describe('the fallback layout contradicts what the owner described', () => {
       if (blind.length === 0) continue
       impossible.push(`${p.passage}: ${blind.join(', ')}`)
     }
-    expect(impossible).toEqual([
-      '2-3: foot-2-3',
-      '3-4: foot-3-4',
-      '4-6: foot-4-6',
-      '6-7: foot-6-7',
-      '7-8: foot-7-8',
-      '8-9: head-8-9',
-    ])
+    expect(impossible).toEqual(['2-3: head-2-3', '3-4: head-3-4', '8-9: head-8-9'])
   })
 })
 
 /**
  * THE COUNT DOES NOT MATCH AND THIS TEST DOES NOT PRETEND OTHERWISE.
  *
- * Six openings are derived from the owner's rule; eleven exterior photographs
+ * Nine openings are derived from the owner's rule; eleven exterior photographs
  * found eight slits. Asserting agreement would be asserting something untrue, so
  * these pin the DISAGREEMENT instead: they fail if it silently changes size,
  * which is the only useful thing a test can do here.
@@ -434,10 +544,19 @@ describe('the fallback layout contradicts what the owner described', () => {
 describe('what the photographs still say, and how far the model stands from it', () => {
   const r = ladderResidual(BASE.openings, LADDER, TOWER.height)
 
-  it('is two openings short of the photographed count', () => {
-    expect(r.count).toBe(6)
+  it('is one opening OVER the photographed count, having been two under', () => {
+    /*
+     * The sign flipped on 2026-08-13. Six against eight became nine against
+     * eight, and the owner's own complaint — that the tower has too few openings
+     * — is answered by the same quarter turn that moved the stair.
+     *
+     * One over is not agreement and is not treated as any. It is a smaller
+     * residual arrived at from the other side, and the count is still a property
+     * of a daylight check standing in for twelve unanswered questions.
+     */
+    expect(r.count).toBe(9)
     expect(LADDER.count).toBe(8)
-    expect(r.countResidual).toBe(-2)
+    expect(r.countResidual).toBe(1)
   })
 
   it('spreads its two columns three times as far as the photographs do', () => {
@@ -449,10 +568,26 @@ describe('what the photographs still say, and how far the model stands from it',
     expect(Math.abs(r.separationResidual)).toBeGreaterThan(LADDER.separationSpreadDeg * 5)
   })
 
-  it('steps up the tower by the storey where the photographs step by 2.78 m', () => {
-    expect(r.rungSpacing).toBeCloseTo(3.281, 2)
+  it('steps up the tower a little TIGHTER than the photographs, having stepped wider', () => {
+    /*
+     * A residual that changed sign without anybody touching the floor table, and
+     * the reason is worth stating because it is easy to read this as progress.
+     *
+     * The derived ladder used to step by exactly one storey — 3.281 m — because
+     * the six cut ends were one per flight. With nine cut ends, several flights
+     * now carry an opening at BOTH levels, so the mean gap between successive
+     * openings falls to 2.461 m against 2.781 photographed. The residual went
+     * from +0.500 to −0.321.
+     *
+     * NOTHING ABOUT THE STOREY HEIGHTS HAS BEEN CORRECTED. rungSpacing is the
+     * mean gap over whatever set is cut, so it moves when the COUNT moves, and
+     * the count here is a fallback's. The conflict this figure was recording —
+     * that the photographed ladder does not step by the derived storey — is not
+     * settled by the number getting smaller.
+     */
+    expect(r.rungSpacing).toBeCloseTo(2.461, 2)
     expect(r.photographedRungSpacing).toBeCloseTo(2.781, 2)
-    expect(r.rungResidual).toBeGreaterThan(0.4)
+    expect(r.rungResidual).toBeLessThan(-0.3)
   })
 
   it('keeps the photographic reading in the file, undeleted', () => {
@@ -580,15 +715,20 @@ describe('a slit at a passage end cannot be entered', () => {
   })
 })
 
-describe('the buttress head decides the count', () => {
-  it('adds two feet at the low reading, which is a consequence and not a result', () => {
+describe('the buttress head no longer decides the count', () => {
+  it('changes nothing at the low reading, where it used to add two openings', () => {
     /*
      * config/tower.ts records two irreconcilable readings of where the pier
-     * stops: level with the parapet, and 18.3 ± 0.5 m. At the low one the feet of
-     * 6→7 and 7→8 rise clear of it. That takes the derived count to eight — the
-     * photographed number — and it MUST NOT be quoted as evidence for the low
-     * buttress. It is recorded because an unresolved silhouette now decides how
-     * many openings the building has.
+     * stops: level with the parapet, and 18.3 ± 0.5 m. Until 2026-08-13 that
+     * unresolved silhouette decided how many openings the tower had — at the low
+     * reading the feet of 6→7 and 7→8 rose clear of the pier and the count went
+     * from six to eight, which is the photographed number, and the file was at
+     * pains to say that was NOT evidence for the low buttress.
+     *
+     * The quarter turn takes the question away. The only two ends still inside
+     * the pier are head-2-3 at y 8.31 and head-3-4 at 11.59, both far below
+     * either reading of where it stops, so both readings now cut the same nine.
+     * One fewer thing hanging off an unresolved silhouette, and it came free.
      */
     const low = planPassageOpenings({
       anchors: BASE.anchors,
@@ -604,9 +744,14 @@ describe('the buttress head decides the count', () => {
       towerTopY: TOWER.topY,
     })
     const built: PassageOpening[] = low.filter((o) => o.built)
-    expect(built.map((o) => o.id)).toContain('foot-6-7')
-    expect(built.map((o) => o.id)).toContain('foot-7-8')
-    expect(built).toHaveLength(8)
+    expect(built.map((o) => o.id)).toEqual(BUILT.map((o) => o.id))
+    expect(built).toHaveLength(9)
+    // and the two that stay blind are blind on both readings, by a wide margin
+    for (const id of ['head-2-3', 'head-3-4']) {
+      const o = low.find((x) => x.id === id)!
+      expect(o.built, id).toBe(false)
+      expect(o.centreY, id).toBeLessThan(TOWER.groundY + 18.3 - 4)
+    }
   })
 })
 

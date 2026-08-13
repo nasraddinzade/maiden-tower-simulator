@@ -695,12 +695,16 @@ export function doorwayCutter(d: StairDoorway): THREE.BufferGeometry {
  * starts eating reveals silently.
  *
  * A window reveal that crosses the flight really does eat the passage floor —
- * measured on the built shell, storey 3's opening takes it out from under the
- * top three treads of the first flight and the bottom tread of the second, up to
- * 2.39 m deep. That clash is real and it is between two numbers neither of which
- * is measured: STAIR.startAzimuthDeg is [PLACEHOLDER], and data/windows.json
- * gives its own azimuths ±20° of systematic error. Moving either to make the
- * picture tidy would be fitting geometry to a preference (CLAUDE.md rule 7).
+ * measured on the built shell, storey 3's opening took it out from under the top
+ * three treads of the first flight and the bottom tread of the second, up to
+ * 2.39 m deep. That clash was between two numbers neither of which was measured:
+ * STAIR.startAzimuthDeg was a [PLACEHOLDER] and data/windows.json gave its own
+ * azimuths with ±20° of systematic error. Only the second half of that is still
+ * true — since 2026-08-13 the stair's bearing is [OWNER] testimony resolved
+ * against the [OSM] buttress, and windows.json no longer supplies an azimuth at
+ * all — but the conclusion is unchanged and is now firmer: moving the stair to
+ * make the picture tidy would be fitting the building to a preference, and it is
+ * a witness's word that would be being overruled (CLAUDE.md rule 7).
  *
  * So the rule applied is structural instead, and it is true of any building: a
  * window opening does not remove the stone a stair is carried on. The mason cuts

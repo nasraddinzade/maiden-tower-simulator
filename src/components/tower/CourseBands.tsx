@@ -32,13 +32,18 @@ const DEG = Math.PI / 180
  *
  * A CONSEQUENCE TO SHOW THE OWNER RATHER THAN SMOOTH AWAY. Since [OWNER]
  * 2026-08-10 the openings are the ends of the stair flights, and the flights are
- * stacked in one sector of the wall, so five of the six slits stand inside a 14°
- * arc between y 8.3 and 24.7. Every course they cross is broken in the same
- * place, and the drum will read with a near-continuous vertical seam up that
- * sector. That is what a stacked stair with a slit at each landing produces; it
- * is not a bug in this file, and it must not be hidden by nudging
- * STAIR.startAzimuthDeg, which is a [PLACEHOLDER] and would be being tuned for
- * appearance.
+ * stacked in one sector of the wall, so the slits fall into vertical columns and
+ * every course they cross is broken in the same place. The drum reads with a
+ * near-continuous seam up each column.
+ *
+ * [2026-08-13] The turn onto his buttress bearing made the effect STRONGER, not
+ * weaker, and it is the plainest thing to look at when judging whether the
+ * stacked-flight layout is right at all: five of the nine cut openings now stand
+ * within 1.5° of azimuth 206, from y 5.03 to 21.44 — a seam three storeys taller
+ * than before — with a second, shorter column at 113.6–116.0 and one outlier at
+ * 46.8. That is what a stacked stair with a slit at each landing produces; it is
+ * not a bug in this file, and it must not be hidden by nudging
+ * STAIR.startAzimuthDeg, which would now be tuning testimony for appearance.
  */
 export function CourseBands({
   windows,

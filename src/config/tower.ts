@@ -405,12 +405,21 @@ export const TOWER = {
  * That is visible from the terrace, and it is the whole of fault A.
  *
  * The breach does not begin abruptly either, and the run-up to it is its own
- * argument that this roof is wrong. From about azimuth 83 the passage's vault has
- * under 0.30 m of stone over it, and from 80 to 63 it has 0.09 m — a lintel the
+ * argument that this roof is wrong. From about azimuth 180 down to 163 the
+ * passage's vault carries under 0.30 m of stone, thinning to 0.09 m — a lintel the
  * thickness of a book carrying the top of a tower. Nothing is done about that: it
  * is what the measured stack gives, and it is a consequence of a deck at 26.749
  * under a top at 27.500 rather than a modelling slip. It would go away by itself
  * if the paving crossed the wall.
+ *
+ * THE BREACH MOVED ON 2026-08-13 AND DID NOT CHANGE SIZE, which is worth one line
+ * because it is the clearest demonstration that it belongs to the vertical stack
+ * rather than to any bearing. When the stair turned a quarter of the drum on
+ * [OWNER]'s testimony, the open-to-sky sector went from azimuth 13–63 to 110–160
+ * — 16 of the roof climb's 36 sections before and after, to the section. The
+ * consequence for anyone standing on the deck is that the trench is now on the
+ * south-east side, over the pier rather than away from it, and the last 3.4° of
+ * it (110.1–113.5) stands above the buttress head.
  *
  * IT IS NOT REPAIRABLE FROM WHAT WE HAVE. Rebuilding the roof needs the paving's
  * outward reach and the edge parapet's thickness and height, and
@@ -553,6 +562,26 @@ export const ENTRANCE = {
 // Still worth a human check: this rests on reading wedge convergence in dim,
 // wide-angle photographs, not on a survey. Flipping this one value mirrors every
 // flight, and the leva control does it instantly.
+
+/**
+ * ° from the buttress, clockwise, to the foot of every flight. [OWNER] 2026-08-13.
+ *
+ * HIS WORD IS "RIGHT", NOT NINETY. Asked where the entrance to the stair is when
+ * you look down on the tower from above, he put it to the RIGHT of the beak —
+ * clockwise from it — "about a quarter of the circumference". A quarter is 90°,
+ * and 90 is written here because it is the arithmetic of the sentence, not
+ * because anybody stood in the tower with a compass. Read the ± with it: a
+ * quarter of a circle said by eye is worth perhaps ±15°, and the whole of the
+ * layout below moves with it.
+ *
+ * It is a SEPARATE FACT from the bearing it is added to. BUTTRESS.azimuthDeg is
+ * [OSM], traced off a footprint and the one solid bearing in the model; this is
+ * testimony about where the stair stands relative to it. Keeping them apart is
+ * the point of the constant: correct the traced bearing and the stair follows,
+ * correct the quarter turn and the buttress does not move.
+ */
+const STAIR_FROM_BUTTRESS_DEG = 90
+
 export const STAIR: {
   winding: Winding
   riserTarget: number
@@ -604,84 +633,93 @@ export const STAIR: {
    */
   wallClearance: 0.25,
   /**
-   * ° — where every flight begins. Still [PLACEHOLDER]: no source fixes it.
+   * ° — where every flight begins. [OWNER] 2026-08-13, resolved against [OSM].
    *
-   * IT IS NO LONGER AN INTERIOR NUMBER. Since 2026-08-10 it sets the FAÇADE.
+   * NO LONGER A [PLACEHOLDER], AND NOT A MEASUREMENT EITHER. It is one sentence
+   * of testimony added to one traced bearing, and it is written as that sum
+   * rather than as a literal so that the two halves can be corrected separately.
    *
-   * [OWNER]: "НА ЯРУСАХ ОКНА ТОЛЬКО В НАЧАЛЕ И В КОНЦЕ ПРОХОДОВ ЛЕСТНИЦ. НА
-   * САМИХ ЯРУСАХ НИКАКИХ ОКОН НЕТ." Every exterior slit is now the end of a
-   * flight, so this angle — a placeholder — decides where all of them appear on
-   * the drum. Whoever drags this slider in leva moves the whole façade, and
-   * nothing on screen will say so.
+   * WHAT HE SAID. Asked, looking down on the tower from above, where the entrance
+   * to the stair stands relative to the beak, he answered: to the RIGHT of it —
+   * clockwise — about a quarter of the circumference. BUTTRESS.azimuthDeg is
+   * 106.7 [OSM], so a quarter turn clockwise is 196.7. He has walked the building
+   * and could not measure it; the quarter is his eye, not a survey.
    *
-   * THE ARGUMENT BELOW HAS INVERTED, and it is left standing because it is the
-   * record of how the value was chosen. 100 was picked so the stair would MISS
-   * the window column. The stair IS the window column now, so that reason is
-   * void; but reaching for its opposite — retuning until the derived bearings sit
-   * on the photographed ones — would be moving the placeholder to fit readings
-   * whose own file calls them ±20° systematic and calls the lower column "a
-   * judgement inside a 6 deg spread". The placeholder moved once to get away from
-   * the photographs; moving it back to them closes a circle rather than settling
-   * anything. It stays at 100 until the owner or a tape says otherwise.
+   * THE FLIGHT'S FIRST TREAD IS NOT THE DOORWAY, and the difference is worth
+   * stating before anyone checks the arithmetic against his sentence. This angle
+   * places the first RISER; the landing at the foot runs back from it by
+   * endLandingLength and the doorway sits at the ramp's own bearing, so the foot
+   * landings come out centred at 205.4–206.9 and the foot doorways at 190.6–191.5.
+   * Between the first tread and the door onto it is some 6–16° of arc, which is
+   * inside the error of "about a quarter" by a wide margin and is not corrected
+   * for. Solving the start angle backwards so that some chosen part of the foot
+   * landed exactly on 196.7 would be fitting a testimony to three decimal places
+   * it does not have.
    *
-   * WHAT 100 COSTS, measured on the built model rather than argued: the six
-   * flight feet stand on landings centred at azimuth 108.7–110.2 (and 121.8 for
-   * the roof climb, whose landing pays for its interior landing in arc). The
-   * buttress root arc is 72.7–113.5 [OSM], so five of those six ends look into
-   * 10.21–10.55 m of solid pier and carry no opening at all. The heads, at 5.7,
-   * 8.8, 16.9, 19.3, 21.6 and 310.1, are all clear of it, but the last of them is
-   * the roof landing and has parapet above it rather than wall. Six slits,
-   * therefore, against eight in the photographs.
+   * READ THE HISTORY, BECAUSE THIS VALUE HAS BEEN AROUND THE HOUSES AND THE
+   * UNCOMFORTABLE PART IS THE PART THAT MATTERS.
    *
-   * AND SINCE 2026-08-10 IT COSTS SOMETHING THAT IS NOT A COUNT. Asked a second
-   * time, the owner described the openings end by end: «в некоторых местах и
-   * вначале входа на лестницу и в конце есть окна а в некоторых местах или в
-   * начале или в конце» — some passages have one at the beginning of the climb
-   * AND one at the end, others at one end only. At 100 the model has five
-   * passages open at the head only and one at the foot only, and NOT ONE open at
-   * both. Worse, no answer he could give would fix it: every passage has at least
-   * one end that is blind here, so marking any passage open at both ends
-   * necessarily produces an opening into solid stone. The arithmetic is in
-   * passageOpenings.test.ts and it is asserted, so it fails if it silently
-   * changes shape.
+   * It was 200 for a long time, and earlier in this same session it was moved to
+   * 100 — on the ground that from 200 the flights swept straight through the
+   * columns of slits read off the exterior photographs, and that between an
+   * unsourced stair azimuth and a photographed window bearing the unsourced one
+   * should move. Walked, that was not a near miss: the climb stopped dead at
+   * azimuth 153 on 2→3 and at 131 on 4→6 against the stepped embrasures.
    *
-   * FOUR DEGREES OF TURN WOULD CARRY THE FEET CLEAR AND MAKE HIS SENTENCE TRUE.
-   * DO NOT. This value is a [PLACEHOLDER] — no source fixes it, the entrance
-   * orientation it hangs off is itself unresolved, and the argument that put it
-   * at 100 has already inverted once (see below). Turning a placeholder until a
-   * statement about the building comes true is fitting the geometry to the claim,
-   * which is CLAUDE.md rule 7. It moves when somebody measures it or when the
-   * owner answers the question below — not to silence a warning.
+   * The owner's answer says the stair was RIGHT THE FIRST TIME and the slits were
+   * in the wrong place. That is not special pleading, because the premise of the
+   * 100 argument has since been withdrawn by the same witness: on 2026-08-10 he
+   * said the storeys carry no openings at all and that every slit is the end of a
+   * stair passage, and the model was rebuilt on it. The photographed columns are
+   * therefore a CONSEQUENCE of where the stair runs, not an independent constraint
+   * on it, and the collision the 100 move was made to avoid cannot arise — there
+   * is nothing left in the wall for the stair to run through. What moved the value
+   * to 100 was real evidence honestly applied to a model that no longer exists.
    *
-   * QUESTION FOR THE OWNER: standing in a chamber facing the entrance, is the
-   * doorway onto the stair to your left or to your right?
+   * 196.7 IS NOT 200 RESTORED. It is 3.3° away from it and it arrives from a
+   * different direction entirely — from a bearing he gave, tied to the one solid
+   * measurement in the project, rather than from the round number a spec once
+   * suggested. That it lands so near the old value is a coincidence worth
+   * noticing and worth not leaning on.
    *
-   * It was 200, and 200 put the stair through the windows. The flights stack in
-   * one sector and the widest sweeps 160°, so from 200 they cover the whole arc
-   * from 213 down to about 40 — and the openings run from about 123 to 174 once
-   * the lower column is where the photographs put it. Walked, that is not a near
-   * miss: with the stepped embrasures built, the climb stopped dead at azimuth
-   * 153 on the 2→3 flight and at 131 on 4→6, and every flight completed the
-   * moment the recesses were taken out.
+   * WHAT IT COSTS AND BUYS, measured on the built model rather than argued —
+   * see the re-derivation in src/data/windows.json:
+   *   - all SIX flight feet now stand clear of the pier (they were five-of-six
+   *     blind in 10.21–10.55 m of it) and carry openings;
+   *   - two heads go the other way: head-2-3 at azimuth 102.4 and head-3-4 at
+   *     105.5 now look into 9.88 m and 10.64 m of buttress and are withheld;
+   *   - nine ends are cut where six were. The owner also said there are TOO FEW
+   *     openings, and this is the cause; nine against the eight the photographs
+   *     count is the first time the model has overshot rather than undershot.
+   *   - three passages come out open at BOTH ends and three at one end only,
+   *     which is the shape of his 2026-08-10 sentence and something no setting of
+   *     the old value could produce. That is a corroboration and NOT a reason:
+   *     the angle was set from his answer about the beak, before this was known,
+   *     and it must never be tuned to keep it true.
    *
-   * The arc in that argument was 123–143 when it was written, because the lower
-   * column was then filed at 141, inside the upper column instead of 29° round
-   * from it. Correcting the windows widened the arc to about 50°, and 100° still
-   * clears it — the sweep runs down through 0 to about −60 and never reaches
-   * 123. The conclusion survived, but it survived the correction rather than
-   * following from the figure quoted, which is worth saying out loud.
+   * ON A KNIFE EDGE, and it must be said in the same breath: head-6-7 comes out
+   * at azimuth 113.6 against a pier whose daylight edge is at 113.5. It is open by
+   * one tenth of a degree — 14 mm on the drum face. Nothing about that opening is
+   * decided by evidence; it is decided by the fourth significant figure of an OSM
+   * trace. head-7-8 at 116.0 clears by 2.5°, which is barely better.
    *
-   * Two unsourced-against-measured numbers again, and the tie breaks the same way
-   * it did for the window bearing: the stair's azimuth is a PLACEHOLDER and the
-   * windows' azimuths are photographs. So the placeholder moves. 100° keeps the
-   * whole sweep — down through 0 to about −60 on the long flight — clear of the
-   * slit column without ever reaching the entrance sector at 270.
+   * WHAT WOULD CHANGE IT:
+   *   - the owner correcting "a quarter" to a third or a sixth: change
+   *     STAIR_FROM_BUTTRESS_DEG, not this line;
+   *   - a survey correcting the buttress bearing off 106.7: change BUTTRESS and
+   *     the stair follows by itself, which is the whole reason this is a sum;
+   *   - him saying which side he was facing. "Looking down on the tower" fixes the
+   *     sense of "right" only if the viewer is above it looking down, which is how
+   *     the question was put; asked from the ground the same word means the
+   *     opposite turn, and 106.7 − 90 = 16.7 is the layout this replaced.
    *
-   * It runs through the buttress instead, which is not a problem but a slightly
-   * better place for a stair: there is more masonry there than anywhere else on
-   * the drum.
+   * A CHEAP CROSS-CHECK NOBODY HAS RUN. With the entrance at 270 [İçərişəhər] and
+   * the foot doorways at about 191, a person standing in a chamber and facing the
+   * entrance has the doorway onto the stair some 79° round to their LEFT, just
+   * behind the shoulder. That is a prediction of this value, answerable in one
+   * word, and it is a different question from the one he has just answered.
    */
-  startAzimuthDeg: 100,
+  startAzimuthDeg: BUTTRESS.azimuthDeg + STAIR_FROM_BUTTRESS_DEG,
   /**
    * m — clear width of the doorway between a chamber and the stair passage.
    * [ESTIMATE] 1.1, taken from the SOURCED main entrance, which [İçərişəhər]
@@ -1298,12 +1336,35 @@ export const WELL = {
    * nothing depends on it: the stair's azimuth had already been moved once to
    * clear the windows, and moving it again would have put those back at risk.
    *
-   * THE REASONING IS REBUILT, THE VALUE IS NOT. It used to read "the slit columns
-   * stand between 123 and 170", and after 2026-08-10 no slit stands there: the
-   * openings are the ends of the flights and their bearings are 5.7–21.6, 110
-   * (blind, in the pier) and 310. 230 survives the re-check on its own merits —
-   * the nearest thing to it is the head of 4→6 at 310, 80° away, and the entrance
-   * at 270 — so the number is kept and only the argument for it is replaced.
+   * THE REASONING HAS BEEN REBUILT TWICE AND THE VALUE HAS NOT MOVED ONCE, which
+   * is either luck or a sign that 230 is simply an empty quarter of this tower.
+   *
+   * It first read "the slit columns stand between 123 and 170". After 2026-08-10
+   * no slit stood there — the openings became the ends of the flights, at 5.7–21.6
+   * and 310 — and the argument was replaced with "the nearest thing to it is the
+   * head of 4→6 at 310, 80° away".
+   *
+   * THAT SECOND ARGUMENT IS NOW VOID TOO, and by much more than the first. On
+   * 2026-08-13 the stair turned a quarter of the drum onto [OWNER]'s bearing and
+   * the whole FOOT column — six of the nine openings the model cuts — swung to
+   * azimuth 205.4–218.5, straight at this. Re-measured rather than re-argued:
+   *
+   *   - the nearest reveal is foot-8-9 at 218.5, and in PLAN IT OVERLAPS: 11.5°
+   *     of separation against 11.7° of combined half-width. What keeps them apart
+   *     is height — the chase stops at the storey-7 springing, 21.79, and that
+   *     reveal starts at 23.77, so 1.98 m of masonry lies between them. A test now
+   *     asks about both dimensions instead of only the bearing, because the old
+   *     azimuth-only one failed on exactly this pair and was right to be doubted;
+   *   - the nearest STAIR DOORWAY is the roof climb's foot at 205.0, 14.5° clear;
+   *   - the nearest passage tube on a storey the chase actually runs up is 8.4°
+   *     clear at storey 3 — down from 105° before the turn, which is the real
+   *     cost of this move and is recorded here rather than in a test's silence;
+   *   - the entrance at 270 is 40° away, unchanged.
+   *
+   * So 230 survives on measurement a third time, and the margins are now single
+   * digits of arc where they used to be three. It is still a [PLACEHOLDER], and
+   * the honest statement is that nothing has ever measured it: it is chosen to be
+   * clear of everything else, and everything else keeps moving.
    */
   azimuthDeg: 230,
   /** Distance of the wellhead from the tower axis. [PLACEHOLDER]. */

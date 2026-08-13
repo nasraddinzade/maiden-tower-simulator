@@ -12,6 +12,8 @@
  */
 
 import {
+  BUTTRESS,
+  ENTRANCE,
   FLOORS,
   LIFTS,
   PASSAGE_OPENING,
@@ -28,7 +30,14 @@ import {
   planAllFlights,
   stairPassageSections,
 } from '../lib/staircase'
-import { passageEndAnchors, type PassageEndAnchor } from '../lib/passageOpenings'
+import {
+  passageEndAnchors,
+  planPassageOpenings,
+  type OpeningFitting,
+  type PassageEndAnchor,
+  type PassageOpening,
+} from '../lib/passageOpenings'
+import windowData from './windows.json'
 
 export type HotspotId =
   | 'cupola-oculus'
@@ -106,25 +115,72 @@ function angleDelta(a: number, b: number): number {
 }
 
 /**
- * Where an opening at one end of a passage stands: centred on the landing arc,
- * at the sill height PASSAGE_OPENING gives it. The same rule planPassageOpenings()
- * applies, kept in step by a test rather than by memory.
+ * THE OPENINGS AS THE APPLICATION CUTS THEM, not as this file remembers them.
+ *
+ * This used to be a hand-written id — `head-3-4` for the interior marker,
+ * `head-6-7` for the exterior one — and an arithmetic copy of where an opening
+ * sits on its landing. Both went stale on 2026-08-13, when the stair moved a
+ * quarter turn on the owner's testimony: head-3-4 now looks into 10.64 m of
+ * buttress and is not cut at all, so the panel claiming "here is where the model
+ * can be checked against a photograph" was hung on blank stone. The same fault as
+ * the hardcoded 141°, one layer up — a NAME rather than a number, and a name goes
+ * stale exactly as quietly.
+ *
+ * So run the planner. Which ends are open is a [PLACEHOLDER] record standing on a
+ * daylight check, and it moves; the markers move with it or they lie.
  */
-function passageOpeningAt(id: string): { azimuthDeg: number; centreY: number; outerHeight: number } {
-  const [end, from, to] = id.split('-')
-  const i = WALL_LIFTS.findIndex(
-    (l) => l.fromFloorNumber === Number(from) && l.toFloorNumber === Number(to),
-  )
-  const a = PASSAGE_ENDS.find((x) => x.flightIndex === i && x.end === end)
-  if (!a) throw new Error(`hotspots: no passage end ${id}`)
-  const outerHeight = 1.9 // m — from windows.json; only the marker's height uses it
-  return {
-    azimuthDeg:
-      a.capAzimuthDeg + angleDelta(a.treadAzimuthDeg, a.capAzimuthDeg) / 2,
-    centreY: a.landingY + PASSAGE_OPENING.sillAboveLanding + outerHeight / 2,
-    outerHeight,
-  }
+const OPENINGS: PassageOpening[] = planPassageOpenings({
+  anchors: PASSAGE_ENDS,
+  fittings: windowData.passageOpenings as OpeningFitting[],
+  liftLabel: (i) => ({
+    from: WALL_LIFTS[i].fromFloorNumber,
+    to: WALL_LIFTS[i].toFloorNumber,
+  }),
+  cfg: PASSAGE_OPENING,
+  buttress: BUTTRESS,
+  outerRadius: TOWER.outerRadius,
+  // the same two bounds App.tsx passes; see the note there on the unresolved
+  // buttress head
+  buttressTopY: Math.min(ENTRANCE.groundY - 0.5 + TOWER.height, TOWER.topY),
+  towerTopY: TOWER.topY,
+})
+
+const BUILT_OPENINGS = OPENINGS.filter((o) => o.built)
+if (BUILT_OPENINGS.length === 0) {
+  // loud on purpose, exactly like MASONRY_OCULI below: with nothing cut there is
+  // no opening for either window marker to stand on, and a marker on stone is
+  // indistinguishable from a marker on a hole once it is rendered
+  throw new Error('hotspots: no passage end is cut; the window markers have nothing to mark')
 }
+
+/**
+ * The opening the INTERIOR marker stands at: the lowest one that is cut.
+ *
+ * A rule, not a name. Lowest because the marker is meant to be met early in the
+ * climb and because the lower the landing the thicker the wall it is cut through,
+ * which is what the reveal is there to show.
+ */
+const INTERIOR_SLIT = BUILT_OPENINGS.reduce((low, o) => (o.centreY < low.centreY ? o : low))
+
+/**
+ * The opening the EXTERIOR marker stands off: the one FARTHEST ROUND FROM THE
+ * BEAK, ties broken upward.
+ *
+ * Also a rule, and the reason is the camera rather than the building. This marker
+ * hangs 1.2 m outside the drum face, and on a bearing the pier covers that point
+ * is inside ten metres of solid stone. The daylight check already refuses to cut
+ * such an end, so any built opening is safe in principle — but head-6-7 is
+ * currently open by one tenth of a degree (azimuth 113.6 against a pier edge at
+ * 113.5), and a marker whose position is decided by the fourth significant figure
+ * of an OSM trace is not a place to stand a camera. Farthest from the beak is the
+ * one choice that cannot be made wrong by a small correction to it.
+ */
+const EXTERIOR_SLIT = BUILT_OPENINGS.reduce((best, o) => {
+  const gap = Math.abs(angleDelta(o.azimuthDeg, BUTTRESS.azimuthDeg))
+  const bestGap = Math.abs(angleDelta(best.azimuthDeg, BUTTRESS.azimuthDeg))
+  if (Math.abs(gap - bestGap) < 1e-9) return o.centreY > best.centreY ? o : best
+  return gap > bestGap ? o : best
+})
 
 /**
  * A point in a chamber, facing the doorway onto the flight that climbs out of it.
@@ -216,17 +272,20 @@ export const HOTSPOTS: Hotspot[] = [
      * Was 'window-niche', standing inside storey 5 at a written-down azimuth of
      * 141 and describing a stepped recess in the chamber wall. [OWNER] says
      * there is no opening in any chamber wall, so both the place and the subject
-     * were wrong. It marks the real thing instead: a slit at the head of a
-     * flight, seen from the landing it lights.
+     * were wrong. It marks the real thing instead: a slit at an end of a stair
+     * passage, seen from the landing it lights.
+     *
+     * WHICH end is no longer written here. It was `head-3-4` until 2026-08-13,
+     * when the stair turned a quarter of the drum and that end went inside the
+     * pier. See INTERIOR_SLIT.
      */
     id: 'passage-slit',
     position: (() => {
-      const o = passageOpeningAt('head-3-4')
+      const o = INTERIOR_SLIT
       const d = azimuthToVector(o.azimuthDeg)
-      const a = PASSAGE_ENDS.find((x) => x.flightIndex === 1 && x.end === 'head')!
       // just inside the passage's outer cheek, facing the reveal
-      const r = a.cheekRadius - 0.5
-      return [d.x * r, a.landingY + PLAYER.eyeHeight, d.z * r] as [number, number, number]
+      const r = o.cheekRadius - 0.5
+      return [d.x * r, o.landingY + PLAYER.eyeHeight, d.z * r] as [number, number, number]
     })(),
     photo: 'photos/window-niche.jpg',
     interior: true,
@@ -234,24 +293,30 @@ export const HOTSPOTS: Hotspot[] = [
   },
   {
     id: 'slits',
-    position: (() => {
-      const o = passageOpeningAt('head-6-7')
-      return outsideAt(o.azimuthDeg, o.centreY)
-    })(),
+    position: outsideAt(EXTERIOR_SLIT.azimuthDeg, EXTERIOR_SLIT.centreY),
     photo: 'photos/slits.jpg',
     interior: false,
     confidence: 'inferred',
   },
   {
     id: 'entrance',
-    position: outsideAt(270, 3.0),
+    // read from the config, not written out: 270 is [İçərişəhər]'s compass word
+    // and it has already been 135 in this repository's history
+    position: outsideAt(ENTRANCE.azimuthDeg, 3.0),
     photo: 'photos/entrance.jpg',
     interior: false,
     confidence: 'measured',
   },
   {
     id: 'buttress',
-    position: outsideAt(106.7, TOWER.height * 0.35, 9),
+    /*
+     * Also read from the config, and since 2026-08-13 it matters more than it
+     * did. BUTTRESS.azimuthDeg is the bearing STAIR.startAzimuthDeg is derived
+     * FROM, so a survey correcting the [OSM] trace now turns the whole stair and
+     * every opening with it. A marker that kept its own copy of 106.7 would be
+     * the one thing on screen still pointing at the old beak.
+     */
+    position: outsideAt(BUTTRESS.azimuthDeg, TOWER.height * 0.35, 9),
     photo: 'photos/buttress.jpg',
     interior: false,
     confidence: 'measured',
