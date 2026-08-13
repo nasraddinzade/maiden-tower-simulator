@@ -890,6 +890,122 @@ export function patternResidual(
   }
 }
 
+/*
+ * ————————————————— THE SWEEP AND THE DRIFT ARE ONE QUANTITY —————————————————
+ *
+ * The three functions below exist to settle an argument the file was losing on
+ * the wrong ground. `reconciliation` → `different-sweep` said a flight might
+ * sweep 35° instead of 97°, and it was answered with "then the tread would be
+ * 0.12 m, which is not a tread". That answer is weak, and it is weak in a way
+ * that invites the next reader to push back: STAIR.goingTarget is marked
+ * [ASSUMPTION] and not in any source, endLandingLength is an [ESTIMATE], and the
+ * walking line's radius is a model choice too. Three soft numbers is not a
+ * refutation, it is an invitation.
+ *
+ * THE PHOTOGRAPH REFUTES IT WITHOUT THEM. Stack flights of equal rise at one
+ * bearing and their far ends do not stand in a vertical line — the wall thins
+ * with height, the walking line moves outward, and a flight of the same rise and
+ * the same tread sweeps LESS arc higher up. So the column of far ends leans, and
+ * by exactly
+ *
+ *     drift  =  sweep × (1 − r_low / r_high)
+ *
+ * because a flight's arc is (number of treads × going) ÷ r, and the number of
+ * treads and the going are the same for every equal-rise flight. THE TREAD, THE
+ * RISER AND THE WALKING RADIUS ALL CANCEL in that ratio: only the taper survives,
+ * and the taper is docs-sourced (5.0 m at the base, 3.7 m at the top).
+ *
+ * So a measured lean measures a sweep, with no assumption in the chain. The
+ * frames measure the upper column leaning 5.1° per storey. That needs a sweep
+ * near 176°. A 35° sweep would lean 1.02°. The reading `different-sweep` asks for
+ * is refuted BY THE SAME PHOTOGRAPH IT WAS DRAWN FROM, five times over, and the
+ * refutation survives any tread a person could climb.
+ *
+ * It does not rescue the model either, and that must be said in the same breath:
+ * the model's flights lean 2.3–3.1° per storey against 5.1 measured. Both
+ * readings are wrong on this quantity; one is wrong by a factor of two and the
+ * other by a factor of five.
+ *
+ * Reporting only. No caller places anything from these.
+ */
+
+/**
+ * The rigid coupling: what fraction of a flight's sweep a stacked column of its
+ * far ends drifts, over the whole span between the two radii.
+ *
+ * `rLow` and `rHigh` are the walking-line radii of the lowest and highest flight
+ * in the column. Independent of tread, riser and rise.
+ */
+export function driftPerSweep(rLow: number, rHigh: number): number {
+  if (rLow <= 0 || rHigh <= 0) throw new Error('radii must be positive')
+  return 1 - rLow / rHigh
+}
+
+/**
+ * Invert it: the sweep a measured drift implies. The one way a photograph can
+ * measure a stair's sweep without anybody guessing a tread.
+ *
+ * `storeys` is how many storey gaps the drift was measured over, so the answer
+ * is in the same per-storey units as the measurement.
+ */
+export function sweepFromDrift(
+  driftPerStoreyDeg: number,
+  rLow: number,
+  rHigh: number,
+  storeys: number,
+): number {
+  if (storeys <= 0) throw new Error('storeys must be positive')
+  const perStorey = driftPerSweep(rLow, rHigh) / storeys
+  if (perStorey <= 0) return Number.POSITIVE_INFINITY
+  return driftPerStoreyDeg / perStorey
+}
+
+/** How much of a foot-to-head separation is the climb, and how much is not. */
+export interface SeparationParts {
+  /** Foot opening to head opening, degrees. */
+  totalDeg: number
+  /** The risers alone — the only part that is (rise/riser) × (going/r). */
+  climbDeg: number
+  /** The two end landings. STAIR.endLandingLength is an [ESTIMATE], 0.9 m. */
+  landingDeg: number
+  /** The openings standing clear of the flight's ends. A rule, not a dimension. */
+  clearanceDeg: number
+  /** Fraction of the separation that is not the climb. */
+  notFromTheClimb: number
+}
+
+/**
+ * Split a modelled foot-to-head separation into its three parts.
+ *
+ * WHY IT IS WORTH A FUNCTION. windows.json used to state that the separation is
+ * "(rise / riser) × (going / midRadius)" and therefore "not a free parameter".
+ * THAT IS WRONG, and this measures by how much: of the 104.5° the model puts
+ * between foot-2-3 and head-2-3, 64.3° is the climb, 20.1° is the two end
+ * landings and 20.1° is planPassageOpenings holding each opening clear of the
+ * flight's last tread. Two fifths of the disagreement is estimate and rule.
+ *
+ * It still does not rescue `different-sweep`: strip both and 64.3° remains
+ * against 35.3° measured. But the file said something untrue in its own defence,
+ * and the correction belongs where the claim was made.
+ */
+export function separationParts(input: {
+  totalDeg: number
+  /** First tread to last tread, degrees. */
+  flightArcDeg: number
+  /** The part of that arc spent on the two flat end landings. */
+  landingArcDeg: number
+}): SeparationParts {
+  const climbDeg = input.flightArcDeg - input.landingArcDeg
+  const clearanceDeg = input.totalDeg - input.flightArcDeg
+  return {
+    totalDeg: input.totalDeg,
+    climbDeg,
+    landingDeg: input.landingArcDeg,
+    clearanceDeg,
+    notFromTheClimb: input.totalDeg > 0 ? 1 - climbDeg / input.totalDeg : 0,
+  }
+}
+
 /** Problems that should stop an opening being cut. Data, not exceptions. */
 export function validatePassageOpening(o: PassageOpening): string[] {
   /*

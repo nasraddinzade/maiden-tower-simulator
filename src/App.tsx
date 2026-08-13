@@ -470,22 +470,35 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
    * 43° in the single rung between storey 4 and storey 5. That is the storey he
    * himself calls exceptional, so the question is about the STAIR and not the
    * windows. windows.json → photographedPattern and → sectorStepQuestion.
+   *
+   * SO BY THE END OF 2026-08-13 THIS EFFECT PRINTED FOUR WALLS OF RUSSIAN ON EVERY
+   * LOAD, and the comment above it argues, correctly, that a wall of text is read
+   * exactly as often as no text at all. It had become the thing it was written to
+   * prevent. What prints now is windows.json → askInThisOrder: ONE question first,
+   * in one sentence, then the queue behind it, each item naming the block that
+   * holds its argument. The four `ask` blocks are not deleted and not shortened —
+   * they are where a reader goes after the index sends them there.
+   *
+   * THE ORDER IS NOT ARBITRARY AND IT CHANGED TODAY. First is which end of each
+   * passage carries a window, which used to be fourth. Measuring the frames rung by
+   * rung found that NO TWO SLITS SHARE A HEIGHT, and stacked flights pierced at both
+   * ends cannot produce that — so six sentences from him settle the count, the
+   * pairing and the shape of the disagreement at once, at no cost in invention.
+   * windows.json → reconciliation → one-end-per-passage.
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return
-    const unanswered: Array<readonly string[]> = []
-    for (const q of [windowData.headShapeQuestion, windowData.sillHeightQuestion]) {
-      if (q.climbs.every((c) => c.answer === null)) unanswered.push(q.ask)
-    }
-    if (windowData.beakSideQuestion.answer === null) {
-      unanswered.push(windowData.beakSideQuestion.ask)
-    }
-    if (Object.values(windowData.sectorStepQuestion.answers).every((a) => a === null)) {
-      unanswered.push(windowData.sectorStepQuestion.ask)
-    }
-    for (const ask of unanswered) {
-      console.warn(`[openings — unanswered]\n${ask.join('\n')}`)
-    }
+    const q = windowData.askInThisOrder
+    if (q.answered !== null) return
+    console.warn(
+      `[openings — спросить в этом порядке]\n${[
+        ...q.theQuestion,
+        '',
+        ...q.thenTheseFive,
+        '',
+        ...q.andTwoFaultsYouNamedWithoutCorrecting,
+      ].join('\n')}`,
+    )
   }, [])
 
   /*

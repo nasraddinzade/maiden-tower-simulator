@@ -412,6 +412,89 @@
     "  contingent on an unanswered question, and the hypotheses layer says so."
   ],
 
+  "askInThisOrder": {
+    "note": [
+      "THE ONE PLACE THE OPEN QUESTIONS LIVE, RANKED, WITH THE SENTENCE THAT ANSWERS",
+      "EACH. Everything below it in this file is the argument; this is the queue.",
+      "",
+      "WHY IT EXISTS. By 2026-08-13 there were five separate question blocks in this",
+      "file, each with a forty-line note, each printing its own wall of Russian into the",
+      "console on every dev load. A question nobody reads is not open, it is lost —",
+      "which is the reason those blocks were written, and by then they had become the",
+      "thing they were guarding against. The detail stays where it is. What is here is",
+      "the order to ask in, one sentence apiece, and what each answer would settle.",
+      "",
+      "EVERY ONE OF THEM IS ABOUT THE BUILDING. He has walked the tower and cannot",
+      "measure it, so nothing here asks about a parameter, a degree count or an id this",
+      "repository invented. Answers go into the block each item names; none of them may",
+      "be guessed, and no geometry moves until one arrives (CLAUDE.md rules 1 and 7)."
+    ],
+    "theQuestion": [
+      "ГЛАВНЫЙ ВОПРОС — ОДИН, И ОН ПРО ОКНА В МАРШАХ.",
+      "",
+      "10 августа ты сказал: у одних маршей окно есть и в начале подъёма, и в конце, а у",
+      "других — только с одной стороны. По какому маршу как — не спрашивали ни разу, и в",
+      "файле до сих пор двенадцать пустых мест.",
+      "",
+      "Теперь это стало важнее всего остального, потому что снимки, которые ты сам",
+      "подтвердил («в таком вот распорядке и отдалении»), показывают вещь, которой в",
+      "модели нет: НИ НА ОДНОЙ ВЫСОТЕ НЕТ ДВУХ ЩЕЛЕЙ. Восемь щелей — по одной на ярус. А",
+      "если у марша пробиты оба конца, то на каждой промежуточной площадке окно верхнего",
+      "конца одного марша и окно нижнего конца следующего стоят на ОДНОЙ высоте — в",
+      "модели так выходит трижды. Значит либо снимки сняты с грани, где эти пары не",
+      "видны, либо у большинства маршей пробит только один конец.",
+      "",
+      "  «Пройди мысленно каждый марш снизу вверх. Для каждого скажи: окно есть",
+      "   ТОЛЬКО в начале подъёма, ТОЛЬКО в конце, И ТАМ И ТАМ, или НИ ТАМ НИ ТАМ?»",
+      "",
+      "Шесть ответов — шесть маршей: 2→3, 3→4, 4→6 (длинный, мимо 5-го), 6→7, 7→8, 8→кровля.",
+      "«Начало» — площадка, на которую выходишь из нижней комнаты, до первой ступени.",
+      "«Конец» — верхняя площадка, перед дверью в комнату наверху.",
+      "",
+      "Ответы — в windows.json → openEndsQuestion → passages[].answer. Пока они пусты,",
+      "модель подставляет проверку «дошёл бы сюда дневной свет» вместо твоего ответа, и",
+      "это стоит в двенадцати местах из двенадцати."
+    ],
+    "thenTheseFive": [
+      "1. НАСКОЛЬКО ДАЛЕКО ВЛЕВО ОТ КЛЮВА. «Встань перед клювом, лицом к башне. Раздели",
+      "   глазом стену пополам: от клюва до левого края, где стена уходит за поворот.",
+      "   Окна в ближней к клюву половине, в дальней у края, или уходят ЗА край?»",
+      "   → меняет STAIR_FROM_BUTTRESS_DEG. Подробно: → beakSideQuestion",
+      "",
+      "2. ОДНА ЛИ ЧАСТЬ СТЕНЫ У ЛЕСТНИЦЫ. «Заходя на каждый ярус: вход на лестницу всегда",
+      "   в одном и том же месте комнаты, или где-то в середине башни он один раз",
+      "   перескакивает в другое место?»",
+      "   → меняет раскладку маршей и частично спорит с твоим указанием от 06.08.",
+      "   Подробно: → sectorStepQuestion, → reconciliation.not-feet-and-heads",
+      "",
+      "3. В КАКУЮ СТОРОНУ ЗАКРУЧЕНА ЛЕСТНИЦА. «Поднимаясь по проходу в стене, ось башни",
+      "   у тебя слева или справа?»",
+      "   → STAIR.winding, который не отвечен ни разу и зеркалит весь фасад одним словом.",
+      "   Подробно: → openEndsQuestion.note, → reconciliation.winding-flip",
+      "",
+      "4. ДВА КОРОТКИХ, ПРО ДВА МЕСТА, КОТОРЫХ В МОДЕЛИ НЕТ. «Между 1-м и 2-м ярусом есть",
+      "   в стене каменная лестница — заложенная или открытая — кроме железной винтовой?»",
+      "   и «там, где выходишь на 5-й ярус с середины подъёма, есть рядом окно?»",
+      "   → закрывают ровно две недостающие ступени. Подробно: → sectorStepQuestion.ask,",
+      "   → reconciliation.two-named-rungs",
+      "",
+      "5. КАКАЯ СТУПЕНЬКА. «На ступеньке помещается вся ступня или только половина?»",
+      "   → STAIR.goingTarget помечен [ASSUMPTION] и не взят ни из какого источника; это",
+      "   самое слабое звено во всей лестнице. Ответ НЕ закроет разнос колонок — это",
+      "   посчитано и записано в → sweepDriftCoupling — но перестанет быть допущением."
+    ],
+    "andTwoFaultsYouNamedWithoutCorrecting": [
+      "Оба с 13.08, оба не тронуты, оба ждут числа, а не подтверждения:",
+      "",
+      "  форма верха проёмов — → headShapeQuestion",
+      "  высота подоконника над площадкой — → sillHeightQuestion",
+      "",
+      "И один вопрос не про окна вовсе: чем накрыт последний марш на кровлю —",
+      "→ config/tower.ts → ROOF_QUESTION."
+    ],
+    "answered": null
+  },
+
   "openEndsQuestion": {
     "note": [
       "WHAT A READER MUST ASK THE OWNER TO FILL IN `open` ON THE TWELVE ENDS BELOW.",
@@ -450,7 +533,23 @@
       "cheap independent check: with the entrance at 270 and the foot doorways at about 191,",
       "a person standing in a chamber facing the entrance has the way onto the stair some",
       "79 deg round to their LEFT, just behind the shoulder. If he says right, the quarter",
-      "turn is wrong and everything above moves again."
+      "turn is wrong and everything above moves again.",
+      "",
+      "[2026-08-13, later] THIS BECAME THE FIRST QUESTION TO ASK, and it was the fourth",
+      "when it was written. Measuring the frames rung by rung found something these six",
+      "answers bear on directly: NO TWO SLITS SHARE A HEIGHT ANYWHERE on the photographed",
+      "face — eight slits, one per storey. Flights stacked at one bearing and pierced at",
+      "BOTH ends cannot do that: at every intermediate landing one flight's head and the",
+      "next flight's foot stand at the same level, and the model does it three times.",
+      "So `both` on a middle flight and the photograph are in tension, and six sentences",
+      "from him resolve it. See `reconciliation` → `one-end-per-passage`, ranked first",
+      "there for the same reason.",
+      "",
+      "THE TENSION IS WITH HIS OWN WORDS AND IS NOT SMOOTHED OVER. He said on 2026-08-10",
+      "that SOME flights have a window at both ends. The frames say no pair shares a",
+      "height. Both can be true — a `both` on the topmost or the bottommost flight makes",
+      "no pair, and the photographs show one face and not the drum — but it is his to",
+      "say which, and nobody may pick the reading that suits the model."
     ],
     "passages": [
       { "climb": "storey 2 → storey 3", "sets": ["foot-2-3", "head-2-3"], "answer": null },
@@ -1022,6 +1121,90 @@
     ]
   },
 
+  "sweepDriftCoupling": {
+    "note": [
+      "THE ONE PIECE OF THIS ARGUMENT THAT NEEDS NO ASSUMPTION, AND IT SETTLES A",
+      "CANDIDATE WITHOUT ASKING HIM ANYTHING.",
+      "",
+      "Stack flights of equal rise at one bearing and the column of their FAR ends does",
+      "not come out vertical. The wall thins with height, the walking line moves",
+      "outward, and a flight of the same rise on the same tread sweeps LESS arc higher",
+      "up. So the far ends lean, and by exactly",
+      "",
+      "    drift = sweep × (1 − r_low / r_high)",
+      "",
+      "because a flight's arc is (tread count × going) ÷ r, and tread count and going",
+      "are the same for every equal-rise flight. THE TREAD, THE RISER AND THE WALKING",
+      "RADIUS ALL CANCEL in that ratio. Only the taper survives — and the taper is the",
+      "docs-sourced one, 5.0 m of wall at the base and 3.7 m at the top.",
+      "",
+      "Verified rather than asserted: re-planning the whole stair at four treads and two",
+      "risers moves the sweep from 48° to 115°, a 2.4× range spanning every value anyone",
+      "has proposed, and the ratio does not move in the fourth decimal",
+      "(src/lib/sweepDrift.test.ts).",
+      "",
+      "WHAT THAT DOES. A measured lean measures a sweep. The frames put the upper column",
+      "leaning 5.1° per storey; that needs a sweep near 176°. A 35° sweep would lean",
+      "1.02°. So `different-sweep` — the candidate that made the two photographed columns",
+      "the feet and heads of the same flights by shrinking the tread — is refuted BY THE",
+      "SAME PHOTOGRAPH IT WAS DRAWN FROM, by a factor of five, with no tread named.",
+      "",
+      "AND IT DOES NOT RESCUE THE MODEL, which has to be said in the same breath or this",
+      "stops being a measurement and becomes an argument for the model. The model's own",
+      "heads lean 2.27–3.08° per storey against 5.1 photographed. Both readings are wrong",
+      "on this quantity; one by a factor of two, the other by a factor of five.",
+      "",
+      "THE HALF THE MODEL DOES GET RIGHT, and it is what makes the other half a real",
+      "disagreement rather than a broken measurement: feet stand at the flight's START,",
+      "which is one bearing for every stacked flight, so a foot column is vertical to",
+      "within the doorway's own lead. Model 0.30° per storey; the frames give the lower",
+      "four 0.3–0.9. A head column in that place would lean 2.3–3.1. The lower column is",
+      "a FOOT signature and the model reproduces it.",
+      "",
+      "AND A CORRECTION TO SOMETHING THIS FILE SAID IN ITS OWN DEFENCE. It used to state",
+      "that the column separation is «(rise / riser) × (going / midRadius)» and therefore",
+      "«not a free parameter». Two of its three parts are. Of the 104.51° the model puts",
+      "between foot-2-3 and head-2-3, 64.31° is the climb, 20.10° is the two end landings",
+      "(STAIR.endLandingLength, an [ESTIMATE] with no source) and 20.10° is",
+      "planPassageOpenings holding each opening clear of the last tread — a rule the code",
+      "declares as a choice. Two fifths is estimate and rule. It does not change the",
+      "verdict — strip both and 64.31° still stands against 35.3 measured — but an",
+      "argument that overstates itself is one a reader is right to distrust.",
+      "",
+      "ONE THING RETIRED WHILE CHECKING: a reading of this stair was circulated with the",
+      "walking line at 3.62 m, which would have made the sweep 18% wider than it is and a",
+      "0.17 m tread look sufficient. It is the inner face plus STAIR.wallClearance plus half the stair's width, 4.277 m",
+      "on the lowest flight, and the config says so."
+    ],
+    "arcTimesRadius": 361.0,
+    "arcTimesRadiusNote": "° × m, the same for all four equal-rise flights to five significant figures (361.014, 361.011, 361.003, 361.001). Not a measurement of the tower — a property of the model's own stair, and the premise the coupling rests on.",
+    "driftPerSweep": 0.1446,
+    "driftPerSweepNote": "1 − r_low/r_high across the model's four equal-rise flights. Measured 0.14462 against 0.14459 predicted from the two radii alone.",
+    "walkingLineLowestFlight": 4.277,
+    "walkingLineToStorey5": 4.566,
+    "walkingLineToStorey8": 5.0,
+    "taperPerStorey": 0.02892,
+    "photographedLeanPerStoreyDeg": 5.1,
+    "sweepTheLeanImpliesDeg": 176.4,
+    "a35SweepWouldLeanDeg": 1.021,
+    "modelLeanPerStoreyDeg": [
+      2.27,
+      3.08
+    ],
+    "modelFootLeanPerStoreyDeg": 0.3,
+    "separationParts": {
+      "totalDeg": 104.51,
+      "climbDeg": 64.31,
+      "landingDeg": 20.1,
+      "clearanceDeg": 20.1
+    },
+    "sectorStepRangeDeg": [
+      46.2,
+      61.3
+    ],
+    "sectorStepNote": "DERIVED, NOT MEASURED, AND NOT BUILT. If the photographed 43.2° step between storey 4 and storey 5 is a foot below and a head above, the offset between two stair sectors is the model's own foot-to-head separation minus that step: 46.2–61.3° depending on which flight it is read off. STAIR.startAzimuthDeg is still one number for all six flights, as [OWNER] 2026-08-06 instructed."
+  },
+
   "reconciliation": {
     "note": [
       "WHAT COULD MAKE BOTH OF HIS STATEMENTS TRUE AT ONCE — a quarter turn clockwise",
@@ -1033,11 +1216,37 @@
       "the entry, because that is his to resolve and not the model's.",
       "",
       "Ranked by invention, cheapest first. Read `explains` before `rank`: the cheapest",
-      "candidate explains the least."
+      "candidate explains the least.",
+      "",
+      "[2026-08-13, later] THE LIST WAS MERGED AND PRUNED, and both operations matter",
+      "more than the additions. Several entries in circulation were the same claim in",
+      "different words — «only one end of each passage is pierced», «one slit per",
+      "landing», «the ends alternate» are one candidate, and it is now",
+      "`one-end-per-passage`; `opening-at-storey-5` and `more-flights` were the two",
+      "halves of one observation and are now `two-named-rungs`. A list that says a thing",
+      "three times reads as three pieces of evidence, which is exactly the error this",
+      "whole exercise exists to avoid.",
+      "",
+      "AND FIVE ENTRIES LEFT THE LIST ALTOGETHER, into `refuted` below, each with what",
+      "refuted it. The largest of them, `different-sweep`, was killed by the photograph",
+      "it was drawn from — see `sweepDriftCoupling`. A refuted candidate is deleted from",
+      "nowhere and kept with its cause of death, because the next reader will think of it",
+      "again otherwise."
     ],
     "candidates": [
       {
         "rank": 1,
+        "id": "one-end-per-passage",
+        "claim": "Each stair passage is pierced at ONE end, not both, and which end changes with height: the lower passages at the foot of the climb, the upper ones at its head.",
+        "changes": "Nothing dimensional and nothing in config/tower.ts. It fills in `open` on the twelve ends below, all of which are still null.",
+        "predicts": "ONE SLIT PER STOREY AND NO TWO AT ONE HEIGHT — which is what the frames show and what stacked flights pierced at both ends cannot produce, because they put a head at the same level as the next flight's foot at every intermediate landing (the model does it three times over). It also predicts the two column signatures separately, and both of them land: a foot column is vertical, model 0.30° per storey against 0.3–0.9 photographed; a head column leans, model 2.27–3.08 against 5.1 photographed. Count comes out 9 = 8 − 2 missing levels + 3 duplicated pairs.",
+        "doesNotFix": "The separation. The step from the lowest head to the highest foot is still a flight's own sweep, 89–105° modelled against a 43.2° step measured.",
+        "kills": "«И там и там» on the upper flights. If he says the upper passages have a window at the beginning of the climb as well as at the end, this is dead — and so is the only account anyone has of why no two slits share a height.",
+        "observation": "It is already written out in full in `openEndsQuestion`, and one sentence of it is enough: «в каждом марше окно только в начале подъёма, только в конце, и там и там, или нигде?» Six answers set twelve ends.",
+        "invention": "none — it is literally one of the four answers his own 2026-08-10 sentence allows, and the record has been waiting for it since"
+      },
+      {
+        "rank": 2,
         "id": "smaller-than-a-quarter",
         "claim": "The turn from the beak to the stair is smaller than a quarter — a sixth, say.",
         "changes": "STAIR_FROM_BUTTRESS_DEG alone, which exists as its own constant for exactly this reason. It is [OWNER]'s eye and the file already reads ±15° with it.",
@@ -1048,54 +1257,114 @@
         "invention": "none"
       },
       {
-        "rank": 2,
-        "id": "opening-at-storey-5",
-        "claim": "The 4→6 passage carries an opening where it meets storey 5, so that landing is a passage END in his vocabulary — it is the beginning of a climb for anyone entering there.",
-        "changes": "Nothing dimensional. The model already has that landing (LIFTS → opensAtY), it simply does not treat it as an end.",
-        "predicts": "Exactly one more opening at h/H 0.572, which is where the photograph's unmatched 4th rung is (0.560). Its bearing would be 128.7 — that flight sweeps 141° in all and is about half way through it at storey 5.",
-        "kills": "128.7 is the UPPER column's bearing and the photograph puts its 0.560 rung in the LOWER column, some 30–40° away. So the prediction is sharp and, on the frames we have, it fails on bearing while succeeding on height.",
-        "observation": "«Когда поднимаешься с 4-го на 6-й и проходишь выход на 5-й ярус — там рядом есть окно?» And, if yes: is it on the same side of the tower as the windows below it, or round from them?",
-        "invention": "none"
-      },
-      {
         "rank": 3,
-        "id": "more-flights",
-        "claim": "There are eight flights, not six — one per storey gap from the ground to the roof.",
-        "changes": "The lift table in config/tower.ts, which is [OWNER] + [VIDEO] and the best-sourced thing in the stair.",
-        "predicts": "The photographed ladder has EIGHT rungs where a stair from storey 1 to the roof needs eight flights, and the two the model lacks are exactly the two its table merges or replaces: 1→2 (the modern steel spiral) and the storey-5 half of 4→6. Under this candidate the two missing rungs are the two missing flights.",
-        "kills": "Nothing yet, and that is the news: this was written down as killed by the pitch — eight feet one per storey would step by the STOREY, 3.281 m, against a photograph that appeared to step 2.83 — and the 2.83 turned out to be a datum artefact. Measured in drum radii the ladder steps 0.414 against the model's 0.398, so ONE RUNG PER STOREY is what the frames now say. This candidate went from contradicted to corroborated on a correction to somebody's arithmetic, which is a reason to hold it loosely rather than to promote it.",
-        "observation": "«Между 1-м и 2-м ярусом есть каменная лестница в стене — заложенная или открытая — кроме железной винтовой?» One word.",
-        "invention": "contradicts his own account of the climb"
+        "id": "opening-centred-on-landing",
+        "claim": "The slit sits at the landing's END TREAD, not in the middle of the landing — so part of the model's column separation is a placement rule rather than a stair.",
+        "changes": "planPassageOpenings, which declares its own choice in the code («CENTRED, rather than pushed hard against the cap»), plus STAIR.endLandingLength — an [ESTIMATE] of 0.9 m that «no source gives».",
+        "doesNotFix": "The count, the levels and the lean, none of which move at all.",
+        "predicts": "Two fifths of the separation is not the climb: of the 104.51° between foot-2-3 and head-2-3, 64.31° is the risers, 20.10° the two end landings and 20.10° the openings standing clear of the last tread. Stripping both takes the model to 64.31°, closing about 40% of the gap to 35.3 and no more.",
+        "kills": "Nothing — and that is its ceiling. Even fully applied it leaves 64.31° against 35.3, so it cannot be the answer on its own. It is here because the file previously claimed the separation had no free parameters, which was untrue.",
+        "observation": "«Стоя на площадке в конце прохода: окно прямо перед тобой, или сбоку, за последней ступенькой?» One gesture answers it.",
+        "invention": "none — both quantities are already declared as model choices, not as evidence"
       },
       {
         "rank": 4,
-        "id": "different-sweep",
-        "claim": "A flight sweeps about 35° between its ends, not 90°, so the two columns are feet and heads after all.",
-        "changes": "STAIR.goingTarget or riserTarget.",
-        "predicts": "sweep = (rise / riser) × (going / midRadius). With rise 3.281 and midRadius 4.20–5.22, 35° needs a going of about 0.12 m, or a riser of about 0.52 m. Neither is a step a person climbs.",
-        "kills": "Its own arithmetic, unless a tread in the tower measures something nobody expects.",
-        "observation": "One photograph of one tread with anything of known size beside it.",
-        "invention": "a tread dimension that is not a tread dimension"
+        "id": "two-named-rungs",
+        "claim": "The model is short exactly two rungs, and both are NAMED rather than counted: the mid-climb exit onto storey 5, and the foot of a masonry flight out of storey 1.",
+        "changes": "For storey 5, nothing dimensional — the landing already exists (LIFTS → opensAtY, [OWNER] 2026-08-09). For storey 1 it changes the lift table in config/tower.ts, which is [OWNER] + [VIDEO].",
+        "doesNotFix": "The separation and the lean. It is a vertical candidate only.",
+        "predicts": "By the model's own rule (floor + 0.30 sill + half of a 1.90 opening) those two levels stand 1.530 and 3.182 drum radii below the crown, against 1.555 and 3.186 measured — 15 to 25 cm out, with nothing fitted to make it so. The ladder closes at eight rungs with no hole. Bearing is NOT predicted: the model puts the storey-5 exit at 128.7 while the frames put that rung in the lower column, 30–40° away.",
+        "kills": "For storey 1, one word from him. For storey 5, one word from him. Neither is a measurement anybody can take from the corpus.",
+        "observation": "«Между 1-м и 2-м ярусом есть в стене каменная лестница — заложенная или открытая — кроме железной винтовой?» and «там, где выходишь на 5-й ярус с середины подъёма, есть рядом окно?»",
+        "invention": "none at storey 5; at storey 1 it contradicts the lift table, though his account there described the MODERN spiral rather than the absence of an older flight"
       },
       {
         "rank": 5,
         "id": "not-feet-and-heads",
         "claim": "The two photographed columns are not the two ends of the same flights. The stair runs in one sector of the wall for the lower storeys and in another, about 35° round, for the upper ones — so the photograph is ONE ladder of eight that steps sideways once, at mid-height.",
         "changes": "Where each flight starts. It keeps flights stacked within each half and so contradicts [OWNER] 2026-08-06 («САМОЕ ГЛАВНОЕ НУЖНО ПОМЕНЯТЬ СПЛОШНУЮ ЛЕСТНИЦУ НА ПРОХОДНУЮ», on which the six flights were stacked into one sector) only in part, and it must be put to him in those terms rather than adopted.",
-        "predicts": "THE ONE CANDIDATE THAT EXPLAINS THE DISJOINT HEIGHTS, which is the fact none of the others touch: the photographed upper column lies ENTIRELY ABOVE the lower one, whereas stacked flights put a head at the same height as the next flight's foot at every intermediate level. It also explains the separation without touching a tread.",
-        "kills": "If he says the way onto the stair is in the same part of every chamber from the bottom to the top, this is dead.",
+        "doesNotFix": "The lean. A rigid sideways step moves the upper column bodily; within it the heads still lean at whatever the sweep gives, 2.3–3.1° per storey against 5.1 measured.",
+        "predicts": "THE ONE CANDIDATE THAT EXPLAINS THE DISJOINT HEIGHTS BY ITSELF, and, with `one-end-per-passage` beside it, all four quantities at once without touching a tread. The offset it needs is derived rather than guessed: the model's own foot-to-head separation minus the measured 43.2° step, i.e. 46.2–61.3° — about a sixth of the circumference. AND IT HAS A MECHANISM IN docs/, which is what lifts it above a free parameter: the drum is documented in TWO SECTIONS, «30 stone corbels on the lower and 31 on the upper, tied by a stone belt». Two lifts of construction are two settings-out, and a stair begun again above the belt need not start where the one below it did. THAT IS A BUILDING ARGUMENT AND NOT A CALENDRICAL ONE — the same 30 and 31 carry Əhmədov's calendar reading, and using the seam as a construction break is not adopting it (CLAUDE.md rule 7).",
+        "kills": "If he says the way onto the stair is in the same part of every chamber from the bottom to the top, this is dead. And one check needs neither him nor a survey: count the corbel courses in frame A and measure where the belt falls against the ladder of slits. The candidate predicts it between the 4th and 5th rung, i.e. 1.56–1.87 radii below the crown. AND THE MODEL'S OWN BELT MAY NOT BE USED TO CHECK IT: CORBELS.beltHeightFraction is 0.55, a [PLACEHOLDER] with no source, which puts it at 1.50 radii — near the prediction and worth nothing, because two unsourced numbers agreeing is not evidence. The check is to count the corbel courses in frame A, 30 below the belt and 31 above, and read the belt's height against the ladder of slits. If the belt falls anywhere else, the mechanism goes even if the offset survives.",
         "observation": "«Заходя в каждый ярус: вход на лестницу всегда в одном и том же месте комнаты, или где-то на середине башни он перескакивает в другое место?»",
-        "invention": "a new rule for where a flight begins, which no source gives"
+        "invention": "a new rule for where a flight begins — but the seam it would begin at is documented, so the invention is the rule and not the place"
       },
       {
         "rank": 6,
+        "id": "winding-flip",
+        "claim": "STAIR.winding is the other way round, which mirrors every flight and every opening with it.",
+        "changes": "One [PLACEHOLDER] enum in config/tower.ts. It has never been answered — it was read off tread wedges in dim wide-angle frames — and it is a live leva toggle, which is exactly why it is the first thing anybody will reach for.",
+        "doesNotFix": "Nothing. The separation is unchanged (the same sweep), the count is unchanged, the levels are unchanged; only the sign of the lean flips.",
+        "predicts": "Feet stay near 196.7 plus their lead; heads move from 102–118 to about 294 — onto the western arc. AND THE CORPUS SPEAKS TO THAT: across 208 frames the arc from about 219 to 356 shows NO slits at all, which is a positive observation and not an absence of coverage. So at the present sweep the photographs SETTLE the winding. At a small sweep they would not: the heads would land on 205–219, the one arc no frame in the corpus resolves.",
+        "kills": "The western frames, if the heads are pierced at all — which is `one-end-per-passage`'s business, so the two questions are entangled and must be asked together.",
+        "observation": "«Поднимаясь по проходу в стене, ось башни у тебя слева или справа?» One word, and he is the only person who has been in there.",
+        "invention": "none — the question has simply never been put"
+      },
+      {
+        "rank": 7,
+        "id": "oblique-reveal",
+        "claim": "The slit is cut obliquely through the wall, along the passage rather than radially out of it, so the outer mouth is not on the landing's bearing.",
+        "changes": "The premise of PASSAGE_OPENING, which drives every mouth radially outward from its landing.",
+        "doesNotFix": "The count and the levels. It is a bearing candidate only.",
+        "predicts": "A shift of (R_outer − R_landing)·tan θ ÷ R: 25–45° for the whole set at a 30–45° skew, in the direction of the climb. That would reconcile «a quarter turn to the way ONTO the stair» — which is what he walked — with slits standing 35–60° further round, WITHOUT MOVING THE STAIR AT ALL. If foot and head reveals skew opposite ways it also compresses the separation. Against it: the shift falls with wall thickness, so it should be largest low down, and the photographed LOWER column is the one that holds a vertical line to 2.7° over four storeys.",
+        "kills": "A radial reveal is symmetrical about its opening; an oblique one shows one cheek and hides the other, and the opening sits off-centre inside its dressed surround. Measurable on exterior/«Qız qalası yaxından.jpg» and on the 7736 close-up without asking him anything.",
+        "observation": "«Окно прямо в стене рядом с тобой, или в конце глубокой ниши, куда надо зайти? Сколько шагов?»",
+        "invention": "a skew angle, which no source gives — docs/ says only that the openings flare inward"
+      },
+      {
+        "rank": 8,
+        "id": "branch-to-the-slit",
+        "claim": "The upper slits are not passage ends at all but the tops of short branch stairs off the landings, climbing to a light.",
+        "changes": "PASSAGE_OPENING.branchAtEnds, which ships EMPTY precisely because no source gives a branch's length, bearing or pitch.",
+        "doesNotFix": "Nothing on its own; it makes the upper column's bearing a free quantity rather than a consequence.",
+        "predicts": "THE ONLY CANDIDATE IN WHICH THE LEAN IS FREE, and after `sweepDriftCoupling` that matters more than it did: every stacked-flight reading is stuck at 2.3–3.1° per storey against 5.1 measured, and a branch of its own length and bearing at each level is not bound by the taper at all. Its warrant is [VIDEO] 429–449 s — a grille and behind it a separate blocked flight rising to a window slit — and the config already records three such branches as unmodelled.",
+        "kills": "«К скольким окнам от площадки ведут отдельные ступеньки, и на каких ярусах?» Three, all high up, and it becomes the leading reading. None above storey 6 and it is dead.",
+        "invention": "the most of any candidate here — a length, a bearing and a pitch per branch, none of them in any source",
+        "observation": "The same question, and one interior frame from a landing on the photographed face would do as well."
+      }
+    ],
+    "refuted": [
+      {
+        "id": "different-sweep",
+        "claim": "A flight sweeps about 35° between its ends, not 97°, so the two photographed columns are the feet and heads of the same flights after all — reached by shrinking STAIR.goingTarget or the riser.",
+        "refutedBy": "THE PHOTOGRAPH IT WAS DRAWN FROM. A stacked column of flight ends leans by sweep × (1 − r_low/r_high), and tread, riser and walking radius all cancel out of that ratio — verified by re-planning the stair over a 2.4× range of sweep, which moves it by less than 1e-4 (src/lib/sweepDrift.test.ts). The frames measure the upper column leaning 5.1° per storey. That needs a sweep near 176°. A 35° sweep would lean 1.02° — a fifth of what is there. So the same evidence that gives 35° between the columns forbids 35° as a sweep.",
+        "wouldHavePredicted": "About 11 treads per flight instead of 22, on a 0.12–0.24 m going. The old argument against it — that such a tread is not a tread — was WEAK, and this entry says so: STAIR.goingTarget is [ASSUMPTION] and «not in any source», endLandingLength is an [ESTIMATE], and the walking line is a model choice, so three soft numbers were being used to refute a reading. The lean needs none of them.",
+        "note": "Two variants die with it. `going-is-half` (a 0.15–0.19 m tread, half the assumed one) is the same claim with a smaller step and meets the same lean. And the arithmetic circulated with it put the walking line at 3.62 m; it is 4.277 m — inner face plus half the stair's width — which is what the file said all along."
+      },
+      {
+        "id": "handedness-inverted",
+        "claim": "«Left of the beak» is 16.7° rather than 196.7°, and the whole layout is mirrored.",
+        "refutedBy": "Re-derivation from CLAUDE.md rule 3 alone, twice and by two routes. An observer outside on the beak's bearing faces 286.7; left = up × facing, which is the direction of azimuth 196.7 — and a drum point at azimuth φ appears to his left iff sin(φ − 106.7) > 0, a half-circle whose exact middle is 196.7. Pinned in src/lib/beakSide.test.ts so a silent sign flip fails red.",
+        "wouldHavePredicted": "Feet near 25 and heads near 120, and his morning and evening statements contradicting each other. They do not.",
+        "note": "REFUTED ON THE SIGN AND SILENT ON THE SIZE, which is the part worth carrying forward: «left of the beak» is a half-plane 180° wide and 130 or 160 satisfy it exactly as well as 196.7 does. See `smaller-than-a-quarter`."
+      },
+      {
         "id": "wrong-face",
-        "claim": "The photographs show a face the model has not been oriented to.",
-        "changes": "BUTTRESS.azimuthDeg, or the recovered camera bearings.",
-        "predicts": "Nothing that is in dispute. The count, the separation, the drift and the pitch are all ratios inside a single frame and are independent of where the camera stood or of which way the tower faces — the camera's bearing cancels in a difference of azimuths.",
-        "kills": "Itself. It is recorded so that nobody reaches for it as an explanation of the three disagreements it cannot reach.",
-        "observation": "none that would help",
-        "invention": "n/a"
+        "claim": "The photographs show a face the model has not been oriented to, or the beak's bearing is wrong (docs/ «east, about 90», [OSM] 106.7).",
+        "refutedBy": "Not the claim but its usefulness: it predicts nothing that is in dispute. The count, the separation, the lean and the pitch are ratios INSIDE one frame, and the camera's bearing cancels in a difference of azimuths. It moves only the absolute bearing, on which windows.json already books ±20° of systematic error.",
+        "wouldHavePredicted": "A rigid rotation of everything, changing no residual.",
+        "note": "Kept so that nobody reaches for it as an explanation of the three disagreements it cannot reach. The 90-against-106.7 conflict is real and is recorded elsewhere; it is not this."
+      },
+      {
+        "id": "storey-lights",
+        "claim": "The columns are not stair openings at all but windows lighting the storeys, or the niches of the water system — docs/ documents a ceramic pipe descending FROM NICHES into the well and a half-round channel on every storey between the 2nd and the 7th.",
+        "refutedBy": "HIS TESTIMONY, NOT A MEASUREMENT, and the difference is why this is written out rather than deleted. [OWNER] 2026-08-10, in capitals: «НА САМИХ ЯРУСАХ НИКАКИХ ОКОН НЕТ» — on the storeys themselves there are no windows at all — and he said it a second time the same day with the counter-argument in front of him. The arched opening was withdrawn on the same word.",
+        "wouldHavePredicted": "A column running storeys 2–7, the documented pipe run — not 1–4. And a plumb service chase has no mechanism for the upper column's 15° lean.",
+        "note": "Excluded by evidence of a different KIND from everything else here. If his sentence is ever qualified, this comes back, and its prediction is already written down."
+      },
+      {
+        "id": "later-openings",
+        "claim": "Some of the eight are 20th-century, cut or blocked in the 1962–63 excavation or a later restoration, so the «arrangement and spacing» he endorses is today's state rather than the stair's logic.",
+        "refutedBy": "Not refuted — UNTESTABLE ON THIS CORPUS, which is a different verdict and is recorded as one. reference-photos/historical holds two frames (1899, and one Soviet); in both the tower is too small and on another face, and the slits cannot be counted. Frame A does show a plainly later pointed glazed opening beside the eight, which is excluded from the count.",
+        "wouldHavePredicted": "A different count or arrangement in a pre-restoration photograph of this face.",
+        "note": "Listed here rather than among the candidates because nothing in the project can move it either way. The unlock is one pre-restoration frame of this face at usable resolution — the İçərişəhər archive, the same door that is shut on the interior record."
+      },
+      {
+        "id": "corpus-cannot-see-the-model",
+        "claim": "The disagreement is not testable at all: the model puts six feet on azimuths 205–219 and no frame resolves that arc.",
+        "refutedBy": "Not refuted — TRUE, AND RECORDED AS A WARNING RATHER THAN USED AS AN EXPLANATION. Of 208 frames the nearest is the entrance side, reaching about 210 at a grazing 65–73°. The western arc 219–356 is positively empty of slits, which constrains `winding-flip`; 205–219 is simply unseen.",
+        "wouldHavePredicted": "That one photograph from the south-west, over the fortress wall, would show a second ladder of slits — or a blank wall, which would be the strongest thing the corpus could ever say against the model's six feet.",
+        "note": "Useful as a caution and useless as an account: it explains why a disagreement might survive, not why the numbers are what they are."
       }
     ],
     "verticalIsSeparate": [
