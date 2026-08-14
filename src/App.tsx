@@ -514,9 +514,15 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
    * parapet on the outer edge, the parapet unbroken, and the stair arriving at
    * deck level through a door under a modern head-house. So the breach is a known
    * defect now, and what is printed is the last thing missing: how thick the
-   * parapet is. Still printed once per load, so that whoever next stands on the
-   * deck and sees the breach finds the question already written rather than
-   * reaching for a plausible terrace.
+   * parapet is.
+   *
+   * [2026-08-14, later the same day] AND THAT NUMBER WAS MEASURED, off the same
+   * footage, without asking him: 0.75 m with a 0.55…0.95 bracket. So this is no
+   * longer a question at all. It stays printed because the model still BUILDS the
+   * old terrace — the deck stopping at the room face under a 3.733 m ring, and
+   * fault A entire — and whoever next stands on the deck and sees the breach
+   * should find the instruction for closing it already written rather than reach
+   * for a plausible terrace.
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return

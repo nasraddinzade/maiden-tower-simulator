@@ -5,6 +5,7 @@ import {
   ENTRANCE,
   FLOORS,
   LIFTS,
+  ROOF,
   SITE,
   STAIR,
   TOWER,
@@ -287,5 +288,63 @@ describe('the lift table matches the building', () => {
       for (const n of l.opensAtFloorNumbers) reached.add(n)
     }
     for (const f of FLOORS) expect(reached.has(f.floorNumber), `storey ${f.floorNumber}`).toBe(true)
+  })
+})
+
+/**
+ * THE TERRACE, and what these guard is a shape rather than a number.
+ *
+ * Until PARAPET_THICKNESS was measured the model had no roof at all: the deck
+ * stopped at the storey-8 room face and the whole 3.733 m rest of the wall top
+ * was called "parapet". Every assertion below is false of that arrangement, so
+ * they fail on the code that preceded them — which is the point of writing them.
+ * They test arithmetic on the config only; nothing here renders.
+ */
+describe('the roof terrace', () => {
+  it('spends the whole wall top on paving plus parapet, with nothing left over', () => {
+    /*
+     * The property the footage settles: paving crosses the FULL thickness of the
+     * wall to a thin parapet on the outer edge (roof/016, roof/001, up/230).
+     * There is no third band — no second shelf of wall-top outside the parapet
+     * and no unpaved strip inside it.
+     */
+    expect(ROOF.pavedWidth + ROOF.parapetThickness).toBeCloseTo(wallThicknessAt(ROOF.deckY), 9)
+    expect(ROOF.deckOuterRadius).toBeCloseTo(TOWER.outerRadius - ROOF.parapetThickness, 9)
+    expect(ROOF.deckInnerRadius).toBeCloseTo(innerRadiusAt(ROOF.deckY), 9)
+  })
+
+  it('leaves a deck a visitor can stand on: the parapet takes a fifth of the top, not all of it', () => {
+    /*
+     * The old arrangement's parapet was the entire wall top, i.e. this ratio was
+     * 1 and the paved width was 0. "Thin against the 3.7 m it stands on" is the
+     * reading; a fifth is what the measurement makes of it.
+     */
+    expect(ROOF.parapetThickness / wallThicknessAt(ROOF.deckY)).toBeLessThan(0.25)
+    expect(ROOF.pavedWidth).toBeGreaterThan(2.5)
+    expect(ROOF.deckOuterRadius).toBeGreaterThan(ROOF.deckInnerRadius)
+  })
+
+  it('keeps the shipped thickness inside the bracket its own frames produced', () => {
+    /*
+     * 0.66 ± 0.12 (roof/011) and 0.83 ± 0.04 (roof/012) at f = 1550 px; the
+     * bracket carries the frame-to-frame spread, ±30 px of horizon and ±7% on
+     * the plane depth. The 2009 Sony photograph's 0.57 — the one reading with a
+     * hard EXIF focal length — must stay inside the bracket too, because nothing
+     * in the pictures decides between "the coping is narrower than the footage
+     * makes it" and "a 4.2° grazing view hides its outer part".
+     */
+    const [lo, hi] = ROOF.parapetThicknessBracket
+    expect(lo).toBeLessThan(ROOF.parapetThickness)
+    expect(hi).toBeGreaterThan(ROOF.parapetThickness)
+    expect(lo).toBeLessThanOrEqual(0.57)
+    // and the bracket must never grow so wide that it stops excluding anything
+    expect(hi - lo).toBeLessThan(wallThicknessAt(ROOF.deckY) / 2)
+  })
+
+  it('agrees with the deck the rest of the config already lands the stair on', () => {
+    // the roof lift's head, the parapet's foot and ROOF.deckY are one level
+    expect(ROOF.deckY).toBeCloseTo(TOWER.topY - TOWER.parapetHeight, 9)
+    expect(ROOF.parapetHeight).toBeCloseTo(TOWER.parapetHeight, 9)
+    expect(LIFTS[LIFTS.length - 1].toY).toBeCloseTo(ROOF.deckY, 9)
   })
 })
