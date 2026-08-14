@@ -39,6 +39,7 @@ import {
   type OpeningFitting,
   type PassageOpening,
 } from './lib/passageOpenings'
+import { chamberDaylight, daylightCensus } from './lib/chamberDaylight'
 import { Staircase } from './components/tower/Staircase'
 import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
@@ -469,6 +470,48 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
       console.warn(`[passage openings] ${line}`)
     }
   }, [openings])
+
+  /**
+   * HOW MANY ROOMS YOU CAN SEE DAYLIGHT FROM, swept rather than assumed.
+   *
+   * It belongs beside testimonyConflicts() and it is the same KIND of thing: a
+   * large claim about the building that the model was making in silence. With
+   * every opening at the end of a stair passage, a chamber sees out only where
+   * its doorway and a slit overlap in bearing — and at four storeys of eight
+   * they do not overlap at all. Two of those four are the quarter turn's doing
+   * and would change if the owner ruled on it; two are structural and would not.
+   *
+   * Live, off the leva sliders, not off the config: turn Staircase → start az°
+   * and watch the census move. That is the point of printing it here rather than
+   * only asserting it in chamberDaylight.test.ts — the test says what the shipped
+   * tower does, this says what the tower on screen does.
+   */
+  const chambers = useMemo(
+    () =>
+      doorways
+        ? chamberDaylight({
+            floors: FLOORS,
+            doorways,
+            openings,
+            entrance: {
+              azimuthDeg: ENTRANCE.azimuthDeg,
+              width: ENTRANCE.width,
+              height: ENTRANCE.height,
+              thresholdY: ENTRANCE.thresholdY,
+            },
+            buttress: BUTTRESS,
+            buttressTopY: Math.min(ENTRANCE.groundY - 0.5 + TOWER.height, TOWER.topY),
+            outerRadius: TOWER.outerRadius,
+            eyeHeight: PLAYER.eyeHeight,
+          })
+        : [],
+    [doorways, openings],
+  )
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || chambers.length === 0) return
+    for (const line of daylightCensus(chambers)) console.warn(`[daylight] ${line}`)
+  }, [chambers])
 
   /*
    * THE ENDS THE [OSM] TRACE CANNOT DECIDE, on a channel of their own.

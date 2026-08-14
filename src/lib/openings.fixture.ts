@@ -19,6 +19,7 @@ import {
   BUTTRESS,
   ENTRANCE,
   PASSAGE_OPENING,
+  ROOF,
   STAIR,
   TOWER,
   WALL_LIFTS,
@@ -26,7 +27,7 @@ import {
   stairSettings,
 } from '../config/tower'
 import { PLAYER } from '../config/player'
-import { planAllFlights, stairPassageSections } from './staircase'
+import { planAllFlights, stairDoorways, stairPassageSections } from './staircase'
 import {
   passageEndAnchors,
   planPassageOpenings,
@@ -48,6 +49,25 @@ export const SHIPPED_TUBES = stairPassageSections(
   innerRadiusAt,
   TOWER.topY,
   undefined,
+  STAIR.doorwayWidth,
+)
+
+/**
+ * The way onto the stair at each end, and off it partway up the 4→6 run.
+ *
+ * It is here for the same reason SHIPPED_ENDS is: the doorway and the slit at
+ * one end are two holes in the SAME landing, so a test that plans one from the
+ * fixture and the other from its own call is comparing two towers. The argument
+ * list is App.tsx's, term for term.
+ */
+export const SHIPPED_DOORWAYS = stairDoorways(
+  SHIPPED_FLIGHTS,
+  STAIR.width,
+  PLAYER.height + 0.35,
+  innerRadiusAt,
+  (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+  ROOF.masonryTopY,
+  WALL_LIFTS.map((l) => l.opensAtY),
   STAIR.doorwayWidth,
 )
 

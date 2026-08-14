@@ -1015,6 +1015,30 @@ export const ENTRANCE = {
  *     −34. The photograph puts it at beak +13.9. The counterclockwise branch —
  *     the layout this value replaced — is dead, and that is worth having.
  *
+ * WHAT IT COSTS IN DAYLIGHT, measured 2026-08-15, and until then stated nowhere:
+ * TWO WHOLE ROOMS.
+ *
+ * head-2-3 and head-3-4 are the two ends this value buries in the pier, and they
+ * are the only openings that serve storeys 3 and 4. A chamber has no window of
+ * its own; it sees out through its doorway onto the stair and then out of the
+ * passage, and those two holes line up only at a flight's HEAD — at a foot the
+ * doorway stands half a flight-width up the climb from the first tread while the
+ * slit stands on the landing behind it, 13.5–16.4° away against a doorway
+ * half-arc of 6.2–7.5. So at this value four of the eight chambers can see
+ * daylight and at 90 + 11.09 six can. Storeys 2 and 5, which are served by a
+ * foot and by a doorway the stair merely runs past, are dark at every bearing
+ * there is.
+ *
+ * THAT IS NOT AN ARGUMENT FOR TURNING IT, and the arithmetic refuses to become
+ * one. The count does not climb with the turn: 4 at +0, 6 at +11.09, 5 at +45
+ * where the head of 4→6 swings into the pier in its turn, 6 again at +90. There
+ * is no brightest bearing to tune toward, and had there been one, choosing it
+ * would be rule 7 wearing a friendlier face than a solstice. It is written down
+ * because it was not written down: the model has been shipping a tower whose
+ * middle four storeys have no view out and nothing in it said so.
+ * lib/chamberDaylight.ts measures it, chamberDaylight.test.ts asserts the count,
+ * and the day this number moves that count moves audibly with it.
+ *
  * WHY IT IS STILL 90. Because the evidence settles the DIRECTION and a FLOOR and
  * does not settle the VALUE, and this number turns every azimuth in the project.
  * +15.1 comes from one photograph; the same photograph's other openings do not
@@ -1062,6 +1086,17 @@ export const STAIR_BEARING_QUESTION = [
   '    is right and only the bearing is wrong.',
   '  · the sense of your "to the right of the beak" is CONFIRMED by the same',
   '    photograph. The anticlockwise reading is dead.',
+  '',
+  'AND WHAT IT COSTS, which nothing said until 2026-08-15: TWO ROOMS. A chamber',
+  'has no window of its own — it sees out through its doorway onto the stair and',
+  'then out of the passage — and the two blind ends above are the only openings',
+  'that serve storeys 3 and 4. Swept ray by ray at eye height, four of the eight',
+  'chambers can see daylight at 90 and six can at +11.09. This is NOT a reason to',
+  'turn it: a dark room is not evidence about a building, and the count does not',
+  'even climb with the turn — 5 at +45, 6 again at +90 — so there is no brightest',
+  'bearing to aim at. It is measured in lib/chamberDaylight.ts so that nobody',
+  'finds it out later. Storeys 2 and 5 are dark at every bearing there is, for a',
+  'reason no turn can reach.',
   '',
   'NOTHING HAS BEEN TURNED. STAIR_FROM_BUTTRESS_DEG is still the 90 of your',
   '"about a quarter", because +15.1 is one photograph and this number moves every',

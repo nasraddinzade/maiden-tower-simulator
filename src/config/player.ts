@@ -72,13 +72,45 @@ export const PLAYER = {
  * block chosen by judgement, which is why they are written out rather than
  * folded into a magic intensity.
  *
- * WHAT THIS IS NOT: it is not an answer to how the tower is lit today. The
- * chambers have no openings of their own — the owner is explicit that the
- * windows are at the ends of the stair passages — so without this lamp a storey
- * is black, and that darkness is testimony, not a bug. Whether the museum has
- * put fixtures in there is an open question for the owner; if it has, they are
- * fabric and belong in the model as geometry, and this lamp goes back to being
- * what it says it is: something the viewer carries.
+ * WHAT THIS IS NOT: it is not an answer to how the tower is lit today.
+ *
+ * WHICH STOREYS ARE ACTUALLY BLACK, because this note used to say "a storey" and
+ * mean all of them, and that has been measured and is not true.
+ *
+ * The chambers have no openings of their own — the owner is explicit that the
+ * windows are at the ends of the stair passages — so a room is lit only through
+ * its doorway onto the stair and then out of the passage, and whether that works
+ * depends on whether the two holes line up. Swept ray by ray from the axis at
+ * eyeHeight, four of the eight chambers have no sight line to the sky and four
+ * do (lib/chamberDaylight.ts, which is where the argument and the numbers live):
+ *
+ *   storey 1          7.12° of it, through the west door, no stair involved
+ *   storeys 6, 7, 8   2.78°, 1.52° and 2.78°, each through the head of the climb
+ *                     that arrives there
+ *   storeys 2 and 5   nothing, structurally: their only doorway is at a FOOT, or
+ *                     is a doorway the stair merely runs past, and neither is a
+ *                     place a slit can be
+ *   storeys 3 and 4   nothing, but for the other reason: the heads that serve
+ *                     them are the two ends standing inside the buttress, so
+ *                     they are not cut. That one is the quarter turn's doing and
+ *                     it is unresolved — see STAIR_BEARING_QUESTION.
+ *
+ * So the darkness is testimony at four storeys and an open question at two more,
+ * and this lamp is the only reason the other four are not the only ones you can
+ * see anything in. Fourteen degrees of sky in the whole building is not lighting.
+ *
+ * THE COUNT IS ASSERTED, not merely described here, and that is the point of
+ * having measured it: chamberDaylight.test.ts states four of eight, so the day
+ * the owner rules on the quarter turn and two of these rooms open, the suite
+ * says which two and this note fails with it rather than quietly going stale —
+ * which is exactly what the sentence it replaced had done.
+ *
+ * AND THE MUSEUM HAS PUT FIXTURES IN, which used to be written here as an open
+ * question and is not one: the walkthrough shows a continuous concealed strip at
+ * the springing of the ceiling washing the chamber walls (up/099, up/130) and
+ * fluorescent tube in the passages. They are fabric, they belong in the model as
+ * geometry when somebody builds the museum layer, and on the day they do this
+ * lamp goes back to being what it says it is — something the viewer carries.
  */
 export const LAMP = {
   ...deriveLampFalloff({
