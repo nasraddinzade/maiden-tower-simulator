@@ -341,6 +341,57 @@ export function buttressDepthAt(
   return farthest
 }
 
+/**
+ * How far a bearing has to turn, each way, to come out from behind the pier.
+ *
+ * WHY THIS EXISTS. On 2026-08-14 the owner's own footage falsified one of this
+ * model's openings outright: head-3-4 is placed at azimuth 105.5 facing 10.6 m of
+ * solid buttress and is withheld as blind, and up/098, down/138 and down/139 show
+ * a person standing at it looking down on a multi-lane road, a car park and people
+ * on the paving. Something in the layout is wrong, and the first thing anybody
+ * needs to know is HOW WRONG — whether the gap is a fraction of a degree, which
+ * would be noise, or tens of degrees, which would be a different building.
+ *
+ * So this reports the two rotations that reach daylight rather than one "answer".
+ * It chooses nothing: it does not know which sense is right, it does not apply
+ * anything, and a caller that turns the stair by what it returns is fitting the
+ * building to a picture, which is rule 7. It is a ruler, not a repair.
+ *
+ * Clockwise means increasing azimuth (CLAUDE.md rule 3). Infinity means no
+ * rotation within `limitDeg` clears it, which for a pier of finite arc cannot
+ * happen and is returned rather than thrown so a caller can print it.
+ */
+export function rotationToDaylightDeg(
+  azimuthDeg: number,
+  b: ButtressPlan,
+  outerRadius: number,
+  limitDeg = 180,
+): { clockwise: number; counterclockwise: number } {
+  const blind = (a: number) => buttressDepthAt(a, b, outerRadius) > 0
+  if (!blind(azimuthDeg)) return { clockwise: 0, counterclockwise: 0 }
+
+  const find = (sign: 1 | -1): number => {
+    const coarse = 0.25
+    let lo = 0
+    for (let d = coarse; d <= limitDeg + 1e-9; d += coarse) {
+      if (!blind(azimuthDeg + sign * d)) {
+        let hi = d
+        // bisect the crossing: lo is blind, hi is clear
+        for (let i = 0; i < 40; i += 1) {
+          const mid = (lo + hi) / 2
+          if (blind(azimuthDeg + sign * mid)) lo = mid
+          else hi = mid
+        }
+        return hi
+      }
+      lo = d
+    }
+    return Number.POSITIVE_INFINITY
+  }
+
+  return { clockwise: find(1), counterclockwise: find(-1) }
+}
+
 // ————————————————————————— fitting the reveal —————————————————————————
 
 /**

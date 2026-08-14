@@ -172,9 +172,22 @@ function withFittings(fittings: OpeningFitting[], buttressTopY = BEAK_TOP_Y) {
 }
 
 /** As if the owner had answered: every named end open, the rest untouched. */
+/**
+ * A hypothetical record: the named ends ruled, every other end blank.
+ *
+ * IT BLANKS THE REST DELIBERATELY, and that changed on 2026-08-14. It used to
+ * start from the shipped fittings, which was harmless while all twelve of them
+ * were [PLACEHOLDER]. head-3-4 now ships `open: true` on the footage's word, so
+ * starting from the shipped record would leak that one real datum into every
+ * "suppose he said X" case below and make each of them a test of two claims at
+ * once — which is how the both-ends enumeration started naming head-3-4 as the
+ * obstacle in passages it is not even part of.
+ */
 const said = (open: Record<string, boolean>): OpeningFitting[] =>
   FITTINGS.map((f) =>
-    f.id in open ? { ...f, open: open[f.id], openSaidBy: '[OWNER] test' } : f,
+    f.id in open
+      ? { ...f, open: open[f.id], openSaidBy: '[OWNER] test' }
+      : { ...f, open: null, openSaidBy: null },
   )
 
 describe('the daylight check is a check and no longer the answer', () => {
@@ -254,8 +267,13 @@ describe('the daylight check is a check and no longer the answer', () => {
     ])
     for (const o of BUILT) expect(o.buttressDepth).toBe(0)
     // and none of these nine is anybody's word — the count is a property of the
-    // check standing in, not of the tower
-    for (const o of BASE.openings) expect(o.decidedBy).toBe('placeholder')
+    // check standing in, not of the tower. ELEVEN, not twelve, since 2026-08-14:
+    // head-3-4 is ruled open by the footage and is still not among the nine,
+    // because the geometry will not light it. That pair is the finding.
+    for (const o of BASE.openings) {
+      expect(o.decidedBy, o.id).toBe(o.id === 'head-3-4' ? 'record' : 'placeholder')
+    }
+    expect(BUILT.map((o) => o.id)).not.toContain('head-3-4')
   })
 
   it('will not cut an opening into ten metres of pier even when the record says open', () => {
@@ -314,9 +332,22 @@ describe('the record of which ends are open', () => {
     }
   })
 
-  it('is empty — all twelve are [PLACEHOLDER] and the model does not pretend otherwise', () => {
-    expect(unresolvedEnds(BASE.openings)).toHaveLength(12)
+  it('is empty on eleven of the twelve, and names the one that is not', () => {
+    /*
+     * It was twelve of twelve until 2026-08-14, and the one that moved did not
+     * move because anybody was asked: the walkthrough footage shows a person
+     * standing at head-3-4 at an open pointed window over the avenue, which is a
+     * ruling on that end whether or not the question was ever put. Everything
+     * else is still blank and the model still says so.
+     */
+    expect(unresolvedEnds(BASE.openings)).toHaveLength(11)
     for (const o of BASE.openings) {
+      if (o.id === 'head-3-4') {
+        expect(o.open).toBe(true)
+        expect(o.openSaidBy).toContain('[VIDEO]')
+        expect(o.decidedBy).toBe('record')
+        continue
+      }
       expect(o.open, o.id).toBeNull()
       expect(o.openSaidBy, o.id).toBeUndefined()
       expect(o.decidedBy, o.id).toBe('placeholder')
@@ -495,12 +526,14 @@ describe('the fallback layout now has the shape the owner described', () => {
     expect(pairs.filter((p) => p.pattern === 'neither')).toEqual([])
   })
 
-  it('stops reporting the both-ends finding, and keeps reporting the empty record', () => {
+  it('stops reporting the both-ends finding, and reports the record’s one hole and its one clash', () => {
     const lines = testimonyConflicts(BASE.openings)
     // the finding this file was built around is answered, and silence is correct
     expect(lines.some((l) => l.includes('no passage has an opening at both ends'))).toBe(false)
-    // what is NOT answered: nobody has ruled on a single one of the twelve
-    expect(lines.some((l) => l.includes('12 of 12'))).toBe(true)
+    // eleven ends nobody has ruled on, since head-3-4 was ruled by the footage
+    expect(lines.some((l) => l.includes('11 of 12'))).toBe(true)
+    // and the new line, which is the whole of 2026-08-14's finding in one string
+    expect(lines.some((l) => l.startsWith('head-3-4') && l.includes('solid buttress'))).toBe(true)
   })
 
   it('reports an open-but-blind end loudly rather than resolving it either way', () => {

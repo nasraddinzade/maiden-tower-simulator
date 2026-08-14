@@ -13,6 +13,7 @@ import {
   FLOORS,
   ROOF_QUESTION,
   STAIR,
+  STAIR_BEARING_QUESTION,
   TOWER,
   WALL_LIFTS,
   WATER,
@@ -527,6 +528,31 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
   useEffect(() => {
     if (!import.meta.env.DEV) return
     console.warn(`[roof]\n${ROOF_QUESTION.join('\n')}`)
+  }, [])
+
+  /*
+   * AND THE ONE THAT MOVES EVERY AZIMUTH IN THE PROJECT, printed last so it is
+   * the line still on screen.
+   *
+   * [2026-08-14] The footage falsified an opening outright. head-3-4 is placed
+   * at azimuth 105.5 facing 10.64 m of pier and withheld as blind; up/098 and
+   * down/138 show a pointed window there with a road, a car park and people
+   * under it. Three of the four candidate causes are excluded — the buttress
+   * bearing by arithmetic, the chamber-wall reading by the descent sequence, the
+   * stacked layout by there being no source for a per-flight bearing — and the
+   * quarter turn of 2026-08-13 is what gives.
+   *
+   * NOTHING WAS TURNED, which is why this prints. The size of the correction is
+   * bounded by the model's own arithmetic and measured by one photograph, and
+   * those are different kinds of statement; picking a value from them is his
+   * call, not this repository's, because the number carries every other opening
+   * with it. The conflict itself also prints, one line above, out of
+   * testimonyConflicts() — the record now says this end is open and the geometry
+   * still says it is blind, and that pair is the finding.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.warn(`[stair bearing]\n${STAIR_BEARING_QUESTION.join('\n')}`)
   }, [])
 
   const apertures = useMemo(() => buildApertures(windows ?? []), [windows])

@@ -706,6 +706,10 @@ export const ENTRANCE = {
 /**
  * ° from the buttress, clockwise, to the foot of every flight. [OWNER] 2026-08-13.
  *
+ * THIS VALUE IS NOW KNOWN TO BE TOO SMALL BY AT LEAST 8°, AND IT IS STILL 90.
+ * Read the whole of the next section before touching it; the reason it has not
+ * been moved is not inertia and not doubt about the finding.
+ *
  * HIS WORD IS "RIGHT", NOT NINETY. Asked where the entrance to the stair is when
  * you look down on the tower from above, he put it to the RIGHT of the beak —
  * clockwise from it — "about a quarter of the circumference". A quarter is 90°,
@@ -719,8 +723,129 @@ export const ENTRANCE = {
  * testimony about where the stair stands relative to it. Keeping them apart is
  * the point of the constant: correct the traced bearing and the stair follows,
  * correct the quarter turn and the buttress does not move.
+ *
+ * ————————————————————————————————————————————————————————————————————————
+ * REFUTED, 2026-08-14, BY HIS OWN FOOTAGE. See STAIR_BEARING_QUESTION below.
+ *
+ * The model puts head-3-4 — the landing at the top of the climb from storey 3 to
+ * storey 4 — at azimuth 105.5, one degree counterclockwise of the beak's own
+ * axis, facing 10.64 m of solid pier, and withholds the opening as blind. The
+ * footage shows a two-centred pointed WINDOW at exactly that landing, standing
+ * open, looking down on a multi-lane road with moving traffic, a car park and
+ * people on the paving: up/097–098 climbing, down/137–139 descending. A window
+ * cannot be blind and see a car park. One of the model's assumptions is wrong.
+ *
+ * IT IS THIS ONE, and the other three candidates are excluded, not preferred
+ * against:
+ *
+ *   the buttress bearing — CANNOT BE IT, and this is arithmetic rather than
+ *     judgement. STAIR.startAzimuthDeg is defined as BUTTRESS.azimuthDeg + this
+ *     constant, so turning the buttress turns the stair with it and every
+ *     opening keeps its bearing RELATIVE to the pier. No value of
+ *     BUTTRESS.azimuthDeg brings this window into daylight. (Task One's roof
+ *     panorama also declined to refute 106.7, but that is the weaker argument
+ *     and it is not the one relied on here.)
+ *
+ *   the window being in a STOREY wall rather than a passage — EXCLUDED BY THE
+ *     DESCENT. down/135 is the arched doorway out of the storey-4 chamber,
+ *     down/136 is inside the passage, down/137–139 is the window, down/140 is
+ *     the first step down the flight. The window stands between the chamber door
+ *     and the top tread: it is the head of the passage, which is where this model
+ *     puts head-3-4, and it agrees with [OWNER] 2026-08-10 that the chambers
+ *     carry no openings. This retires the caveat windows.json has carried since
+ *     the head shapes were read ("two readings could not tell which side of the
+ *     doorway it is on").
+ *
+ *   the stacking — all six flights at one bearing, [OWNER] 2026-08-09 — NOT
+ *     TOUCHED BY THIS EVIDENCE. Moving one flight and not the others would need
+ *     a per-flight bearing, which no source gives and which his instruction
+ *     denies. It stays the open question it was; see windows.json →
+ *     placeInTheWall, which now carries a second, independent arrival at the
+ *     same disagreement.
+ *
+ * HOW FAR OUT, from three independent handles:
+ *   · ≥ 8.01° clockwise — the model's own arithmetic, rotationToDaylightDeg() in
+ *     lib/passageOpenings.ts: the smallest turn that brings head-3-4 out from
+ *     behind the pier. ≥ 11.09° to bring head-2-3 out with it, which is the
+ *     smallest rigid turn that leaves NO end blind.
+ *   · +15.1° ± 4 — measured. reference-photos/exterior/«2022-ci ildəki Qız
+ *     Qalası şəkli.jpg» is taken from the avenue and shows the drum's left
+ *     silhouette, the top rim and the drum↔buttress junction together. The
+ *     junction is a MERIDIAN at a fixed azimuth ([OSM] root arc, clockwise edge
+ *     113.5), so measuring the window against it cancels the camera bearing and
+ *     yields a bearing RELATIVE TO THE BEAK, which is the quantity this constant
+ *     is. The one arched opening on the drum — every other is a 0.2 m slit —
+ *     lands at beak +13.9° and at height 11.48 m against this model's 11.593 m
+ *     for head-3-4, an agreement of 0.11 m that identifies it beyond argument
+ *     and says the lift table and the flight arithmetic are right. Only the
+ *     bearing is wrong. Cross-check the construction did not have to pass: the
+ *     camera bearing it implies is 137.5°, and [OSM] puts the nearest point of
+ *     Neftçilər prospekti at 137.4°.
+ *   · the SENSE is confirmed. rotationToDaylightDeg also offers −32.79°, i.e. a
+ *     counterclockwise reading of his "right", which would put the window at beak
+ *     −34. The photograph puts it at beak +13.9. The counterclockwise branch —
+ *     the layout this value replaced — is dead, and that is worth having.
+ *
+ * WHY IT IS STILL 90. Because the evidence settles the DIRECTION and a FLOOR and
+ * does not settle the VALUE, and this number turns every azimuth in the project.
+ * +15.1 comes from one photograph; the same photograph's other openings do not
+ * admit any single rigid rotation (see windows.json → placeInTheWall), so
+ * shipping 105.1 would repair one opening while silently asserting five more.
+ * And it would overwrite testimony with photogrammetry, which is the exact move
+ * [OWNER] ruled out on 2026-08-09. One sentence from him closes it; until then
+ * the model carries the contradiction in the open, where testimonyConflicts()
+ * prints it on every load.
  */
 const STAIR_FROM_BUTTRESS_DEG = 90
+
+/**
+ * The one question that would settle where the stair stands in the wall.
+ *
+ * Printed to the dev console on every load, beside ROOF_QUESTION and the
+ * passage-opening conflicts, and for the same reason: a question nobody is
+ * looking at is not open, it is lost. Unlike ROOF_QUESTION this one really is a
+ * question — the footage measures the disagreement but cannot choose the value,
+ * and the value moves every azimuth in the project.
+ */
+export const STAIR_BEARING_QUESTION = [
+  'THE STAIR IS TURNED TOO FAR ANTICLOCKWISE AND YOUR OWN FOOTAGE PROVES IT.',
+  '',
+  'The model puts the top landing of the climb 3→4 at azimuth 105.5 — one degree',
+  'off the beak’s own axis — facing 10.64 m of solid pier, and refuses to cut an',
+  'opening there. up/097–098 and down/137–139 show you standing at that landing at',
+  'a two-centred pointed window, casement open, looking down on the avenue, a car',
+  'park and people on the paving. Both cannot be true.',
+  '',
+  'WHAT THAT DOES NOT MEAN, so nobody re-opens it:',
+  '  · it is NOT the buttress bearing. STAIR.startAzimuthDeg is BUTTRESS.azimuthDeg',
+  '    plus a constant, so turning the beak turns the stair with it and the window',
+  '    keeps its bearing relative to the pier. No value of 106.7 clears it.',
+  '  · it is NOT a window on the storey. down/135 is the chamber door, down/140 is',
+  '    the first tread down; the window is between them, in the passage.',
+  '',
+  'WHAT IS MEASURED:',
+  '  · at least +8.0° clockwise to bring that landing into daylight, +11.1° to',
+  '    bring the landing above storey 2 out with it — the model’s own arithmetic,',
+  '    rotationToDaylightDeg();',
+  '  · +15.1° ± 4 from the 2022 photograph off the avenue, which puts the arched',
+  '    window at beak +13.9° and at height 11.48 m against the model’s 11.593 m.',
+  '    The height agreeing to 0.11 m is what identifies it: the flight arithmetic',
+  '    is right and only the bearing is wrong.',
+  '  · the sense of your "to the right of the beak" is CONFIRMED by the same',
+  '    photograph. The anticlockwise reading is dead.',
+  '',
+  'NOTHING HAS BEEN TURNED. STAIR_FROM_BUTTRESS_DEG is still the 90 of your',
+  '"about a quarter", because +15.1 is one photograph and this number moves every',
+  'azimuth in the project — and because turning the stair until a photograph comes',
+  'true is what rule 7 forbids.',
+  '',
+  'ONE SENTENCE CLOSES IT. Standing at that pointed window and looking straight',
+  'out of it, is the beak below you to your LEFT, and roughly how far round —',
+  'a hand’s width, or a quarter of the way round the tower? If it is a little to',
+  'the left, STAIR_FROM_BUTTRESS_DEG becomes about 105 and eleven openings move',
+  'with it. If the beak is directly below the window, the model is right and the',
+  'photograph is being read wrong.',
+] as const
 
 export const STAIR: {
   winding: Winding
@@ -846,7 +971,12 @@ export const STAIR: {
    *   - all SIX flight feet now stand clear of the pier (they were five-of-six
    *     blind in 10.21–10.55 m of it) and carry openings;
    *   - two heads go the other way: head-2-3 at azimuth 102.4 and head-3-4 at
-   *     105.5 now look into 9.88 m and 10.64 m of buttress and are withheld;
+   *     105.5 now look into 9.88 m and 10.64 m of buttress and are withheld —
+   *     AND ONE OF THE TWO IS NOW KNOWN TO BE A WINDOW WITH A VIEW. That is the
+   *     refutation written up at STAIR_FROM_BUTTRESS_DEG above; it says this
+   *     value is too small by at least 8°, and by about 15° if the one exterior
+   *     photograph that can measure it is right. The cost line is left standing
+   *     because the cost was correctly foreseen here and paid anyway;
    *   - nine ends are cut where six were. The owner also said there are TOO FEW
    *     openings, and this is the cause; nine against the eight the photographs
    *     count is the first time the model has overshot rather than undershot.

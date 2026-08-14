@@ -364,8 +364,16 @@ describe('the finding is published, not repaired', () => {
     expect(STAIR.startAzimuthDeg).toBeCloseTo(BUTTRESS.azimuthDeg + 90, 6)
   })
 
-  it('leaves every end unruled and the question unanswered', () => {
-    expect(ALL.every((o) => o.open === null)).toBe(true)
+  it('leaves every end unruled but the one the footage ruled, and the question unanswered', () => {
+    /*
+     * head-3-4 stopped being [PLACEHOLDER] on 2026-08-14 — up/098 and down/138
+     * show a person at an open pointed window there — and that end is precisely
+     * the one this file's question is about, so it is named rather than let
+     * through by a loosened predicate. The question itself is still unanswered:
+     * knowing that the window exists does not say how far round from the beak it
+     * stands, which is what beakSideQuestion asks.
+     */
+    expect(ALL.filter((o) => o.open !== null).map((o) => o.id)).toEqual(['head-3-4'])
     expect(windowData.beakSideQuestion.answer).toBeNull()
     expect(windowData.beakSideQuestion.ask.join('\n')).toContain('«Встань перед клювом')
   })
