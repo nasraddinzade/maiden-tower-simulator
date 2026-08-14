@@ -36,6 +36,7 @@ import * as THREE from 'three'
 import {
   BUTTRESS,
   ENTRANCE,
+  ROOF,
   STAIR,
   TOWER,
   WALL_LIFTS,
@@ -62,7 +63,9 @@ function tubesFor(winding: Winding): PassageSection[][] {
     STAIR.width,
     PLAYER.stairHeadroom,
     innerRadiusAt,
-    TOWER.topY,
+    // the underside of the terrace paving — the level the app clamps to, and
+    // the one the shell this test raycasts is actually built with
+    ROOF.masonryTopY,
     undefined,
     STAIR.doorwayWidth,
   )
@@ -217,7 +220,7 @@ describe('the shell is closed at every stair doorway end', () => {
       PLAYER.height + 0.35,
       innerRadiusAt,
       (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
-      TOWER.topY,
+      ROOF.masonryTopY,
       WALL_LIFTS.map((l) => l.opensAtY),
       STAIR.doorwayWidth,
     ) as ShellParams['stairDoorways'],
@@ -273,7 +276,7 @@ describe('the shell is closed at every stair doorway end', () => {
     },
   ])
 
-  it('walls off all twelve ends', () => {
+  it('walls off eleven ends and leaves the twelfth open, because the twelfth is the way out', () => {
     /*
      * Stated separately from the direction, because "no surface facing the wrong
      * way" is satisfied trivially by no surface at all. A passage that stopped
@@ -287,6 +290,23 @@ describe('the shell is closed at every stair doorway end', () => {
      * run tangentially — 6.8 m of masonry from the cheek to the drum face on that
      * bearing — and would surface metres round the drum from the landing it was
      * meant to light. See planPassageOpenings().
+     *
+     * THE TWELFTH IS THE EXCEPTION AND IT IS NOT A LEAK. This used to read "walls
+     * off all twelve", and it was true of a tower whose stair came out by tearing
+     * a 50° trench through the parapet ring — the head cap stood in stone because
+     * there was 3.733 m of wall top standing over the deck to hold it.
+     *
+     * The terrace crosses the wall now (roof/016, roof/001, up/230), so over the
+     * roof climb the stone stops at the underside of the paving and the passage's
+     * last cross-section is barely a hand deep. There is nothing left up there to
+     * cap it with, and there should not be: the flight comes out through an
+     * OPENING IN THE PAVING at deck level — roof/007's stainless threshold set
+     * flush in the slabs, treads starting straight behind it. A walled twelfth end
+     * would be a stair that arrives at a wall.
+     *
+     * So the assertion is now that exactly ONE end is open and it is the roof
+     * climb's head. Eleven ends still stop in stone, and the day a second one
+     * opens something has gone through the drum.
      */
     expect(ends.length).toBe(12)
     const open = ends
@@ -295,7 +315,11 @@ describe('the shell is closed at every stair doorway end', () => {
           endWall(section, Math.sign(next.azimuthDeg - section.azimuthDeg)).facingVoid < 0.2,
       )
       .map((e) => e.name)
-    expect(open).toEqual([])
+    expect(open).toEqual([`flight ${tubes.length - 1} head`])
+    // and it is open because the paving is over it, not because the wall is gone
+    const roofHead = tubes[tubes.length - 1][tubes[tubes.length - 1].length - 1]
+    expect(roofHead.topY).toBeLessThanOrEqual(ROOF.masonryTopY + 1e-9)
+    expect(roofHead.openToSky).toBe(true)
   })
 
   it('turns every square metre of that wall toward the passage, not into the masonry', () => {

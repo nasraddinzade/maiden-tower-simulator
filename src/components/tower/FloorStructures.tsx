@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from '../../lib/cupola'
 import { azimuthToVector } from '../../lib/geometry'
-import { FLOORS, TOWER, innerRadiusAt } from '../../config/tower'
+import { FLOORS, ROOF, TOWER, innerRadiusAt } from '../../config/tower'
 import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import { isStoreyVisible, lodSegments } from '../../lib/visibility'
 
@@ -50,7 +50,7 @@ const DEG = Math.PI / 180
  * source gives a bearing depth; this is only deep enough that the join cannot
  * show. See the note in cupolaProfile().
  */
-const WALL_EMBED = 0.25
+export const WALL_EMBED = 0.25
 
 /**
  * Cut the stairwell out of a lathe surface.
@@ -60,7 +60,7 @@ const WALL_EMBED = 0.25
  * band, subtracted with the same CSG evaluator the shell uses, so the result
  * stays a clean mesh rather than a surface with a hole punched by alpha.
  */
-function cutStairwell(
+export function cutStairwell(
   geometry: THREE.BufferGeometry,
   cut: StairwellCut,
   yCentre: number,
@@ -498,7 +498,10 @@ export function FloorStructures({
                 topY={
                   FLOORS[f.index + 1]
                     ? FLOORS[f.index + 1].floorY - TOWER.floorSlab
-                    : TOWER.topY - TOWER.parapetHeight
+                    : // the top storey's fill stops under the terrace's paving,
+                      // which RoofTerrace lays over it; running it up to the deck
+                      // surface instead put two up-facing stone faces on one plane
+                      ROOF.masonryTopY
                 }
                 cut={throughCupola}
                 material={xray ? undefined : material}

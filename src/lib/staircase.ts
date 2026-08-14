@@ -372,28 +372,30 @@ export interface PassageSection {
   bottomY: number
   topY: number
   /**
-   * THIS STRETCH OF PASSAGE HAS NO VAULT, because the building has run out.
+   * THIS STRETCH OF PASSAGE HAS NO VAULT, because the drum's stone has run out.
    *
    * Set where `tread + headroom` came out above the top of the masonry, which in
-   * this model happens over the last third of the roof climb and nowhere else.
+   * this model happens over the last stretch of the roof climb and nowhere else.
    * `topY` is then the top of the stone rather than a crown, and the two are not
    * the same kind of thing: one is where a vault springs to, the other is where
-   * the building stops. Anything that draws or cuts these sections has to know
-   * which it has been handed — a pointed vault whose crown is exactly the roof
-   * surface is tangent to it, and tangency is the CSG case this model has twice
-   * lost a floor to.
+   * the wall stops. Anything that draws or cuts these sections has to know which
+   * it has been handed — a pointed vault whose crown is exactly the roof surface
+   * is tangent to it, and tangency is the CSG case this model has twice lost a
+   * floor to.
    *
-   * It is NOT a claim that the tower's roof is open over its stair. It is a claim
-   * about this model's own arithmetic, which cannot roof that stretch at all. See
-   * ROOF_QUESTION in config/tower.ts.
+   * WHAT IT MEANS CHANGED ON 2026-08-14 WITHOUT THE FLAG CHANGING. It used to be
+   * a confession: the masonry top was TOWER.topY, so a flagged section was one
+   * the cutter drove through the parapet ring, and the last steps really did come
+   * out under open sky over a 50° breach. It is now a description of a lintel.
+   * The masonry top is ROOF.masonryTopY — the underside of the paving — so a
+   * flagged section is one that has the terrace's own paving course over it
+   * rather than a vault, and where the flag runs on past the deck opening the
+   * paving is what carries the roof across the stair. That is what a roof over a
+   * stair mouth is made of.
    *
-   * [2026-08-14] AND THE TOWER'S ROOF IS NOT OPEN OVER ITS STAIR. The owner's roof
-   * footage shows the stair arriving at deck level through a door, under a modern
-   * head-house, with the parapet running on unbroken past it (roof/007, up/250).
-   * So this flag is now known to be false of the building as well as true of the
-   * model. It stays because the model still cannot roof that stretch: the paving
-   * has to cross the wall for the breach to close, and the paving cannot cross the
-   * wall until the parapet has a thickness, which no source gives.
+   * The tower is not open over its stair and never was: roof/007 and up/250 show
+   * the stair arriving at deck level through a door under a head-house, with the
+   * parapet running on unbroken past it. The model no longer says otherwise.
    */
   openToSky?: boolean
 }
@@ -448,25 +450,25 @@ export function stairPassageSections(
    * in between. The clamp is only honest together with sectionProfile()'s
    * flattening of a vault that has nothing to spring from; see the note there.
    *
-   * WHAT IT DOES NOT DO, and this must not be claimed for it. Over the last
-   * third of the roof climb the treads rise past `topY − headroom`, so the
-   * passage has less than its headroom of stone above it and then none at all:
-   * the cut goes clean through the parapet ring for about 50° of arc and the
-   * final steps come out under open sky. That breach is REAL — it is in the
-   * built shell, you can stand on the deck and look into it. Clamping the cutter
-   * neither closes it nor excuses it.
+   * WHAT IT USED TO NOT DO, and the reason it now does. Callers passed
+   * TOWER.topY, the top of the parapet, so over the last stretch of the roof
+   * climb the cut went clean through the parapet ring for about 50° of arc and
+   * the final steps came out under open sky. Clamping the cutter neither closed
+   * that breach nor excused it, and the note here said so.
    *
-   * WHETHER THE TOWER'S ROOF IS LIKE THAT WAS ANSWERED ON 2026-08-14 AND THE
-   * ANSWER IS NO. The owner's roof footage shows the paving crossing the whole
-   * thickness of the wall to a thin parapet on the outer edge, the parapet
-   * unbroken all the way round, and the stair arriving at deck level through a
-   * door under a modern head-house (roof/007, roof/016, up/250). The breach is
-   * therefore a known defect rather than a suspected one — and it still cannot be
-   * closed here, because closing it means carrying the paving out over the wall
-   * and nothing gives the parapet a thickness to carry it to. Until that one
-   * number arrives, moving the deck, the parapet or the headroom to make the
-   * picture tidy would be fitting a measured stack to a view (CLAUDE.md rule 1).
-   * ROOF_QUESTION in config/tower.ts is now that single question.
+   * WHAT THE CALLER PASSES NOW IS ROOF.masonryTopY — the underside of the terrace
+   * paving, one paving course below the deck — and the breach is gone with it.
+   * The owner's roof footage settled the shape (roof/016, roof/001, roof/007,
+   * up/250): the paving crosses the whole thickness of the wall to a thin parapet
+   * on the outer edge, the parapet is unbroken all the way round, and the stair
+   * comes up through an opening in the deck. So over the passage the stone stops
+   * at the paving's underside, not at the coping — the ring is 2 m further out
+   * than the cutter ever reaches — and the last flagged sections are roofed by
+   * the paving until the deck opening starts, which is where the stair mouth is.
+   *
+   * The clamp is the same clamp; only the level it is given is honest now. Do NOT
+   * put it back to TOWER.topY to "simplify": the two levels are 1.00 m apart and
+   * everything between them is either paving or air.
    */
   masonryTopY: number,
   sideClearance = PASSAGE_SIDE_CLEARANCE,
@@ -580,6 +582,27 @@ export function stairPassageSections(
    * and top treads, so no cap stands where anyone walks. A stair in a wall starts
    * at a doorway off the room and ends at a landing, not flush with a tread.
    */
+  /**
+   * A SECTION WHOLLY ABOVE THE STONE IS NOT A SECTION, it is a sliver.
+   *
+   * The clamp above holds `topY` down to the masonry, and holds it off `bottomY`
+   * by a millimetre so a section can never turn itself inside out. Where a
+   * section's FLOOR is already above the stone those two rules fight: the result
+   * is a 1 mm-tall cross-section which cuts nothing (there is nothing there to
+   * cut) but still claims a passage, and the claim is read. It made the roof
+   * climb's head cap a hand's breadth of stone standing at deck level.
+   *
+   * It only arises at the top of the tower, and only since the terrace was
+   * built: the roof flight's last tread IS the deck, one paving course above the
+   * masonry it is cut in, and the lead-out landings past it are higher still.
+   * They are above the paving, in the open, on the terrace — the stair has left
+   * the building by then and comes out through the deck opening. Dropping them
+   * is the same rule as the clamp, one step further: a cutter may not remove
+   * stone the building has not got, and it may not describe a tunnel there
+   * either.
+   */
+  const inStone = (s: PassageSection) => s.bottomY < masonryTopY - 1e-9
+
   const tubes: PassageSection[][] = []
   for (const flight of flights) {
     if (flight.length === 0) continue
@@ -587,7 +610,7 @@ export function stairPassageSections(
     const riser = riserOf(flight)
     const body = flight.map((step) => sectionAt(step, riser))
     if (flight.length < 2) {
-      tubes.push(body)
+      tubes.push(body.filter(inStone))
       continue
     }
     const stepAngle = flight[1].azimuthDeg - flight[0].azimuthDeg
@@ -623,7 +646,7 @@ export function stairPassageSections(
     for (let k = 1; k <= leadSteps; k++) {
       leadOut.push(sectionAt(last, riser, last.azimuthDeg + lastAngle * k, true))
     }
-    tubes.push([...leadIn, ...body, ...leadOut])
+    tubes.push([...leadIn, ...body, ...leadOut].filter(inStone))
   }
   return tubes
 }
@@ -789,13 +812,19 @@ export interface StairDoorway {
   /**
    * NO ARCH OVER THIS ONE, because the wall ends before the head does.
    *
-   * The same fact PassageSection.openToSky records, and the roof exit is the one
-   * doorway it applies to: its head wants 2.1 m over a landing at 26.749 and the
-   * masonry stops at 27.500, so what stands over it is 0.751 m of parapet. An
-   * arch struck in that gives a semicircle whose crown lands exactly on the roof
-   * plane — tangent to it, coincident along a line, and the boolean then leaves a
-   * curved lid of stone over the way out. It is a notch in the top of the wall,
-   * and the cutter should say so. See doorwayCutter().
+   * The same fact PassageSection.openToSky records. The roof exit used to be the
+   * one doorway it applied to: its head wanted 2.1 m over a landing at 26.749
+   * against masonry stopping at 27.500, so what stood over it was 0.751 m of
+   * parapet, an arch struck in that gave a semicircle tangent to the roof plane,
+   * and the boolean left a curved lid of stone over the way out.
+   *
+   * NOTHING SETS IT SINCE 2026-08-14 and the field is kept rather than deleted.
+   * The roof exit is no longer a doorway at all — see hasWallAbove() below: a
+   * landing at the top of the stone leaves through its ceiling, and the terrace's
+   * paving is opened instead. But the case it describes is a property of the
+   * rule, not of the roof: any doorway whose head outruns the stone it is cut in
+   * is a notch rather than an arch, and the day one appears the cutter must still
+   * be told. See doorwayCutter().
    */
   openToSky?: boolean
 }
@@ -820,10 +849,11 @@ export function stairDoorways(
   floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
   /**
    * World Y of the top of the stone — see the long note on the same argument to
-   * stairPassageSections(). The roof exit is the one doorway it touches: its
-   * head came out at 28.849 against masonry that stops at 27.500, so the arch
-   * was 1.35 m taller than the wall it is cut in. Like the passage's own crown
-   * it removed nothing up there; like it, it was a claim about a building.
+   * stairPassageSections(). It does two things here. It clamps an arch that
+   * outruns its wall, which is what the roof exit used to need: its head came out
+   * at 28.849 against masonry stopping at 27.500, so the arch was 1.35 m taller
+   * than the wall it was cut in. And, since the terrace was built, it decides
+   * whether a doorway exists at all — see hasWallAbove().
    */
   masonryTopY: number,
   /**
@@ -1032,11 +1062,36 @@ export function stairDoorways(
     }
   }
 
+  /**
+   * A DOORWAY NEEDS WALL ABOVE THE FLOOR IT OPENS ONTO, and at the roof there is
+   * none: the floor IS the top of the stone.
+   *
+   * This is one line and it retires the last piece of the old terrace. While the
+   * "parapet" was the whole 3.733 m wall top, the roof exit was a doorway like
+   * any other — a hole cut in stone standing over the landing — except that its
+   * head wanted 2.1 m and the stone gave 0.751, so it came out as a notch in the
+   * top of the tower with `openToSky` set and a 50° breach round it.
+   *
+   * With the paving carried across the wall the arithmetic says something quite
+   * different, and simpler: masonryTopY IS the landing level, so there is no
+   * wall to cut. The way out of the roof stair is the opening in the PAVING —
+   * the same stairwell cut every storey slab takes — and the door the footage
+   * shows (roof/007) is the head-house's, standing on the deck above this level.
+   * Nothing here should try to build it.
+   *
+   * Written as a comparison rather than a special case for the roof, because
+   * that is what it is: any flight whose landing is at the top of the stone
+   * leaves through its ceiling, not through a wall.
+   */
+  const hasWallAbove = (floorY: number) => masonryTopY > floorY + 1e-9
+
   flights.forEach((steps, i) => {
     if (steps.length === 0) return
     for (const end of ['foot', 'head'] as const) {
       const s = end === 'foot' ? steps[0] : steps[steps.length - 1]
-      out.push(doorwayAt(steps, s, floorYOf(i, end), end === 'head'))
+      const floorY = floorYOf(i, end)
+      if (!hasWallAbove(floorY)) continue
+      out.push(doorwayAt(steps, s, floorY, end === 'head'))
     }
     // and the openings partway along, for a flight that passes a storey
     for (const floorY of opensAtYPerFlight[i] ?? []) {

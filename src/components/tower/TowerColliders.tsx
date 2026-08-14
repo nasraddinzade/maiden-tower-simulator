@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
-import { ENTRANCE, FLOORS, TOWER, innerRadiusAt } from '../../config/tower'
+import { BALUSTRADE, ENTRANCE, FLOORS, ROOF, TOWER, innerRadiusAt } from '../../config/tower'
 import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import {
   floorColliders,
@@ -71,13 +71,21 @@ export function TowerColliders({
     const sectorDeg = 360 / sectors
     const passageAt = (azimuthDeg: number) => stairPassageBandsAt(sections, azimuthDeg, sectorDeg)
 
-    // one band per storey, plus the parapet above the top floor
-    const bands = [
-      ENTRANCE.groundY - 0.5,
-      ...FLOORS.map((f) => f.floorY),
-      TOWER.topY - TOWER.parapetHeight,
-      TOWER.topY,
-    ]
+    /*
+     * One band per storey, AND THE DRUM STOPS AT THE PAVING.
+     *
+     * The wall these bands describe runs from a room face to the drum, and it
+     * only does that as far up as ROOF.masonryTopY. Above that there is no room
+     * and no room face: the terrace crosses the whole thickness and the only
+     * stone left is the parapet ring, which is raised separately below.
+     *
+     * It used to run to TOWER.topY, and while the "parapet" was the entire
+     * 3.733 m wall top that was right. Left that way after the terrace was cut it
+     * would fill the deck back in with a band of masonry from the old room face
+     * out to the drum, 0.75 m high, right round the circuit — you would arrive at
+     * the stair mouth and be unable to step off it.
+     */
+    const bands = [ENTRANCE.groundY - 0.5, ...FLOORS.map((f) => f.floorY), ROOF.masonryTopY]
       .filter((y, i, a) => a.indexOf(y) === i)
       .sort((a, b) => a - b)
 
@@ -88,7 +96,8 @@ export function TowerColliders({
       // down to the plinth, so the wall is solid where it meets the street and a
       // walker outside cannot step into the tower's base
       baseY: ENTRANCE.groundY - 0.5,
-      topY: TOWER.topY,
+      // the underside of the terrace paving, not the coping — see the bands above
+      topY: ROOF.masonryTopY,
       bandBoundaries: bands,
       entrance: {
         azimuthDeg: ENTRANCE.azimuthDeg,
@@ -140,38 +149,49 @@ export function TowerColliders({
     /*
      * THE ROOF DECK, which is walked on and was not carried.
      *
-     * The last lift climbs from storey 8 to `TOP_OF_FLOORS` — the level this same
-     * expression already marks as a wall band boundary a few lines up, and the
-     * level config/tower.ts hands the 8→roof lift as its toY. FLOORS stops at
-     * storey 8, so the loop above emitted nothing here, and the parapet band is a
-     * vertical ring of wall boxes, which holds a walker in but does not hold one
-     * up. The walker therefore arrived at the head of the last flight with
-     * nothing underfoot, on drawn deck (FloorStructures' ceiling fill tops out
-     * exactly here), and fell 3.28 m to storey 8. Same class of fault as the
-     * stairwell wedge that used to be dropped whole out of a slab.
+     * The last lift climbs from storey 8 to `TOP_OF_FLOORS` — the level
+     * config/tower.ts hands the 8→roof lift as its toY, and ROOF.deckY. FLOORS
+     * stops at storey 8, so the loop above emits nothing here, and the parapet
+     * band is a vertical ring of wall boxes, which holds a walker in but does not
+     * hold one up. Without this the walker arrived at the head of the last flight
+     * with nothing underfoot and fell 3.28 m to storey 8.
      *
-     * It is NOT a floor slab — it is the top of the masonry mass, which is why it
-     * has no FLOORS entry and no stairwell cut in App.tsx — but the walker cannot
-     * tell the difference, so it gets a ring like any storey.
+     * IT NOW REACHES THE PARAPET. It used to stop at innerRadiusAt(deckY), the
+     * old room face, because that is where the drawn deck stopped; the wall above
+     * was one solid 3.733 m ring and there was nothing out there to stand on. The
+     * terrace crosses the whole wall (roof/016), so the collider does too — out
+     * to ROOF.deckOuterRadius, where the parapet band's inner face begins.
+     *
+     * AND IT HAS A HOLE IN IT, which no storey slab's deck ever needed: the stair
+     * comes up through the paving, so the well is a hole with 1.7 m of deck
+     * outboard of it rather than a bite out of an outer lip. That is what
+     * stairwell.outerRadius is for.
      *
      * FLUSH, never proud. floorColliders() hangs its boxes BELOW floorY, so the
      * surface lands exactly on the level the last tread and the head landing sit
-     * at, and the walker steps off the landing onto it sideways. A deck a
-     * centimetre higher would be a lip, and this controller will not climb a lip
-     * of any height — measured, it refused 0.20 m with autostep at 0.60.
+     * at, and the walker steps off the landing onto it. A deck a centimetre
+     * higher would be a lip, and this controller will not climb a lip of any
+     * height — measured, it refused 0.20 m with autostep at 0.60.
      */
-    const deckY = TOWER.topY - TOWER.parapetHeight
+    const deckWell = stairwells?.[FLOORS.length]
     floors.push(
       ...floorColliders({
         sectors: Math.min(sectors, 24),
-        floorY: deckY,
-        thickness: TOWER.floorSlab,
+        floorY: ROOF.deckY,
+        thickness: ROOF.pavingDepth,
         // the same rule the storeys follow: the hole in a surface is cut by the
-        // vault BELOW it. Storey 8's vault is closed, so the deck is unbroken.
+        // vault BELOW it. Storey 8's vault is closed, so the deck is unbroken
+        // except where the stair comes through it.
         oculusRadius: FLOORS[FLOORS.length - 1].oculusRadius,
-        // out to the room face, where the parapet band's inner face begins — the
-        // two are the same radius at this height, so they meet without a seam
-        outerRadius: innerRadiusAt(deckY),
+        outerRadius: ROOF.deckOuterRadius,
+        stairwell: deckWell
+          ? {
+              centreAzimuthDeg: deckWell.centreAzimuthDeg,
+              widthDeg: deckWell.widthDeg,
+              innerRadius: deckWell.innerRadius,
+              outerRadius: deckWell.outerRadius,
+            }
+          : undefined,
       }),
     )
 
@@ -193,6 +213,52 @@ export function TowerColliders({
      * drawn, collision is primitives, and the two never come off one mesh.
      */
     const guards: BoxSpec[] = []
+    /*
+     * THE PARAPET, raised as its own ring rather than as the drum's top band.
+     *
+     * It is one ring of masonry 0.75 m thick standing on ROOF.masonryTopY, and
+     * it could have been the last band of wallColliders — except that
+     * wallColliders takes the taper of the inner face across each band and lays
+     * its boxes on that cone. The inner face here does not taper, it JUMPS: the
+     * room face at the storey-8 band's top is r 4.52 and the parapet's inner face
+     * is 7.50, three metres out in no height at all. Fed that as one function the
+     * band came out tilted 46° and the wall of the top storey leaned into the
+     * room. A step is not a taper, so it is not given to something that
+     * interpolates.
+     *
+     * Full height of the stone, masonryTopY to the coping, which shows 0.751 m
+     * above the paving — the measured parapet — with the paving course buried
+     * behind the rest.
+     */
+    guards.push(
+      ...guardRingBoxes({
+        sectors,
+        openingRadius: ROOF.deckOuterRadius,
+        floorY: ROOF.masonryTopY,
+        height: TOWER.topY - ROOF.masonryTopY,
+        thickness: ROOF.parapetThickness,
+        kind: 'wall',
+      }),
+    )
+    /*
+     * THE BALUSTRADE, on the same principle as the opening guards: you can put a
+     * hand on it, so it is not a diagram.
+     *
+     * It is not redundant against the parapet's own boxes even though it stands
+     * on the parapet's inner face. The parapet stops at TOWER.topY, 0.75 m over
+     * the deck — low enough to lean out over, which on a terrace 27 m up is
+     * exactly what the glass is there to stop and what its own "SÖYKƏNMƏYİN /
+     * DON'T LEAN" plate says. Without this the walker leans through 0.28 m of
+     * glass and stands with their head out over the city.
+     */
+    guards.push(
+      ...guardRingBoxes({
+        sectors: Math.min(sectors, 32),
+        openingRadius: BALUSTRADE.glassRadius - BALUSTRADE.glassThickness / 2,
+        floorY: ROOF.deckY,
+        height: BALUSTRADE.glassTop,
+      }),
+    )
     for (const g of GUARDED_OPENINGS) {
       guards.push(
         ...guardRingBoxes({

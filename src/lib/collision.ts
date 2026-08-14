@@ -423,7 +423,24 @@ export interface FloorColliderParams {
    * you walked onto floor that was drawn but had no collider under it and fell
    * a storey.
    */
-  stairwell?: { centreAzimuthDeg: number; widthDeg: number; innerRadius: number }
+  stairwell?: {
+    centreAzimuthDeg: number
+    widthDeg: number
+    innerRadius: number
+    /**
+     * Where the well ENDS going outward, if there is floor beyond it.
+     *
+     * Absent on a storey slab, and rightly: the flight runs in the wall, so the
+     * well is a bite out of the slab's outer lip and there is nothing past it
+     * but masonry. On the ROOF there is — the terrace crosses the whole wall to
+     * the parapet, so the stair mouth is a HOLE with 1.7 m of paving outboard of
+     * it, which a visitor walks round. Left undefined there the ring was
+     * shortened to the mouth's inner edge instead and the whole outer band went
+     * with it: a 50°-wide gap in the deck at the parapet, drawn solid, with
+     * nothing under it for eleven metres.
+     */
+    outerRadius?: number
+  }
 }
 
 /**
@@ -439,30 +456,8 @@ export function floorColliders(p: FloorColliderParams): BoxSpec[] {
   const sectorDeg = 360 / p.sectors
   const halfChord = p.outerRadius * Math.tan((sectorDeg / 2) * DEG) * 1.06
 
-  for (let s = 0; s < p.sectors; s++) {
-    const azimuthDeg = s * sectorDeg + sectorDeg / 2
-
-    // default: the full ring segment, oculus out to the wall
-    let inner = p.oculusRadius
-    let outer = p.outerRadius
-
-    if (p.stairwell) {
-      const d = Math.abs(angleDelta(azimuthDeg, p.stairwell.centreAzimuthDeg))
-      if (d <= p.stairwell.widthDeg / 2) {
-        /*
-         * Inside the well the segment is SHORTENED, not dropped.
-         *
-         * The flight runs in the wall, so only the slab's outer lip has to go.
-         * Dropping the whole wedge cut the floor from the oculus to the wall
-         * over some 50° of arc while the drawn slab kept its inner part — so
-         * you walked onto floor that was visibly there, with nothing under it,
-         * and fell a storey. Reproduced at azimuth 132° on storey 2.
-         */
-        outer = p.stairwell.innerRadius
-        if (outer - inner < 0.15) continue // nothing worth keeping
-      }
-    }
-
+  const emit = (azimuthDeg: number, inner: number, outer: number) => {
+    if (outer - inner < 0.15) return // nothing worth keeping
     const rad = azimuthDeg * DEG
     const half = (outer - inner) / 2
     const mid = (outer + inner) / 2
@@ -472,6 +467,38 @@ export function floorColliders(p: FloorColliderParams): BoxSpec[] {
       quaternion: yawThenTilt(radialYaw(rad), 0),
       kind: 'floor',
     })
+  }
+
+  for (let s = 0; s < p.sectors; s++) {
+    const azimuthDeg = s * sectorDeg + sectorDeg / 2
+
+    const well = p.stairwell
+    const inWell =
+      well !== undefined &&
+      Math.abs(angleDelta(azimuthDeg, well.centreAzimuthDeg)) <= well.widthDeg / 2
+
+    if (!well || !inWell) {
+      // the full ring segment, oculus out to the wall
+      emit(azimuthDeg, p.oculusRadius, p.outerRadius)
+      continue
+    }
+
+    /*
+     * Inside the well the segment is SHORTENED, not dropped.
+     *
+     * The flight runs in the wall, so only the slab's outer lip has to go.
+     * Dropping the whole wedge cut the floor from the oculus to the wall over
+     * some 50° of arc while the drawn slab kept its inner part — so you walked
+     * onto floor that was visibly there, with nothing under it, and fell a
+     * storey. Reproduced at azimuth 132° on storey 2.
+     */
+    emit(azimuthDeg, p.oculusRadius, well.innerRadius)
+    /*
+     * And where the surface carries on OUTBOARD of the well, that band is
+     * emitted too — the roof, where the paving crosses the wall to the parapet.
+     * See the note on stairwell.outerRadius.
+     */
+    if (well.outerRadius !== undefined) emit(azimuthDeg, well.outerRadius, p.outerRadius)
   }
   return out
 }
@@ -501,6 +528,17 @@ export interface GuardRingParams {
   height: number
   /** Radial thickness of the boxes; defaults to GUARD_BOX_THICKNESS. */
   thickness?: number
+  /**
+   * What to call these boxes, for the F4 debug view and for tests.
+   *
+   * Defaults to 'guard' because a guard is what this shape usually is. The roof
+   * parapet is the exception and it is not a stretch: a ring of masonry standing
+   * on the terrace's outer edge is the same solid as a ring of glass standing on
+   * a floor's inner edge, and building it here rather than in wallColliders is
+   * what keeps the drum's bands free of a discontinuity — see the note where the
+   * parapet is raised.
+   */
+  kind?: BoxSpec['kind']
 }
 
 /**
@@ -549,7 +587,7 @@ export function guardRingBoxes(p: GuardRingParams): BoxSpec[] {
         -Math.cos(rad) * midRadius,
       ],
       quaternion: yawThenTilt(radialYaw(rad), 0),
-      kind: 'guard',
+      kind: p.kind ?? 'guard',
     })
   }
   return out

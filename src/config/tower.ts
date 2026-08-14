@@ -434,24 +434,51 @@ export const TOWER = {
 
 // ———————————————————————————— the roof deck ————————————————————————————
 /**
- * THE ROOF, as the footage and one calibrated photograph give it.
- *
- * This block did not exist until 2026-08-14 — see the history note below, which
- * is kept because it records what the model still BUILDS and why that is wrong.
- * The terrace has not been rebuilt yet; these are the numbers to rebuild it from.
+ * THE ROOF, as the footage and one calibrated photograph give it, and as the
+ * model now BUILDS it (2026-08-14, third pass).
  *
  * The deck is TOP_OF_FLOORS and the paving crosses the WHOLE thickness of the
  * wall, from the room face out to the inner face of a thin parapet standing on
  * the drum's outer edge [VIDEO roof/016, roof/001, roof/021, roof/032, up/230].
  * So the parapet is a ring `parapetThickness` across and PARAPET high, and
  * everything inboard of it is paved.
+ *
+ * THE PAVING IS A COURSE OF STONE, NOT A PLANE, and that is what makes the rest
+ * of the rebuild work. `masonryTopY` is where the drum's own stone stops and
+ * `deckY` is where you stand — one `pavingDepth` higher. Three things need the
+ * difference and none of them would work without it:
+ *
+ *   · the drum's cut and the paving's top are then never coplanar, so the wall
+ *     top and the slabs laid on it cannot z-fight along the room face;
+ *   · the parapet stands on the same bed as the paving rather than on top of it,
+ *     which is what roof/016 shows — the coping's courses run down PAST the
+ *     paving's arris into the wall;
+ *   · the stair passage gets a lintel over its last roofed metre: the paving is
+ *     what carries the terrace over the stair, and it is the only stone there.
+ *
+ * `pavingDepth` is FLOOR_SLAB, the same [ASSUMPTION] every other floor in the
+ * tower is drawn with. No frame shows the slabs' depth — you only ever see their
+ * top — so this is a borrowed assumption and deliberately not a new one: the
+ * terrace should not acquire a number of its own that nobody measured.
  */
 const DECK_OUTER_RADIUS = OUTER_RADIUS - PARAPET_THICKNESS
 const DECK_INNER_RADIUS = innerRadiusAt(TOP_OF_FLOORS)
+const PAVING_DEPTH = FLOOR_SLAB
 
 export const ROOF = {
-  /** World Y of the paving. Same level the roof stair arrives at. */
+  /** World Y of the paving's TOP — what you stand on, and where the stair lands. */
   deckY: TOP_OF_FLOORS,
+  /**
+   * m — depth of the paving course. [ASSUMPTION], borrowed from FLOOR_SLAB; see
+   * the note above for why it is borrowed rather than invented.
+   */
+  pavingDepth: PAVING_DEPTH,
+  /**
+   * World Y where the DRUM'S stone stops under the paving — the level the
+   * terrace void is cut down to and the level the stair passage may be vaulted
+   * up to. Everything above it inboard of `deckOuterRadius` is paving or air.
+   */
+  masonryTopY: TOP_OF_FLOORS - PAVING_DEPTH,
   /** m — height of the parapet above the paving. [VIDEO] 0.75 ± 0.06. */
   parapetHeight: PARAPET,
   /** m — thickness of the parapet. [VIDEO] 0.75, bracket 0.55…0.95; see its note. */
@@ -466,34 +493,160 @@ export const ROOF = {
   pavedWidth: DECK_OUTER_RADIUS - DECK_INNER_RADIUS,
 } as const
 
+/*
+ * THERE IS NO masonryInnerRadiusAt(), and the attempt is worth one note.
+ *
+ * The obvious way to teach the wall's colliders about the terrace is a function
+ * that answers "the first solid stone going outward at height y" — the room face
+ * below the paving, the parapet's inner face above it. It was written, and it is
+ * wrong for the thing that wanted it: wallColliders() takes the taper of the
+ * inner face ACROSS each band and lays its boxes on that cone. This face does not
+ * taper at the paving, it jumps three metres in no height at all, and fed as one
+ * function the storey-8 band came out tilted 46°.
+ *
+ * So the drum's bands stop at ROOF.masonryTopY and the parapet is raised as its
+ * own ring in TowerColliders. A step is not a taper.
+ */
+
+// ————————————————————————— the roof balustrade —————————————————————————
 /**
- * WHAT THE ROOF WAS, and what the model still builds. [PLACEHOLDER] in shape.
+ * THE STAINLESS-AND-GLASS BALUSTRADE that stands inside the parapet.
+ *
+ * Modern fabric, and in the model for the reason CLAUDE.md gives for all of it:
+ * the target is the tower as it stands in 2026, and "ограждение кровли" is on
+ * that list by name. It is also the most conspicuous thing on the terrace — you
+ * cannot look out over the city without looking through it — and the model has
+ * been drawing the parapet with nothing on it.
+ *
+ * WHAT IT IS. Tubular posts stood on the paving at the parapet's inner foot,
+ * each base a round flange bolted down, each post carrying a spider at its cap
+ * and a second one low down; the panes hang OUTBOARD of the posts on point
+ * clamps, edge to edge, with the joint at every post; a raking stay ties each
+ * post back to the paving. roof/010, roof/011, roof/021, roof/028, roof/032 all
+ * show the same fitting from different sides, and
+ * reference-photos/views_from/"Baku view from Maiden Tower.JPG" [PHOTO] shows a
+ * whole bay of it square-on with the parapet behind. The "SÖYKƏNMƏYİN /
+ * DON'T LEAN" plate hangs on the glass in that photograph; it is signage, so it
+ * belongs to the museum layer and is not built here.
+ *
+ * HOW THE HEIGHTS WERE GOT, since no source gives any of them. The parapet is
+ * the ruler: it is 0.751 m [VIDEO] and it stands directly behind the balustrade,
+ * so anything in the same frame at the same distance can be read against it.
+ * Working in the [PHOTO] above, whose rows are easiest to trust because the
+ * whole bay is in view:
+ *
+ *   · the parapet's own face runs from the paving at row 2180 to the coping's
+ *     inner arris at row 1370, with the sea horizon at row 830. Rows below the
+ *     horizon go as (h_c − y)/d, so 540/1350 = (h_c − 0.751)/h_c solves the
+ *     camera at h_c = 1.25 m and fixes the scale at the parapet;
+ *   · the right-hand post stands on the paving at row 2380 and caps at row 1292,
+ *     which is 0.88 m. Its cap is a little ABOVE the coping, by 0.06 m;
+ *   · the panes' top edge runs at row 1100, which is 1.03 m above the paving —
+ *     about a quarter of a metre proud of the coping;
+ *   · the lower spider's clamps sit at row 2210, 0.14 m up.
+ *
+ * The video agrees where it can be read the same way: in roof/010 the parapet's
+ * face is 543 px for 0.751 m and the post measures 590 px, i.e. 0.82 m, and its
+ * lower clamp is 0.145 m above the paving. Two frames and one photograph, three
+ * cameras, on the post: 0.88, 0.82, cap level with the coping. The spread is the
+ * uncertainty, and it is mostly the parapet's own ±0.06 carried through.
+ *
+ * WHAT IS NOT MEASURED, and is tagged as such below: the glass thickness (no
+ * frame resolves a pane edge against anything of known size), and the pane's
+ * bottom edge, which is hidden behind the base fitting in every frame — the
+ * lowest thing that can actually be seen there is the lower clamp, so that is
+ * what the pane is drawn down to.
+ */
+const BALUSTRADE_POST_SPACING = 0.9
+
+export const BALUSTRADE = {
+  /** m — top of the glass above the paving. [PHOTO] 1.03 ± 0.10; see above. */
+  glassTop: 1.03,
+  /**
+   * m — bottom of the glass above the paving. [VIDEO] roof/010, and it is the
+   * LOWER CLAMP's level rather than the pane's edge, which no frame shows. The
+   * error is one clamp radius, downward, in the one place on the terrace where
+   * nothing can be seen anyway.
+   */
+  glassBottom: 0.145,
+  /** m — post above the paving. [PHOTO] 0.88, [VIDEO] roof/010 0.82; ±0.08. */
+  postHeight: 0.88,
+  /**
+   * m — outside diameter of the post tube. [PHOTO] 80 px at 1238 px/m and
+   * [VIDEO] roof/010 50 px at 723 px/m both give 0.065; rounded to 0.06.
+   */
+  postDiameter: 0.06,
+  /**
+   * m — from the post's axis to the glass. [PHOTO]: the clamp disc's centre
+   * stands 80 px off the post's axis at 1238 px/m. This is what puts the panes
+   * outboard of the posts, which is the way round every frame shows them.
+   */
+  clampReach: 0.065,
+  /** m — diameter of a point-clamp disc. [PHOTO], read off the same bay. */
+  clampDiameter: 0.07,
+  /**
+   * m — pane thickness. [ASSUMPTION]. Nothing in the corpus resolves it: the
+   * green edge of a pane is a few pixels at an unknown distance in every frame
+   * that shows one. 15 mm is a fabrication figure, not a reading, and it moves
+   * nothing but where the pane's two faces sit relative to each other.
+   */
+  glassThickness: 0.015,
+  /**
+   * m — post to post along the parapet. [PHOTO] 0.88 ± 0.10 from the one bay in
+   * view: 1105 px of lateral separation at that depth, plus a depth term that
+   * needs an assumed focal length and contributes 0.01 m of the total. Rounded
+   * to 0.9, which is what the count below is actually built from.
+   */
+  postSpacing: BALUSTRADE_POST_SPACING,
+  /**
+   * How many posts go round. DERIVED, not read: nothing in the corpus shows
+   * enough of the circuit to count them. Spacing is what was measured, so the
+   * count is what the circumference makes of it, and it is rounded to a whole
+   * number of equal bays rather than left with a short one.
+   */
+  get postCount(): number {
+    const r = this.glassRadius - this.clampReach
+    return Math.max(8, Math.round((2 * Math.PI * r) / this.postSpacing))
+  },
+  /** m — radius of the pane's mid-plane: its outer face on the parapet. */
+  get glassRadius(): number {
+    return DECK_OUTER_RADIUS - this.glassThickness / 2
+  },
+  /** m — radius of the post axes, one clamp's reach inboard of the glass. */
+  get postRadius(): number {
+    return this.glassRadius - this.clampReach
+  },
+}
+
+/**
+ * WHAT THE ROOF WAS, and what the model built until 2026-08-14. Kept because it
+ * is the record of a defect that was described, argued and only then repaired.
  *
  * There was no `ROOF` block above because there was nothing sourced to put in
- * one. What the model builds instead falls out of two other quantities: the deck is
+ * one. What the model built instead fell out of two other quantities: the deck was
  * TOP_OF_FLOORS, the top of the eighth storey's ceiling structure, and the
- * "parapet" is the whole remaining top of the wall — a ring 3.733 m thick and
+ * "parapet" was the whole remaining top of the wall — a ring 3.733 m thick and
  * PARAPET (0.751 m) high, from the room face at r 4.517 out to the drum face at
- * r 8.250. Nobody decided that. It is the residue of the vertical budget, and
- * the deck is drawn only as far as the room face because that is where
- * FloorStructures' annulus stops.
+ * r 8.250. Nobody decided that. It was the residue of the vertical budget, and
+ * the deck was drawn only as far as the room face because that is where
+ * FloorStructures' annulus stopped.
  *
  * `reference-photos/views_from/Maiden towers top old city baku azerbaijan.jpg`
- * [PHOTO] does not look like that. It shows paving running out across the wall
+ * [PHOTO] did not look like that. It shows paving running out across the wall
  * thickness with people standing on it, and a low thin parapet along the outer
  * edge. If that is the building, the head of the roof stair stands UNDER the
  * paving (it is at r 4.71–5.73, inside the wall) and comes out through an
- * opening in the deck. In the model there is nothing over it but 0.751 m of the
- * ring, the passage needs 2.300, and the cutter takes the ring away for about
- * 50° of arc — the stair's last steps are open to the sky and a 0.190 m fin of
- * stone is left standing where the deck edge and the passage cheek fail to meet.
- * That is visible from the terrace, and it is the whole of fault A.
+ * opening in the deck. In the model there was nothing over it but 0.751 m of the
+ * ring, the passage needed 2.300, and the cutter took the ring away for about
+ * 50° of arc — the stair's last steps open to the sky and a 0.190 m fin of
+ * stone left standing where the deck edge and the passage cheek failed to meet.
+ * That was visible from the terrace, and it was the whole of fault A.
  *
- * The breach does not begin abruptly either, and the run-up to it is its own
- * argument that this roof is wrong. From about azimuth 180 down to 163 the
- * passage's vault carries under 0.30 m of stone, thinning to 0.09 m — a lintel the
- * thickness of a book carrying the top of a tower. Nothing is done about that: it
- * is what the measured stack gives, and it is a consequence of a deck at 26.749
+ * The breach did not begin abruptly either, and the run-up to it was its own
+ * argument that that roof was wrong. From about azimuth 180 down to 163 the
+ * passage's vault carried under 0.30 m of stone, thinning to 0.09 m — a lintel the
+ * thickness of a book carrying the top of a tower. Nothing was done about that: it
+ * was what the measured stack gave, and it was a consequence of a deck at 26.749
  * under a top at 27.500 rather than a modelling slip. It would go away by itself
  * if the paving crossed the wall.
  *
@@ -535,10 +688,10 @@ export const ROOF = {
  *
  * SO FAULT A IS NOT A DOUBT ANY MORE, IT IS A KNOWN DEFECT. The 50° trench, the
  * last 1.55 m of the climb open to the sky, the 0.190 m fin and the book-thick
- * lintel from azimuth 180 to 163 are all consequences of a deck that stops at
+ * lintel from azimuth 180 to 163 were all consequences of a deck that stopped at
  * the room face, and the building does not do that. Note what the paragraph
  * above predicted before there was any footage: "it would go away by itself if
- * the paving crossed the wall". It would.
+ * the paving crossed the wall". It did.
  *
  * THE MISSING NUMBER IS NO LONGER MISSING (2026-08-14, second pass). The
  * paragraph that stood here said the terrace could not be repaired for exactly
@@ -546,29 +699,57 @@ export const ROOF = {
  * about the frames. No frame shows the parapet's outer FACE, but several show
  * its top SURFACE between two arrises from 2 m away and 0.6 m above, and that is
  * a measurement — see PARAPET_THICKNESS, 0.75 with a 0.55…0.95 bracket, and
- * ROOF above, which now carries deckOuterRadius = 7.50 m and a paved width of
+ * ROOF above, which carries deckOuterRadius = 7.50 m and a paved width of
  * 2.98 m from the room face out to the parapet.
  *
- * WHAT IS LEFT IS BUILD WORK, NOT EVIDENCE. This file's numbers now describe the
- * terrace the footage shows; FloorStructures and TowerColliders still build the
- * old one — an annulus stopping at the room face under a 3.733 m ring — and with
- * it fault A entire. Nothing further needs to be asked of the owner to fix that.
- * Do NOT close the breach by lowering the deck, raising the parapet or
- * shortening the headroom: it closes when the paving reaches ROOF.deckOuterRadius
- * and the head-house is built over the stairwell.
+ * ═════════════════════════════════════════════════════════════════════════
+ * 2026-08-14, THIRD PASS: THE TERRACE IS BUILT AND FAULT A IS GONE.
+ * ═════════════════════════════════════════════════════════════════════════
  *
- * STILL UNKNOWN, and none of it blocks the terrace: the coping's own profile
- * (whether the capping slab overhangs the rubble below it, which is the most
- * likely reading of the 2009 photograph's narrower 0.57 m); the head-house's
- * plan size; and where in plan the stair head stands relative to the beak.
+ * The paragraph that stood here said "what is left is build work, not evidence",
+ * and listed it. That work is done, and every part of it followed from the deck
+ * crossing the wall rather than from any new number:
+ *
+ *   · buildShellGeometry() subtracts a TERRACE VOID — a cylinder of
+ *     ROOF.deckOuterRadius standing on ROOF.masonryTopY — so the top of the wall
+ *     inboard of the parapet is taken away and what is left round the rim is a
+ *     ring 0.75 m thick and 0.751 m high. That ring is now the parapet;
+ *   · the paving is a course of stone laid on the cut, ROOF.pavingDepth deep,
+ *     from the axis out past the parapet's inner face, drawn in RoofTerrace;
+ *   · the stair passage is clamped to ROOF.masonryTopY, not to TOWER.topY. The
+ *     cutter therefore stops under the paving instead of running up through the
+ *     parapet ring, and the parapet is not touched anywhere on the circuit —
+ *     which is what roof/007 and up/250 show;
+ *   · where the passage runs out of stone the PAVING is opened instead, by the
+ *     same stairwell cut every storey slab takes, so the stair comes out through
+ *     a hole in the deck. That is roof/007's threshold, set flush in the paving.
+ *
+ * The three faults went with it and none of them was patched separately: there
+ * is no trench, because there is no ring to trench; no 0.190 m fin, because the
+ * deck edge and the passage cheek no longer have to meet; and the book-thick
+ * lintel is the paving course itself, which is what a lintel there ought to be.
+ * Nothing moved: the deck, the parapet, the headroom and the top of the tower are
+ * the same four numbers they were.
+ *
+ * STILL UNBUILT, and it is the only thing on the terrace that is: the HEAD-HOUSE
+ * over the stairwell — the wedge of sawn ashlar raked to the pitch of the stair
+ * under an inclined glazed light (up/250, roof/007, roof/008). Its plan follows
+ * the deck opening and its rake follows the stair, so it needs no measurement
+ * that is not already here; it is simply not modelled yet, and until it is, the
+ * way out of the stair is an open hole in the paving instead of a door.
+ *
+ * STILL UNKNOWN, as opposed to merely unbuilt: the coping's own profile (whether
+ * the capping slab overhangs the rubble below it, which is the most likely
+ * reading of the 2009 photograph's narrower 0.57 m); and where in plan the stair
+ * head stands relative to the beak.
  *
  * Printed to the dev console on every load, with the passage-opening conflicts
  * and for the same reason: a question nobody is looking at is not open, it is
  * lost.
  */
 export const ROOF_QUESTION = [
-  'ROOF — the terrace is now DESCRIBED and still WRONGLY BUILT. Nothing here is a',
-  'question for you any more; it is a note to whoever builds it next.',
+  'ROOF — the terrace is DESCRIBED and now BUILT. Nothing here is a question for',
+  'you; it is the standing note on what the deck is made of and what is missing.',
   '',
   'MEASURED, 2026-08-14, off your own roof footage — no question was needed:',
   '  · parapet HEIGHT   0.75 ± 0.06 m  [VIDEO] — the focal-free 0.556 ratio;',
@@ -578,28 +759,32 @@ export const ROOF_QUESTION = [
   '  · so the paving runs from the storey-8 room face (r 4.52) out to r 7.50, a',
   '    walkable 2.98 m, and the parapet is the 0.75 m ring outside that.',
   '',
-  'WHAT THE FOOTAGE ALREADY ANSWERED, so nobody asks it again:',
+  'WHAT THE FOOTAGE ANSWERED, and what the model now builds because of it:',
   '  · the paving reaches the OUTER edge of the wall — roof/016, roof/001, up/230;',
   '  · the parapet is thin, on the outer edge, 3–4 courses under one flat coping —',
   '    roof/016, roof/011, roof/012;',
   '  · it is NOT broken where the stair comes out — roof/007, up/250, and no break',
-  '    anywhere in 32 roof frames;',
-  '  · the stair reaches the deck through a DOOR AT DECK LEVEL, over an opening in',
-  '    the paving, under a modern ashlar head-house with a glazed raking cap —',
-  '    roof/007, up/250. Not a break in the parapet, and not open sky.',
+  '    anywhere in 32 roof frames. The passage cutter is clamped to the underside',
+  '    of the paving, so it can no longer reach the ring;',
+  '  · the stair comes up through an OPENING IN THE PAVING at deck level, cut by',
+  '    the same rule that opens every storey slab — roof/007, up/250.',
   '',
-  'The model still builds the wrong one of those: 26.749 (deck) + 2.300',
-  '(PLAYER.stairHeadroom) = 29.049 against a top of 27.500, so the last 1.55 m of',
-  'the climb cannot be roofed by this stack and the cutter opens ~50° of the ring',
-  'to the sky. Do NOT close the breach by lowering the deck, raising the parapet',
-  'or shortening the headroom — all four numbers are measured or derived from',
-  'measured, and moving any of them fits the building to the picture (rule 1). It',
-  'closes when FloorStructures pave out to ROOF.deckOuterRadius and the head-house',
-  'is built over the stairwell. That is build work; the evidence is in.',
+  'The old 50° breach is gone, and nothing was moved to close it: the deck, the',
+  'parapet, the headroom and the top of the tower are the four numbers they were.',
   '',
-  'STILL UNMEASURED, and none of it blocks the terrace: the coping slab’s own',
-  'profile and overhang; the head-house’s plan size; where in plan the stair head',
-  'stands relative to the beak.',
+  'THE BALUSTRADE is built too, from the parapet used as a ruler in your frames',
+  'and in reference-photos/views_from/"Baku view from Maiden Tower.JPG": posts',
+  '0.88 m on the paving at 0.9 m centres, glass to 1.03 m on point clamps. Every',
+  'one of those is a ratio against the 0.751 m parapet, so they all carry its',
+  '±0.06. If you can measure a post, that is the number to send.',
+  '',
+  'STILL UNBUILT: the HEAD-HOUSE over the stairwell — the raked ashlar wedge with',
+  'the glazed light (up/250, roof/008). Plan and rake both follow things already',
+  'in this file; it is scope, not evidence. Until it is built you come out of the',
+  'stair through an open hole in the deck rather than through a door.',
+  '',
+  'STILL UNMEASURED: the coping slab’s own profile and overhang; where in plan the',
+  'stair head stands relative to the beak; the glass thickness.',
 ] as const
 
 // —————————————————————————————— buttress —————————————————————————————

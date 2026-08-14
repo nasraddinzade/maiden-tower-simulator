@@ -11,6 +11,7 @@ import {
   BUTTRESS,
   ENTRANCE,
   FLOORS,
+  ROOF,
   ROOF_QUESTION,
   STAIR,
   STAIR_BEARING_QUESTION,
@@ -50,6 +51,7 @@ import { TowerWireframe } from './components/tower/TowerWireframe'
 import { TowerShell, type ShellStats } from './components/tower/TowerShell'
 import { TowerColliders } from './components/tower/TowerColliders'
 import { FloorStructures } from './components/tower/FloorStructures'
+import { RoofTerrace } from './components/tower/RoofTerrace'
 import { FirstPersonPlayer } from './components/player/FirstPersonPlayer'
 import { TouchControls } from './components/player/TouchControls'
 import { NO_INPUT, type MoveInput } from './lib/playerMovement'
@@ -226,9 +228,17 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
       stair.stairWidth,
       PLAYER.stairHeadroom,
       innerRadiusAt,
-      // and where the stone stops, so the roof climb's vault is not asserted in
-      // mid-air — see the note on the argument and ROOF_QUESTION
-      TOWER.topY,
+      /*
+       * Where the stone stops OVER THE PASSAGE, which is the underside of the
+       * terrace paving and not the top of the parapet.
+       *
+       * This used to be TOWER.topY, and that one substitution is most of the old
+       * roof's fault: the cutter believed it had a metre more stone than the
+       * building has above the stair, drove the passage up through the parapet
+       * ring and opened 50° of it to the sky. The parapet stands 2 m outboard of
+       * the passage's outer cheek and the cutter has no business reaching it.
+       */
+      ROOF.masonryTopY,
       undefined,
       STAIR.doorwayWidth,
     )
@@ -261,22 +271,31 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
        * room face, which is a hole in the floor at the wall rather than a lip
        * over the passage. No inward margin either, for the same reason.
        *
-       * The roof lift lands on the deck, which is not a floor slab and carries
-       * no cut here.
+       * THE ROOF IS ONE OF THEM NOW. It used to be excluded here, on the ground
+       * that "the deck is not a floor slab and carries no cut" — which was true
+       * of the old terrace, where the deck stopped at the room face and the stair
+       * came out by tearing the parapet ring open instead. With the paving
+       * carried across the wall the roof is a surface like any other and the
+       * stair pierces it like any other: roof/007 shows the stainless threshold
+       * set flush IN the paving with the treads starting straight behind it.
+       *
+       * It is keyed at index FLOORS.length, one past the last storey, which is
+       * where FloorStructures and RoofTerrace both look for it.
        */
       const pierces = [...lift.opensAtFloorNumbers, lift.toFloorNumber].filter(
-        (n) => n >= 1 && n <= FLOORS.length,
+        (n) => n >= 1 && n <= FLOORS.length + 1,
       )
       for (const floorNumber of pierces) {
-        const pierced = FLOORS[floorNumber - 1]
+        const onRoof = floorNumber > FLOORS.length
+        const piercedY = onRoof ? ROOF.deckY : FLOORS[floorNumber - 1].floorY
         // for a storey the flight only passes, the opening sits where the flight
         // crosses THAT level, not at the head of the run
         const span = stairwellSpanDeg(
-          steps.filter((s) => s.treadY <= pierced.floorY + 1e-9),
+          steps.filter((s) => s.treadY <= piercedY + 1e-9),
           headroomSteps,
         )
         if (!span) continue
-        const inner = innerRadiusAt(pierced.floorY) + stair.wallClearance
+        const inner = innerRadiusAt(piercedY) + stair.wallClearance
         cuts[floorNumber - 1] = {
           centreAzimuthDeg: span.centreAzimuthDeg,
           widthDeg: span.widthDeg,
@@ -310,7 +329,10 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
       PLAYER.height + 0.35,
       innerRadiusAt,
       LANDING_Y_OF,
-      TOWER.topY,
+      // the same level the passage is clamped to, and for the same reason. It
+      // also decides that the roof exit is NOT a doorway: its landing IS the top
+      // of the stone, so the stair leaves through the paving instead.
+      ROOF.masonryTopY,
       WALL_LIFTS.map((l) => l.opensAtY),
       STAIR.doorwayWidth,
     )
@@ -737,6 +759,15 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
         viewerStorey={viewerStorey}
         showAllStoreys={!firstPerson || !perf.cullStoreys}
       />
+
+      {/*
+        The terrace goes with the SHELL's material, not the interior's: it is the
+        top of the drum seen from outside, in the same sunlight as the coping
+        beside it. It is drawn in the cutaway too — the cutaway removes the wall
+        so you can see the storeys, and a roof hanging over them is exactly what
+        that view is for.
+      */}
+      <RoofTerrace stairwells={stairwells} material={shellMat} showBalustrade={showShell} />
 
       {/*
         The apertures are the SAME array that cuts the shell, not a second

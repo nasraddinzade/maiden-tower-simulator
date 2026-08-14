@@ -16,7 +16,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import { azimuthToVector } from './geometry'
 import type { PassageSection, StairDoorway } from './staircase'
 import { countDegenerateTriangles, filterDegenerateTriangles } from './mesh'
-import { ENTRANCE, TOWER, innerRadiusAt } from '../config/tower'
+import { ENTRANCE, ROOF, TOWER, innerRadiusAt } from '../config/tower'
 
 export interface ShellParams {
   buttressAzimuthDeg: number
@@ -1085,6 +1085,45 @@ export function buildShellGeometry(p: ShellParams): {
   entrance.rotateY(-p.entranceAzimuthDeg * DEG)
   entrance.translate(dir.x * R, p.entranceSillY, dir.z * R)
 
+  /*
+   * THE TERRACE VOID — the cut that makes the top of this tower a roof.
+   *
+   * A cylinder of ROOF.deckOuterRadius standing on ROOF.masonryTopY and carried
+   * well past the coping. What it takes away is the inboard four fifths of the
+   * wall top; what it leaves round the rim is a ring 0.75 m thick and 0.751 m
+   * high, which is the parapet, and a flat bed inside it for the paving.
+   *
+   * Until this cut existed the "parapet" was the WHOLE remaining wall top — a
+   * ring 3.733 m across — because that is what the vertical budget left over and
+   * nobody had decided otherwise. The owner's roof footage decided otherwise:
+   * roof/016 shows paving running out to a thin parapet with nothing but the
+   * city past its coping, and roof/001, roof/021, roof/028 and roof/032 show the
+   * same wall from every side of the circuit. See ROOF in config/tower.ts.
+   *
+   * IT STANDS ON masonryTopY, NOT ON deckY, and the difference is one paving
+   * course. Cut to deckY the bed and the paving's own top face would be the same
+   * plane carrying two materials, which is the z-fight this model has already
+   * paid for once at the storey-1 floor. Cut a course lower, the paving is laid
+   * ON something and the parapet's stone runs down past its arris — which is
+   * also what roof/016 shows.
+   *
+   * The subtraction goes BEFORE the stair passage deliberately. The passage is
+   * clamped to the same masonryTopY, so where its vault runs out its cutter
+   * overshoots a few centimetres into a space this cut has already emptied,
+   * rather than ending tangent to a surface. Tangency is the CSG case this model
+   * has twice lost a floor to.
+   */
+  const terraceHeight = TOWER.topY + 1 - ROOF.masonryTopY
+  const terrace = new THREE.CylinderGeometry(
+    ROOF.deckOuterRadius,
+    ROOF.deckOuterRadius,
+    terraceHeight,
+    RADIAL_SEGMENTS,
+    1,
+    false,
+  )
+  terrace.translate(0, ROOF.masonryTopY + terraceHeight / 2, 0)
+
   const evaluator = new Evaluator()
   evaluator.useGroups = false
 
@@ -1092,11 +1131,13 @@ export function buildShellGeometry(p: ShellParams): {
   const beakB = new Brush(prep(beakIndexed))
   const cavityB = new Brush(prep(cavity))
   const entranceB = new Brush(prep(entrance))
-  for (const b of [drumB, beakB, cavityB, entranceB]) b.updateMatrixWorld(true)
+  const terraceB = new Brush(prep(terrace))
+  for (const b of [drumB, beakB, cavityB, entranceB, terraceB]) b.updateMatrixWorld(true)
 
   let result = evaluator.evaluate(drumB, beakB, ADDITION)
   result = evaluator.evaluate(result, cavityB, SUBTRACTION)
   result = evaluator.evaluate(result, entranceB, SUBTRACTION)
+  result = evaluator.evaluate(result, terraceB, SUBTRACTION)
 
   /*
    * The stair passage, carved BEFORE the windows — same order, different reason.
@@ -1196,7 +1237,7 @@ export function buildShellGeometry(p: ShellParams): {
     degenerateCount: countDegenerateTriangles(geometry.attributes.position.array, idx),
   }
 
-  for (const g of [drum, cavity, beak, beakIndexed, entrance]) g.dispose()
+  for (const g of [drum, cavity, beak, beakIndexed, entrance, terrace]) g.dispose()
 
   return { geometry, stats }
 }
