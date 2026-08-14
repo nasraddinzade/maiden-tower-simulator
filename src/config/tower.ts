@@ -1544,6 +1544,33 @@ export const PASSAGE_OPENING = {
    * gives a length, a bearing or a gradient, and counting risers in them means
    * assuming the riser.
    *
+   * WHAT IS SETTLED AND WHAT IS NOT, now that the frames have been read properly,
+   * because "ships empty" is not the same claim as "nothing is known".
+   *
+   *   SETTLED — that the branch exists, that it is at the END of a passage and
+   *   not in a chamber wall, that it climbs OUTWARD into the embrasure toward the
+   *   slit, and that the recess it climbs in is broad enough to stand in and
+   *   narrows to a slot before the daylight (up/168, down/124).
+   *
+   *   NOT SETTLED, and none of it inferable from these frames:
+   *     · the riser count. up/218 reads as two steps, down/124 as three, and
+   *       up/168 puts the sill about two courses over the tread — three readings
+   *       that do not agree, and each of them is a COUNT, which only becomes a
+   *       height by assuming a riser. Assuming the riser is the thing forbidden.
+   *     · the going, the width and the depth. All three are [ESTIMATE] in
+   *       WINDOW_EMBRASURE and the footage cannot correct any of them: no object
+   *       of known size stands in any of the 492 frames.
+   *     · the bearing and the length of the branch tunnel, i.e. how far off the
+   *       landing's own line it runs before it reaches the reveal.
+   *     · whether every passage end has one. The 2026-08-14 reading found the
+   *       arrangement at the foot of every stone flight; the earlier reading
+   *       counted three. Nobody has walked it counting.
+   *
+   * So the list stays empty. What has changed is that the maths waiting for it is
+   * no longer able to punch a hole in the tower when it is filled in:
+   * planEmbrasure() fits the recess to the stone at its own height. See
+   * WINDOW_EMBRASURE.outerLeaf.
+   *
    * QUESTION FOR THE OWNER: do those steps climb from the stair landing up to the
    * slit, or from the room into a recess in the wall?
    */
@@ -1637,13 +1664,23 @@ export const WINDOW_GRILLE = {
  * has its sill 0.30 m above the landing, so planEmbrasure() returns null for
  * every one), and the layer is off.
  *
- * A CONSTRAINT DISCOVERED WHILE CHECKING THAT, and recorded before anything is
- * built on it: these dimensions give a recess 4.20 m deep for a sill 2.95 m up,
- * whatever height it is at, and the wall thins from 4.855 m at storey 1 to
- * 3.820 m at storey 8. Such a recess fits inside the masonry up to storey 5 and
- * breaks through the outer face from storey 6 — by 0.09 m at storey 6 and 0.38 m
- * at storey 8. The old test never asked, because the one chamber window it ran
- * over sat at storey 4. Pinned in embrasure.test.ts.
+ * A CONSTRAINT DISCOVERED WHILE CHECKING THAT, recorded before anything was
+ * built on it, AND SINCE ENFORCED: these dimensions gave a recess 4.20 m deep for
+ * a sill 2.95 m up, whatever height it was at, and the wall thins from 4.855 m at
+ * storey 1 to 3.820 m at storey 8. Such a recess fitted inside the masonry up to
+ * storey 5 and broke through the outer face from storey 6 — by 0.09 m at storey
+ * 6 and 0.38 m at storey 8. The old test never asked, because the one chamber
+ * window it ran over sat at storey 4.
+ *
+ * [2026-08-14] It stopped being a note and became arithmetic, because the thing
+ * it was waiting on arrived. The walkthrough shows the stepped branch to a slit
+ * at a passage end plainly and in several places — up/218, down/124, up/168,
+ * up/143 — so the recess is a real cut in a real wall and not a number nobody
+ * spends. planEmbrasure() now takes the stone available at the platform's own
+ * height and the leaf that must survive beyond it (`outerLeaf` below), and takes
+ * any shortfall out of the going. It CANNOT return a depth that leaves the drum.
+ * Recording a hole in the outer face of a tower for a second time would have been
+ * a worse failure than the first, because the first was a discovery.
  *
  * A CONFLICT THAT HAS TURNED INTO A CORROBORATION, which is a thing that has to
  * be recorded rather than quietly re-used. This note used to hold, as a conflict,
@@ -1681,6 +1718,38 @@ export const WINDOW_EMBRASURE = {
   width: 0.9,
   /** m — the standing place at the top, deep enough for both feet. [ESTIMATE] */
   platformDepth: 0.7,
+  /**
+   * m — the stone that must survive between the back of the recess and the
+   * OUTER FACE OF THE TOWER. [PLACEHOLDER], and one course, for the same reason
+   * PASSAGE_OPENING.sillAboveLanding is one course: it introduces no new number.
+   *
+   * THAT IT IS POSITIVE IS MEASURED, and it is the frames that measure it. up/168
+   * and down/124 both look straight up an embrasure from inside: a recess broad
+   * enough to stand in, narrowing to a slot a hand wide where the daylight is. So
+   * the recess does NOT run to the face — the wall closes in front of it and the
+   * slit alone goes through. Run the 0.9 m recess to the drum and the tower would
+   * carry a 0.9 m hole where every exterior photograph shows a 0.4 m slit.
+   *
+   * HOW MUCH stone is not measured and cannot be, by the same argument that
+   * governs everything else read off this footage: nothing of known size stands
+   * in any of the 492 frames, so a leaf read off them is a proportion of a person
+   * at unknown distance through a wide-angle lens. Rule 1. FLOOR_SLAB is borrowed
+   * rather than invented — the one course-of-stone unit this model already owns,
+   * the same course the floors are built of and the same one that stands under a
+   * slit's sill and over its head.
+   *
+   * WHAT IT COSTS, said here rather than discovered later. planEmbrasure() takes
+   * the depth out of the going, so with a 2.95 m sill the treads run 0.500 m at
+   * storeys 1–3 and are cut back to 0.486, 0.465, 0.444, 0.424 and 0.403 m from
+   * storey 4 up. The width-to-going ratio therefore climbs from 1.8 to 2.2, and
+   * 2.2 is outside the 0.9–1.9 the one interior photograph of an embrasure gives.
+   * That is published and not hidden, and it argues that the next thing to give
+   * is `width` — an [ESTIMATE] — and never the wall, which is sourced.
+   *
+   * QUESTION FOR THE OWNER: standing in one of those embrasures, how thick is the
+   * stone the slit itself is cut through — a hand, a forearm, an arm's length?
+   */
+  outerLeaf: FLOOR_SLAB,
   /**
    * m — how far a tread's nosing and level wander from nominal. [ESTIMATE]
    *

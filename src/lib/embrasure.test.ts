@@ -6,6 +6,7 @@ import {
   TOWER,
   WINDOW_EMBRASURE,
   innerRadiusAt,
+  wallThicknessAt,
 } from '../config/tower'
 import { wallColliders, type WallColliderParams } from './collision'
 import { PLAYER } from '../config/player'
@@ -31,6 +32,13 @@ const E = WINDOW_EMBRASURE
  * gate on the roof climb. No source gives that branch a length, a bearing or a
  * gradient, so PASSAGE_OPENING.branchAtEnds ships empty and this module waits
  * (CLAUDE.md rule 1). Deleting it would erase the only trace of the testimony.
+ *
+ * [2026-08-14] AND IT IS NO LONGER WAITING ON A MAYBE. The owner's walkthrough
+ * shows that branch in four places — up/218, down/124, up/168, up/143 — so the
+ * arithmetic below governs a cut that will really be made. The last describe in
+ * this file is the consequence: a recess that used to leave the drum through its
+ * own outer face at the top of the tower now cannot, at any height, because the
+ * depth is fitted to the stone instead of being stated in advance.
  */
 
 describe('which windows get steps: under this layout, none, and here is why', () => {
@@ -56,7 +64,18 @@ describe('which windows get steps: under this layout, none, and here is why', ()
       const aboveLanding = o.centreY - o.innerHeight / 2 - o.landingY
       expect(aboveLanding).toBeLessThan(PLAYER.eyeHeight)
       expect(
-        planEmbrasure(aboveLanding, o.landingY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth),
+        // the whole wall, i.e. the most stone any carrier could have: so a null
+        // here is the HEIGHT declining the steps and never a thin wall doing it
+        planEmbrasure(
+          aboveLanding,
+          o.landingY,
+          PLAYER.eyeHeight,
+          E.riserTarget,
+          E.going,
+          E.platformDepth,
+          wallThicknessAt,
+          E.outerLeaf,
+        ),
         o.id,
       ).toBeNull()
     }
@@ -78,6 +97,8 @@ describe('which windows get steps: under this layout, none, and here is why', ()
         E.riserTarget,
         E.going,
         E.platformDepth,
+        wallThicknessAt,
+        E.outerLeaf,
       )
       expect(Boolean(plan), `inner sill ${above.toFixed(2)} m above the floor`).toBe(
         above - PLAYER.eyeHeight > E.riserTarget / 2,
@@ -93,10 +114,19 @@ describe('which windows get steps: under this layout, none, and here is why', ()
 })
 
 describe('embrasure treads', () => {
-  const plan = planEmbrasure(2.95, 13.62, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)!
+  const plan = planEmbrasure(
+    2.95,
+    13.62,
+    PLAYER.eyeHeight,
+    E.riserTarget,
+    E.going,
+    E.platformDepth,
+    wallThicknessAt,
+    E.outerLeaf,
+  )!
 
   it('climbs outward into the wall, one going per step', () => {
-    const treads = embrasureTreads(plan, 4.0, E.going, E.platformDepth)
+    const treads = embrasureTreads(plan, 4.0)
     expect(treads.length).toBe(plan.stepCount + 1)
     for (let i = 1; i < treads.length; i += 1) {
       expect(treads[i].innerRadius).toBeCloseTo(treads[i - 1].outerRadius, 9)
@@ -105,41 +135,189 @@ describe('embrasure treads', () => {
   })
 
   it('ends on a platform level with the top tread', () => {
-    const treads = embrasureTreads(plan, 4.0, E.going, E.platformDepth)
+    const treads = embrasureTreads(plan, 4.0)
     const last = treads[treads.length - 1]
     expect(last.treadY).toBeCloseTo(plan.platformY, 9)
     expect(last.outerRadius - last.innerRadius).toBeCloseTo(E.platformDepth, 9)
   })
+})
 
-  it('stays inside the masonry only in the lower half of the tower, and here is where it stops', () => {
+/*
+ * THE DESCRIBE BELOW REPLACES ONE CALLED "stays inside the masonry only in the
+ * lower half of the tower, and here is where it stops", and the replacement is
+ * the whole change of 2026-08-14.
+ *
+ * That test asserted the fault. It ran planEmbrasure over all eight storeys, put
+ * the storeys whose recess stayed in the wall in one list and the storeys whose
+ * recess came out through the drum in another, and pinned the answer:
+ *
+ *     expect(fits).toEqual([1, 2, 3, 4, 5])
+ *     expect(holes).toEqual([6, 7, 8])
+ *
+ * which is a green test certifying that the top three storeys of the model have
+ * a hole in them. It was written that way on purpose and the reason was good at
+ * the time — the layer had no receivers, the branch off a landing had no source
+ * for its depth, and inventing one to close the gap would have been rule 1. So
+ * the constraint was recorded where the next person would find it.
+ *
+ * The next person found it, and what changed under it is the receivers: the
+ * owner's walkthrough shows the stepped branch to a slit at a passage end in
+ * four places, so the recess is a cut that will really be made. A recorded hole
+ * is a finding; a recorded hole with something about to be built in it is a bug.
+ * The `holes` list is empty now, and it is empty by construction rather than by
+ * arithmetic that happens to come out right — planEmbrasure cannot express a
+ * depth that leaves the drum.
+ */
+describe('a recess may not punch through the outer face', () => {
+  /*
+   * 2.95 m is the sill the chamber openings used to produce, and the tallest of
+   * them: seven risers, the deepest recess these dimensions can ask for. It is
+   * kept as a number rather than read from a file, because the file that held it
+   * lost its chamber openings on 2026-08-10 — see the head of this file.
+   */
+  const SILL = 2.95
+  const at = (floorY: number) =>
+    planEmbrasure(
+      SILL,
+      floorY,
+      PLAYER.eyeHeight,
+      E.riserTarget,
+      E.going,
+      E.platformDepth,
+      wallThicknessAt,
+      E.outerLeaf,
+    )
+
+  it('leaves a leaf of stone outboard of the recess at every storey in the tower', () => {
     /*
-     * AN ANSWER THAT USED TO BE UNASKED, AND IT IS NOT THE ANSWER THE OLD TEST
-     * IMPLIED.
+     * THE PROPERTY. Not "it fits at these storeys" — it fits, full stop, and the
+     * wall is what decides how deep it is allowed to be.
      *
-     * The old version ran over the chamber-opening list, which held exactly one
-     * window, at storey 4. It passed, and it was read as "an embrasure stays
-     * inside the wall". Asked of every storey the answer is no: a 2.95 m sill
-     * needs seven risers and 4.20 m of depth whatever height it is at, while the
-     * wall thins from 4.855 m at storey 1 to 3.820 m at storey 8. It fits up to
-     * storey 5 and breaks through the outer face from storey 6 up, by 0.09 m at
-     * storey 6 and 0.38 m at storey 8.
-     *
-     * Recorded rather than fixed, because there is nothing yet to fix: the layer
-     * has no receivers (see the top of this file) and no source gives the branch
-     * off a landing a depth. When PASSAGE_OPENING.branchAtEnds is finally filled
-     * in, this is the constraint it has to satisfy, and it is now on record
-     * instead of being discovered by a hole in the drum.
+     * The old rule failed this from storey 4 up: an unconditional 4.20 m against
+     * 4.399 m of wall at storey 4 leaves 0.199 m, which is inside the leaf; from
+     * storey 6 the recess is through the face outright.
      */
-    const fits: number[] = []
-    const holes: number[] = []
     for (const f of FLOORS) {
-      const p = planEmbrasure(2.95, f.floorY, PLAYER.eyeHeight, E.riserTarget, E.going, E.platformDepth)
-      if (!p) continue
-      const face = innerRadiusAt(p.platformY)
-      ;(face + p.depth < TOWER.outerRadius ? fits : holes).push(f.floorNumber)
+      const p = at(f.floorY)
+      expect(p, `storey ${f.floorNumber}: the tower has wall enough for a recess here`).not.toBeNull()
+      const face = innerRadiusAt(p!.platformY)
+      expect(
+        face + p!.depth,
+        `storey ${f.floorNumber}: the back of the recess stands at radius ` +
+          `${(face + p!.depth).toFixed(3)} and may not pass ${(TOWER.outerRadius - E.outerLeaf).toFixed(3)}`,
+      ).toBeLessThanOrEqual(TOWER.outerRadius - E.outerLeaf + 1e-9)
     }
-    expect(fits).toEqual([1, 2, 3, 4, 5])
-    expect(holes).toEqual([6, 7, 8])
+  })
+
+  it('says how much stone it left, and it is never less than the leaf', () => {
+    for (const f of FLOORS) {
+      const p = at(f.floorY)!
+      expect(p.coverBeyond, `storey ${f.floorNumber}: cover beyond the recess`).toBeGreaterThanOrEqual(
+        E.outerLeaf - 1e-9,
+      )
+      expect(p.coverBeyond, `storey ${f.floorNumber}`).toBeCloseTo(
+        wallThicknessAt(p.platformY) - p.depth,
+        9,
+      )
+    }
+  })
+
+  it('keeps the drawn treads inside the same stone, not just the stated depth', () => {
+    /*
+     * The number and the stone have to agree. A clamped `depth` drawn with the
+     * nominal going would put the last tread through the face while the plan
+     * still read as sound, which is the worse of the two failures — so the going
+     * travels on the plan and embrasureTreads has no other one to reach for.
+     */
+    for (const f of FLOORS) {
+      const p = at(f.floorY)!
+      const face = innerRadiusAt(p.platformY)
+      const treads = embrasureTreads(p, face)
+      const last = treads[treads.length - 1]
+      expect(last.outerRadius, `storey ${f.floorNumber}: last tread`).toBeLessThanOrEqual(
+        TOWER.outerRadius - E.outerLeaf + 1e-9,
+      )
+      expect(last.outerRadius - face, `storey ${f.floorNumber}: treads match the plan`).toBeCloseTo(
+        p.depth,
+        9,
+      )
+    }
+  })
+
+  it('buys the depth from the going, and only where the wall makes it', () => {
+    /*
+     * Storeys 1–3 are untouched — the wall there is thick enough for the mason's
+     * own 0.50 m tread — and the cut-back is monotonic above them, because the
+     * wall taper is. A model that shortened treads everywhere would be paying a
+     * price the building does not charge.
+     */
+    const goings: number[] = []
+    for (const f of FLOORS) {
+      const p = at(f.floorY)!
+      const room = wallThicknessAt(p.platformY) - E.outerLeaf
+      const wanted = p.stepCount * E.going + E.platformDepth
+      if (wanted <= room) {
+        expect(p.depth, `storey ${f.floorNumber}`).toBeCloseTo(wanted, 9)
+        expect(p.going, `storey ${f.floorNumber}`).toBeCloseTo(E.going, 9)
+        expect(p.depthLimitedByWall, `storey ${f.floorNumber}`).toBe(false)
+      } else {
+        expect(p.depth, `storey ${f.floorNumber}`).toBeCloseTo(room, 9)
+        expect(p.going, `storey ${f.floorNumber}`).toBeLessThan(E.going)
+        expect(p.depthLimitedByWall, `storey ${f.floorNumber}`).toBe(true)
+      }
+      goings.push(p.going)
+    }
+    expect(goings.slice(0, 3).every((g) => Math.abs(g - E.going) < 1e-9)).toBe(true)
+    for (let i = 1; i < goings.length; i += 1) {
+      expect(goings[i], `storey ${i + 1} tread`).toBeLessThanOrEqual(goings[i - 1] + 1e-9)
+    }
+  })
+
+  it('never buys it from the riser, the step count or the platform', () => {
+    /*
+     * The point of the flight is that the platform brings the eye to the sill. If
+     * fitting the wall moved the platform, the recess would fit and light nothing,
+     * which is the trade this must never make.
+     */
+    for (const f of FLOORS) {
+      const p = at(f.floorY)!
+      expect(p.platformY + PLAYER.eyeHeight, `storey ${f.floorNumber}: eye at the sill`).toBeCloseTo(
+        f.floorY + SILL,
+        9,
+      )
+      expect(p.riser * p.stepCount, `storey ${f.floorNumber}`).toBeCloseTo(SILL - PLAYER.eyeHeight, 9)
+      expect(p.platformDepth, `storey ${f.floorNumber}`).toBeCloseTo(E.platformDepth, 9)
+    }
+  })
+
+  it('declines the recess outright where the stone will not hold the platform', () => {
+    /*
+     * A wall with exactly the leaf plus the platform in it has no room for a
+     * single tread, and the honest answer is that there is no recess here — not a
+     * recess with a tread of zero, and certainly not one with a negative tread.
+     * Synthetic: no storey of this tower is that thin, and the rule has to hold
+     * for whatever carrier the branch turns out to sit on, including one cut from
+     * a passage cheek that has only a metre or so of stone outboard of it.
+     */
+    const thin = (metres: number) => () => metres
+    const plan = (stone: number) =>
+      planEmbrasure(
+        SILL,
+        0,
+        PLAYER.eyeHeight,
+        E.riserTarget,
+        E.going,
+        E.platformDepth,
+        thin(stone),
+        E.outerLeaf,
+      )
+    expect(plan(E.outerLeaf + E.platformDepth)).toBeNull()
+    expect(plan(E.outerLeaf + E.platformDepth - 0.5)).toBeNull()
+    // one tread's worth over the platform, and it is a recess again
+    const just = plan(E.outerLeaf + E.platformDepth + 0.35)!
+    expect(just).not.toBeNull()
+    expect(just.depth).toBeCloseTo(E.platformDepth + 0.35, 9)
+    expect(just.coverBeyond).toBeCloseTo(E.outerLeaf, 9)
   })
 })
 
@@ -170,6 +348,8 @@ describe('the wall lets you into the embrasure', () => {
         E.riserTarget,
         E.going,
         E.platformDepth,
+        wallThicknessAt,
+        E.outerLeaf,
       )
       return plan ? { w: { id: `synthetic-${azimuthDeg}`, azimuthDeg }, plan, floorY } : null
     })
