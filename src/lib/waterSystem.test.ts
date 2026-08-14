@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buriedRunRadii,
   channelRings,
+  clearArcsFor,
   flowPosition,
   pipeOuterDiameter,
   segmentsForRing,
@@ -150,5 +151,64 @@ describe('buried run', () => {
     const r = buriedRunRadii(FLOORS[0].innerRadiusAtLevel, TOWER.outerRadius)
     expect(r.from).toBeLessThan(FLOORS[0].innerRadiusAtLevel)
     expect(r.to).toBeGreaterThan(TOWER.outerRadius)
+  })
+})
+
+describe('clearArcsFor', () => {
+  const block = (label: string, azimuthDeg: number, halfWidthDeg: number) => ({
+    label,
+    azimuthDeg,
+    halfWidthDeg,
+  })
+
+  it('returns the whole circle when nothing is in the way', () => {
+    expect(clearArcsFor([], 5)).toEqual([
+      { fromDeg: 0, toDeg: 360, widthDeg: 360, middleDeg: 180 },
+    ])
+  })
+
+  it('widens each block by the run’s own half-angle', () => {
+    // one 10°-wide block at north, plus 5° of run either side, blocks 350..10
+    const [arc] = clearArcsFor([block('a', 0, 5)], 5)
+    expect(arc.fromDeg).toBeCloseTo(10, 9)
+    expect(arc.toDeg).toBeCloseTo(350, 9)
+    expect(arc.widthDeg).toBeCloseTo(340, 9)
+    expect(arc.middleDeg).toBeCloseTo(180, 9)
+  })
+
+  it('does not let the 0/360 seam cut an arc in two', () => {
+    /*
+     * The reason this function merges on a line carrying an extra revolution.
+     * Two blocks at 90 and 270 leave two arcs, one of which straddles north —
+     * and a naive sweep from 0 reports THREE, splitting the free half at the
+     * seam and then reporting the widest as half its true width. The well's
+     * bearing is the middle of the widest arc, so that error would have moved
+     * it by 45°.
+     */
+    const arcs = clearArcsFor([block('a', 90, 20), block('b', 270, 20)], 0)
+    expect(arcs).toHaveLength(2)
+    expect(arcs[0].widthDeg).toBeCloseTo(140, 9)
+    expect(arcs[1].widthDeg).toBeCloseTo(140, 9)
+    expect(arcs.map((a) => Math.round(a.middleDeg)).sort((x, y) => x - y)).toEqual([0, 180])
+  })
+
+  it('merges blocks that overlap and reports the survivors widest first', () => {
+    const arcs = clearArcsFor([block('a', 100, 30), block('b', 140, 30), block('c', 310, 5)], 0)
+    // 70..170 is one block once merged, 305..315 the other
+    expect(arcs).toHaveLength(2)
+    expect(arcs[0].widthDeg).toBeCloseTo(135, 9)
+    expect(arcs[0].fromDeg).toBeCloseTo(170, 9)
+    expect(arcs[0].toDeg).toBeCloseTo(305, 9)
+    expect(arcs[1].widthDeg).toBeCloseTo(115, 9)
+    expect(arcs[1].fromDeg).toBeCloseTo(315, 9)
+    expect(arcs[1].toDeg).toBeCloseTo(70, 9)
+  })
+
+  it('reports nothing free when the blocks close the circle', () => {
+    expect(clearArcsFor([block('a', 0, 60), block('b', 120, 60), block('c', 240, 60)], 0)).toEqual(
+      [],
+    )
+    // and when a single block is wide enough to do it alone
+    expect(clearArcsFor([block('a', 0, 10)], 200)).toEqual([])
   })
 })

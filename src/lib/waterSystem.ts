@@ -121,6 +121,89 @@ export function downpipeChases(
     }))
 }
 
+/** One obstruction seen in plan: a bearing and the half-angle it occupies. */
+export interface PlanBlock {
+  label: string
+  azimuthDeg: number
+  halfWidthDeg: number
+}
+
+/** An arc of bearings nothing occupies. */
+export interface ClearArc {
+  fromDeg: number
+  toDeg: number
+  widthDeg: number
+  /** Bearing furthest from either end — the most defensible place to stand. */
+  middleDeg: number
+}
+
+/**
+ * WHERE A VERTICAL RUN OF THE GIVEN WIDTH MAY STAND AT ALL, in plan.
+ *
+ * Every void is widened by the run's own half-angle and projected onto the
+ * circle; what is left is returned, widest arc first. Height is deliberately
+ * NOT an argument, and that is the whole point of this function: it is the
+ * question the height-aware guards cannot answer.
+ *
+ * The distinction cost this model a year of near misses in both directions. A
+ * guard that compares bearings alone reports clashes that are not there — see
+ * the note in downpipeChases() — so the guards learned to ask about height, and
+ * were right to. But then "clear" came to mean "does not touch anything AT THE
+ * HEIGHTS BOTH HAPPEN TO OCCUPY TODAY", and a placeholder can pass that while
+ * standing dead in line with a window two metres above it. WELL.azimuthDeg did
+ * exactly that at 230. One lowered landing and it would have been a hole.
+ *
+ * So both questions get asked, of different things. Whether stone is being cut
+ * where stone is not there is a question about heights. Where to PUT a value
+ * nobody has measured is a question about plan: choose a bearing that is clear
+ * however the heights move, because in this tower the heights do move.
+ */
+export function clearArcsFor(blocks: readonly PlanBlock[], ownHalfDeg: number): ClearArc[] {
+  const EPS = 1e-9
+  const norm = (x: number) => ((x % 360) + 360) % 360
+  const spans: Array<[number, number]> = []
+  for (const b of blocks) {
+    const half = b.halfWidthDeg + ownHalfDeg
+    if (half <= 0) continue
+    // one block that reaches more than half the circle either way closes it
+    if (half >= 180) return []
+    const from = norm(b.azimuthDeg - half)
+    spans.push([from, from + 2 * half])
+  }
+  if (spans.length === 0) return [{ fromDeg: 0, toDeg: 360, widthDeg: 360, middleDeg: 180 }]
+
+  // merged on a line that carries one extra revolution, so a span that straddles
+  // the 0/360 seam is merged with its neighbours instead of being cut by it
+  spans.sort((a, b) => a[0] - b[0])
+  const doubled: Array<[number, number]> = [
+    ...spans,
+    ...spans.map(([a, b]) => [a + 360, b + 360] as [number, number]),
+  ]
+  const merged: Array<[number, number]> = []
+  for (const s of doubled) {
+    const last = merged[merged.length - 1]
+    if (last && s[0] <= last[1] + EPS) last[1] = Math.max(last[1], s[1])
+    else merged.push([s[0], s[1]])
+  }
+
+  const origin = merged[0][0]
+  const arcs: ClearArc[] = []
+  for (let i = 0; i + 1 < merged.length; i += 1) {
+    const from = merged[i][1]
+    const to = merged[i + 1][0]
+    // one revolution's worth of gaps; past that they repeat
+    if (from >= origin + 360 - EPS) break
+    if (to - from <= EPS) continue
+    arcs.push({
+      fromDeg: norm(from),
+      toDeg: norm(to),
+      widthDeg: to - from,
+      middleDeg: norm((from + to) / 2),
+    })
+  }
+  return arcs.sort((a, b) => b.widthDeg - a.widthDeg)
+}
+
 /**
  * Profile of the well shaft: a funnel collar at the mouth narrowing to the bore.
  * Returned as (radius, y) pairs ready to be revolved.
