@@ -1917,51 +1917,75 @@ export const WELL = {
    */
   startsAtFloorIndex: 2,
   /**
-   * Azimuth of the wellhead within the room. [PLACEHOLDER] — no source fixes it.
+   * Azimuth of the wellhead, and so of the chase the downpipe stands in.
+   * [PLACEHOLDER] — nothing has ever measured it.
    *
-   * It was 20, and at 20 the downpipe stood IN A DOORWAY. The chase the pipe
-   * runs in is cut down the room-side face, and the stair's head doorways come
-   * out at about az 15 since the flights moved to start at 100 — so a visitor
-   * leaving the stair on storey 3 walked into a 0.30 m pipe across the opening.
-   * The owner photographed it and called it, exactly, pipes in the entrances.
+   * IT WAS 230, AND 230 HAD OUTLIVED EVERY REASON IT WAS EVER GIVEN.
    *
-   * 230 is chosen to be clear of everything that is not a placeholder.
+   * It went there from 20 because at 20 the downpipe stood IN A DOORWAY — the
+   * chase is cut down the room-side face and the stair's head doorways came out
+   * at about az 15 while the flights started at 100, so a visitor leaving the
+   * stair on storey 3 walked into a 0.30 m pipe across the opening. The owner
+   * photographed it and called it, exactly, pipes in the entrances. That fault
+   * is real and the cure for it holds; what does not hold is the bearing.
    *
-   * Two placeholders were in conflict and this is the one that moved, because
-   * nothing depends on it: the stair's azimuth had already been moved once to
-   * clear the windows, and moving it again would have put those back at risk.
+   * The flights have started at 196.7 since 2026-08-13, and the argument for 230
+   * was rebuilt twice on other grounds and void twice. First "the slit columns
+   * stand between 123 and 170" — after 2026-08-10 no slit stood anywhere, the
+   * openings having become the ends of the flights. Then "the nearest thing is
+   * the head of 4→6 at 310, 80° away" — after the stair turned a quarter of the
+   * drum the whole FOOT column swung to 205.4–218.5, straight at this. A value
+   * that must be re-justified every time the stair moves is not clear of the
+   * stair. It is being followed by it, and each rebuild left less room.
    *
-   * THE REASONING HAS BEEN REBUILT TWICE AND THE VALUE HAS NOT MOVED ONCE, which
-   * is either luck or a sign that 230 is simply an empty quarter of this tower.
+   * WHAT WAS ACTUALLY WRONG AT 230, measured with the chase's own half-width of
+   * 5.13° (0.33 m at the storey-3 face) counted in, not eyeballed:
    *
-   * It first read "the slit columns stand between 123 and 170". After 2026-08-10
-   * no slit stood there — the openings became the ends of the flights, at 5.7–21.6
-   * and 310 — and the argument was replaced with "the nearest thing to it is the
-   * head of 4→6 at 310, 80° away".
+   *   - the roof climb's passage reaches azimuth 227.0, and the chase at 230
+   *     stood 2.1° INSIDE it. No stone was cut, because that passage runs
+   *     23.14–27.50 and the topmost chase stops at 21.79;
+   *   - the nearest reveal, foot-8-9 at 218.5, OVERLAPPED IN PLAN by 0.3°:
+   *     11.5° of separation against 11.7° of summed half-widths. What kept the
+   *     two apart was 1.98 m of masonry and nothing else;
+   *   - the nearest passage on a storey the chase does run up was 8.4° clear,
+   *     down from 105° before the turn.
    *
-   * THAT SECOND ARGUMENT IS NOW VOID TOO, and by much more than the first. On
-   * 2026-08-13 the stair turned a quarter of the drum onto [OWNER]'s bearing and
-   * the whole FOOT column — six of the nine openings the model cuts — swung to
-   * azimuth 205.4–218.5, straight at this. Re-measured rather than re-argued:
+   * Two of those three were not clearances at all, they were vertical accidents.
+   * Asking the guards about height was right and is not being undone — see
+   * downpipeChases() — but "clear" had quietly come to mean "does not touch
+   * anything at the heights both happen to occupy today", and a [PLACEHOLDER]
+   * whose whole defence is that its neighbour sits two metres higher is one
+   * lowered landing away from being a hole in a window.
    *
-   *   - the nearest reveal is foot-8-9 at 218.5, and in PLAN IT OVERLAPS: 11.5°
-   *     of separation against 11.7° of combined half-width. What keeps them apart
-   *     is height — the chase stops at the storey-7 springing, 21.79, and that
-   *     reveal starts at 23.77, so 1.98 m of masonry lies between them. A test now
-   *     asks about both dimensions instead of only the bearing, because the old
-   *     azimuth-only one failed on exactly this pair and was right to be doubted;
-   *   - the nearest STAIR DOORWAY is the roof climb's foot at 205.0, 14.5° clear;
-   *   - the nearest passage tube on a storey the chase actually runs up is 8.4°
-   *     clear at storey 3 — down from 105° before the turn, which is the real
-   *     cost of this move and is recorded here rather than in a test's silence;
-   *   - the entrance at 270 is 40° away, unchanged.
+   * 312 IS DERIVED, NOT CHOSEN. Project every void in the drum — reveal,
+   * doorway and stair passage — onto plan, widen each by the chase's own
+   * half-angle, take the complement. The tower leaves exactly ONE arc free:
    *
-   * So 230 survives on measurement a third time, and the margins are now single
-   * digits of arc where they used to be three. It is still a [PLACEHOLDER], and
-   * the honest statement is that nothing has ever measured it: it is chosen to be
-   * clear of everything else, and everything else keeps moving.
+   *     232.14° → 32.73° through north, 160.59° wide, middle 312.43°.
+   *
+   * Its ends are passages rather than windows: the roof climb's lead-in at
+   * 227.0 closes it below and flight 4→6's lead-out at 37.9 closes it above.
+   * 312 is that middle to the nearest whole degree — a decimal here would claim
+   * a precision no measurement supports. It stands 79.9° clear in plan of the
+   * nearest void, 81.3° clear once height is counted as well, and 26.9° clear
+   * of the entrance, which is not in the derivation: 270 is sourced, it cannot
+   * move, and it lies 7 m below the lowest chase.
+   *
+   * The half of the drum that is free is free because every flight, every
+   * doorway and every reveal in this model hangs off one stair bearing, and the
+   * stair occupies 37.9° to 227.0 and nothing else. That is a fact about the
+   * layout, not about the well.
+   *
+   * THE STAIR IS STILL THE THING THAT MOVES — STAIR_FROM_BUTTRESS_DEG is known
+   * to be too small by at least 8° and has deliberately not been changed — and
+   * this value is still hostage to it. The difference is that it is now hostage
+   * where a test can see it. clearArcsFor() in lib/waterSystem.ts is the
+   * derivation and wellClearance.test.ts runs it against the live flight plan,
+   * so the day the stair turns again the arc is recomputed, this number stops
+   * being its middle, and the suite says so instead of leaving the well where
+   * the previous stair bearing happened to put it.
    */
-  azimuthDeg: 230,
+  azimuthDeg: 312,
   /** Distance of the wellhead from the tower axis. [PLACEHOLDER]. */
   offsetFromAxis: 2.4,
 }
