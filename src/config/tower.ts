@@ -802,12 +802,56 @@ export const ROOF_QUESTION = [
 // astronomical hypothesis. Default to the MEASURED value and let Phase 8 report
 // whatever the equinox test actually yields (rule 7: no fitting geometry to a
 // hypothesis). Set back to 90 in leva to compare.
+
+/**
+ * m — THE TRACE'S OWN SCATTER, and the only error bar anybody ever wrote down
+ * about the beak.
+ *
+ * It is not a new measurement. The paragraph above has said since the footprint
+ * was fitted that "14 drum nodes agree to ±0.03 m", and that sentence was doing
+ * nothing: it sat in a comment while every number derived from the same trace
+ * was used to four significant figures. Naming it makes it available to the
+ * arithmetic that needs it — see edgeToleranceDeg — and it introduces nothing,
+ * which is the whole point. Rule 1 is not only about inventing dimensions; a
+ * tolerance invented to make a doubt come out the right size is the same fault.
+ */
+const OSM_NODE_SCATTER = 0.03
+
 export const BUTTRESS = {
   azimuthDeg: 106.7, // [OSM] centre→tip-midpoint bearing; [ref] prose says ~90° — see note above
   projection: 10.7, // m beyond the outer wall — [OSM] (tip at r 19.01, drum r 8.34)
   tipWidth: 3.0, // m across the nose — [OSM] (was a 9.0 m invention before measuring)
   rootArcDeg: 40.8, // ° of drum circumference the buttress springs from — [OSM] 72.7°→113.5°
   skewDeg: 13.6, // ° the tip axis leans off the root-arc midpoint — [OSM]; this is the asymmetry seen in photos
+  /**
+   * ° — HOW FINELY THE TRACED EDGES CAN BE READ AT ALL. 0.03 m of node scatter
+   * standing on a drum of radius 8.25 is 0.208° of azimuth, and no bearing taken
+   * off this footprint means anything below that.
+   *
+   * WHY IT HAD TO BECOME A NUMBER. The beak's daylight edge comes out at
+   * azimuth 113.5 (= azimuthDeg − skewDeg + rootArcDeg/2) and the model was
+   * cutting an opening at 113.629 BECAUSE of the 0.129° between them — 19 mm on
+   * the face of the drum, against a trace whose own best-constrained nodes
+   * wander 30 mm. Whether that window existed was therefore decided by the
+   * fourth significant figure of a satellite tracing rather than by the
+   * building, and nothing in the code knew it: 113.5 was carried like a survey.
+   * A datum with no tolerance beside it will always be read to the last digit
+   * somebody typed.
+   *
+   * IT IS A FLOOR AND NOT THE ERROR, and reading it as the error would be the
+   * next version of the same mistake. 0.03 m is what FOURTEEN drum nodes agree
+   * to. The beak is described by TWO — src/data/windows.json →
+   * pointedWindowBearing calls the edge's 6.8° offset from the axis "the softest
+   * term in the chain" and prices the systematic that rides on it in whole
+   * degrees. So a bearing that clears this tolerance is not thereby safe; it is
+   * only not obviously unsafe. What would replace it is a survey, or the
+   * İçərişəhər plans (docs/maiden-tower-reference.md → «Чего нет в открытом
+   * доступе»), and either would make this constant redundant, which is the best
+   * thing that could happen to it.
+   */
+  edgeToleranceDeg: (OSM_NODE_SCATTER / OUTER_RADIUS) * (180 / Math.PI),
+  /** m of node scatter the tolerance above is the angle of. [OSM], see the note. */
+  traceScatter: OSM_NODE_SCATTER,
   plan: 'beak-rounded' as const, // клювообразная, скруглённая [ref]
   get direction() {
     return azimuthToVector(this.azimuthDeg)
@@ -1172,10 +1216,29 @@ export const STAIR: {
    *     and it must never be tuned to keep it true.
    *
    * ON A KNIFE EDGE, and it must be said in the same breath: head-6-7 comes out
-   * at azimuth 113.6 against a pier whose daylight edge is at 113.5. It is open by
-   * one tenth of a degree — 14 mm on the drum face. Nothing about that opening is
+   * at azimuth 113.6292 against a pier whose daylight edge is at 113.5000. It is
+   * open by 0.1292° — 18.6 mm on the drum face. Nothing about that opening is
    * decided by evidence; it is decided by the fourth significant figure of an OSM
    * trace. head-7-8 at 116.0 clears by 2.5°, which is barely better.
+   *
+   * TWO CORRECTIONS TO THAT PARAGRAPH, 2026-08-15, and the second is the larger.
+   *
+   * The 14 mm it used to give was arithmetic, and wrong: 0.1292° × π/180 × 8.25 m
+   * is 0.0186 m. The old figure was the arc of the ROUNDED 0.1°, not of the
+   * clearance, and it had been quoted back in four files. It made the margin sound
+   * thinner than it is, so nothing was decided on the error — but a wrong number
+   * defending a right conclusion is still a wrong number.
+   *
+   * And "nothing about that opening is decided by evidence" was left standing as a
+   * remark, which is exactly the failure it describes: the model went on cutting
+   * the window and shipping the doubt as a comment. The trace states its own
+   * scatter — ±0.03 m over fourteen drum nodes, which is ±0.208° or ±30 mm at this
+   * radius — so the 18.6 mm is 0.62 of the noise, and that comparison is now
+   * arithmetic the model performs rather than prose. BUTTRESS.edgeToleranceDeg
+   * carries the tolerance; lib/passageOpenings.ts → pierEdgeReading() decides what
+   * to do about an opening inside it (cut it, and stop calling it a fact) and
+   * argues why the other two answers are worse; and the viewer is told, because a
+   * visitor in that passage is looking at the window and reads no comments.
    *
    * WHAT WOULD CHANGE IT:
    *   - the owner correcting "a quarter" to a third or a sixth: change

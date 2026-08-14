@@ -170,10 +170,18 @@ const INTERIOR_SLIT = BUILT_OPENINGS.reduce((low, o) => (o.centreY < low.centreY
  * hangs 1.2 m outside the drum face, and on a bearing the pier covers that point
  * is inside ten metres of solid stone. The daylight check already refuses to cut
  * such an end, so any built opening is safe in principle — but head-6-7 is
- * currently open by one tenth of a degree (azimuth 113.6 against a pier edge at
- * 113.5), and a marker whose position is decided by the fourth significant figure
- * of an OSM trace is not a place to stand a camera. Farthest from the beak is the
- * one choice that cannot be made wrong by a small correction to it.
+ * currently open by 0.129° (azimuth 113.629 against a pier edge at 113.500), and
+ * a marker whose position is decided by the fourth significant figure of an OSM
+ * trace is not a place to stand a camera. Farthest from the beak is the one
+ * choice that cannot be made wrong by a small correction to it.
+ *
+ * [2026-08-15] That rule now has arithmetic under it rather than an eye: 0.129°
+ * is 18.6 mm on the drum face — the note used to say 14, which was wrong — against
+ * a trace whose own nodes scatter ±30 mm. The opening is flagged
+ * `pier.insideDatumError` and the model says so to the viewer; see
+ * lib/passageOpenings.ts → pierEdgeReading(). This marker's rule is unchanged and
+ * needs to be: it picks foot-8-9 at azimuth 218.5, 112° round from the beak, and
+ * it would go on avoiding head-6-7 even if the flag were someday cleared.
  */
 const EXTERIOR_SLIT = BUILT_OPENINGS.reduce((best, o) => {
   const gap = Math.abs(angleDelta(o.azimuthDeg, BUTTRESS.azimuthDeg))

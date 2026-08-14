@@ -21,6 +21,12 @@
   "autumnEquinox": "autumn equinox",
   "credits": "Photo credits",
   "vrMode": "VR mode",
+  "datumTitle": "Unsettled",
+  "datumHeadline": "The model shows one opening it cannot vouch for",
+  "datumMore": "detail",
+  "datumLess": "hide",
+  "datumNumbers": "{{id}} — clears the buttress edge by {{clear}} mm, on a tracing that scatters ±{{tol}} mm",
+  "datumBody": "The buttress edge is hand-traced from satellite imagery [OSM], and that tracing's own nodes agree only to ±{{tol}} mm on the face of the drum. This opening clears the edge by {{clear}} mm — less than the scatter — so whether it exists is decided by the tracing rather than by the tower. It is cut, and said out loud, rather than asserted. A survey of the buttress, or the İçərişəhər drawings, would settle it.",
   "now": "now",
   "liveClock": "live"
 }

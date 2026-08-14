@@ -31,10 +31,13 @@ import {
   type Winding,
 } from './lib/staircase'
 import {
+  datumWarnings,
+  openingsInsideDatumError,
   passageEndAnchors,
   planPassageOpenings,
   testimonyConflicts,
   type OpeningFitting,
+  type PassageOpening,
 } from './lib/passageOpenings'
 import { Staircase } from './components/tower/Staircase'
 import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
@@ -72,6 +75,7 @@ import { storeyAt } from './lib/visibility'
 import { LoadingScreen } from './components/ui/LoadingScreen'
 import { HotspotMarkers } from './components/hotspots/HotspotMarkers'
 import { HotspotPanel, AttributionScreen } from './components/ui/HotspotPanel'
+import { DatumCaveat } from './components/ui/DatumCaveat'
 import type { HotspotId } from './data/hotspots'
 import { MaybeXR, useLazyXR } from './components/xr/LazyXR'
 
@@ -87,6 +91,15 @@ interface SceneProps {
    * so. Lifted through a callback, exactly as the shell's own stats are.
    */
   onApertures: (a: OpeningAperture[]) => void
+  /**
+   * The ends the [OSM] trace cannot settle, lifted for the same reason and by the
+   * same route as the apertures: the caveat shown to the VIEWER has to describe
+   * the openings this Canvas actually cut, and the stair's bearing is a live leva
+   * control. Recomputed out there from the config defaults it would eventually
+   * name an opening the model no longer has, which is the failure mode a caveat
+   * can least afford. See lib/passageOpenings.ts → pierEdgeReading().
+   */
+  onDatumCaveats: (o: PassageOpening[]) => void
   hotspot: HotspotId | null
   onHotspot: (id: HotspotId | null) => void
   onPerf: (s: PerfSample) => void
@@ -143,7 +156,7 @@ const OPENING_FITTINGS = windowData.passageOpenings as OpeningFitting[]
  * what would bring it back is in src/data/windows.json → chamberOpeningsHistory.
  */
 
-function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook }: SceneProps) {
+function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook }: SceneProps) {
   const { showShell, showWireframe, showScaleRef, cutaway } = useControls('View', {
     showShell: true,
     showWireframe: false,
@@ -456,6 +469,43 @@ function Scene({ onStats, onApertures, onPerf, date, hypothesis, hotspot, onHots
       console.warn(`[passage openings] ${line}`)
     }
   }, [openings])
+
+  /*
+   * THE ENDS THE [OSM] TRACE CANNOT DECIDE, on a channel of their own.
+   *
+   * head-6-7 clears the pier's traced edge by 19 mm against a tracing whose own
+   * nodes scatter 30 mm, so the model cuts a window on a quantity smaller than
+   * the noise of the thing it was measured against. The decision this makes
+   * visible — cut it, and stop calling it a fact — is argued in
+   * lib/passageOpenings.ts → pierEdgeReading().
+   *
+   * It is a SECOND report beside testimonyConflicts() rather than another line in
+   * it, and the reason is that the other one must be able to fall silent: every
+   * line in it is retired by the owner answering a question, and a test asserts
+   * that it goes quiet when all twelve ends are ruled on. Nothing he could say
+   * retires this one — he is not the person who can place the beak's root to a
+   * fifth of a degree. Only a survey is.
+   *
+   * DEV-gated, like every other warning here, because it is addressed to whoever
+   * is editing the model.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    for (const line of datumWarnings(openings)) console.warn(`[datum] ${line}`)
+  }, [openings])
+
+  /*
+   * AND THE ONE THAT GOES THE OTHER WAY — OUT TO THE VISITOR AND NOT TO ME.
+   *
+   * The same finding, lifted out of the Canvas to the caveat in the interface.
+   * NOT gated on DEV, and that is the whole point of it: a person walking that
+   * passage is looking at a window that may not be there, and a console line does
+   * not reach them. src/components/ui/DatumCaveat.tsx.
+   */
+  useEffect(
+    () => onDatumCaveats(openingsInsideDatumError(openings)),
+    [openings, onDatumCaveats],
+  )
 
   /*
    * AND THE TWO FAULTS HE NAMED WITHOUT CORRECTING, which are questions and not
@@ -864,6 +914,8 @@ export default function App() {
   const [stats, setStats] = useState<ShellStats | null>(null)
   /** The openings the shell was actually cut with; see SceneProps.onApertures. */
   const [apertures, setApertures] = useState<OpeningAperture[]>([])
+  /** Ends the [OSM] trace cannot settle; see SceneProps.onDatumCaveats. */
+  const [datumCaveats, setDatumCaveats] = useState<PassageOpening[]>([])
 
   // Walk mode is a top-level switch: it decides whether physics runs, whether
   // colliders are built, and which camera controls the view.
@@ -934,6 +986,7 @@ export default function App() {
       )}
       <HypothesisPanel selected={hypothesis} onSelect={setHypothesis} />
       <HotspotPanel selected={hotspot} onClose={() => setHotspot(null)} />
+      <DatumCaveat openings={datumCaveats} />
       <AttributionScreen open={creditsOpen} onClose={() => setCreditsOpen(false)} />
 
       <button
@@ -1056,6 +1109,7 @@ export default function App() {
           <Scene
             onStats={setStats}
             onApertures={setApertures}
+            onDatumCaveats={setDatumCaveats}
             onPerf={setPerf}
             date={date}
             hypothesis={hypothesis}

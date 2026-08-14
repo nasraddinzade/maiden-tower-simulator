@@ -232,6 +232,11 @@ export interface PassageOpening extends PassageEndAnchor {
   blindBecause?: 'buttress' | 'parapet'
   /** Metres of solid buttress a radial ray must cross here. 0 is daylight. */
   buttressDepth: number
+  /**
+   * WHAT THE CHECK'S VERDICT IS WORTH: how far this end stands from the pier's
+   * traced edge, and how finely that edge can be read. See pierEdgeReading().
+   */
+  pier: PierEdgeReading
   /** True when this end is actually cut. */
   built: boolean
   /**
@@ -259,6 +264,18 @@ export interface ButtressPlan {
   tipWidth: number
   rootArcDeg: number
   skewDeg: number
+  /**
+   * ° the traced outline can be read to at all. See BUTTRESS.edgeToleranceDeg in
+   * config/tower.ts, which derives it from the [OSM] fit's own node scatter.
+   *
+   * REQUIRED, not optional, and that is the point of putting it here rather than
+   * on the planner's input: every caller in the project already passes BUTTRESS
+   * or a spread of it, so the tolerance travels with the bearings it qualifies
+   * and a doctored beak cannot arrive without one. A datum that can be passed
+   * around without its error bar will be read to the last digit somebody typed —
+   * which is exactly what happened to the 113.5 below.
+   */
+  edgeToleranceDeg: number
 }
 
 /**
@@ -390,6 +407,190 @@ export function rotationToDaylightDeg(
   }
 
   return { clockwise: find(1), counterclockwise: find(-1) }
+}
+
+// ——————————— the pier's edge, and how finely it can be read at all ———————————
+
+/**
+ * The two azimuths at which the beak's root leaves the drum.
+ *
+ * Arithmetic on the [OSM] plan, not a second reading of it: the root arc is
+ * `rootArcDeg` wide and centred `skewDeg` counterclockwise of the nose axis, so
+ * its edges are azimuthDeg − skewDeg ± rootArcDeg/2 — 72.7 and 113.5 as shipped.
+ * buttressDepthAt() finds the same two boundaries by casting rays at the outline,
+ * and a test asserts they agree; this exists because a NUMBER can be compared
+ * against a tolerance and a ray cannot.
+ */
+export function pierEdgesDeg(b: ButtressPlan): { counterclockwise: number; clockwise: number } {
+  const mid = b.azimuthDeg - b.skewDeg
+  return {
+    counterclockwise: norm(mid - b.rootArcDeg / 2),
+    clockwise: norm(mid + b.rootArcDeg / 2),
+  }
+}
+
+/**
+ * ° a bearing stands clear of the nearer pier edge. Negative inside the root arc.
+ *
+ * The same quantity rotationToDaylightDeg() searches for by bisection, in closed
+ * form and with a sign — for the two blind ends the two agree to six figures
+ * (8.0084 and 11.0872), which is the check that this is measuring the pier and
+ * not an idea of it.
+ */
+export function pierClearanceDeg(azimuthDeg: number, b: ButtressPlan): number {
+  const e = pierEdgesDeg(b)
+  const past = delta(azimuthDeg, e.clockwise)
+  const before = delta(e.counterclockwise, azimuthDeg)
+  const outside = [past, before].filter((d) => d > 0)
+  return outside.length > 0 ? Math.min(...outside) : Math.max(past, before)
+}
+
+/** m of an outer mouth of this width, centred here, that stands over pier root. */
+export function pierBlockedWidth(
+  azimuthDeg: number,
+  outerWidth: number,
+  b: ButtressPlan,
+  outerRadius: number,
+): number {
+  const halfDeg = outerWidth / 2 / outerRadius / DEG
+  const halfArc = b.rootArcDeg / 2
+  const c = delta(azimuthDeg, b.azimuthDeg - b.skewDeg)
+  const lo = Math.max(c - halfDeg, -halfArc)
+  const hi = Math.min(c + halfDeg, halfArc)
+  return Math.max(0, hi - lo) * DEG * outerRadius
+}
+
+/**
+ * WHERE ONE OPENING STANDS AGAINST THE PIER, AND WHETHER THAT CAN BE KNOWN.
+ *
+ * Two numbers about the same hole, and they are not the same question:
+ * `centreDeg` is the bearing the daylight check tested, `mouthDeg` is where the
+ * stone actually is once the hole has a width. Both are published because they
+ * disagree at the one end this whole apparatus was written for.
+ */
+export interface PierEdgeReading {
+  /** ° the landing centre — the bearing the check tests — clears the pier edge. */
+  centreDeg: number
+  /** m that clearance is worth on the face of the drum. The knife edge, in metres. */
+  centreOffset: number
+  /** ° the nearer JAMB of the outer mouth clears it. Negative: the mouth overlaps. */
+  mouthDeg: number
+  /** m of the outer mouth standing over pier root; 0 where the mouth is all clear. */
+  blockedWidth: number
+  /** m the outer mouth is wide, carried so blockedWidth reads as a fraction of it. */
+  mouthWidth: number
+  /** ° the trace can be read to at all — ButtressPlan.edgeToleranceDeg. */
+  toleranceDeg: number
+  /** m that tolerance is worth on the drum face, for comparing like with like. */
+  toleranceOffset: number
+  /** True where the beak's head is below this opening, so none of it bites. */
+  aboveBeakHead: boolean
+  /**
+   * THE FINDING. |centreDeg| is inside toleranceDeg: the clearance this end was
+   * cut (or withheld) on is smaller than the scatter of the trace it was measured
+   * against, so the datum does not decide it in either direction.
+   */
+  insideDatumError: boolean
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHAT THE MODEL DOES WITH AN OPENING ITS OWN DATUM CANNOT DECIDE.
+ * Decided 2026-08-15. head-6-7 is the case; the rule is general.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * THE CASE. head-6-7's landing centre comes out at azimuth 113.6292. The pier's
+ * traced daylight edge is at 113.5000. The opening is therefore open by 0.1292°,
+ * which is 18.6 mm on the face of the drum — and the fallback check cuts it for
+ * that reason and no other. The trace those 113.5000 come from states its own
+ * scatter: fourteen drum nodes agreeing to ±0.03 m, which at r 8.25 is ±0.208°,
+ * or ±30 mm. The clearance is 0.62 of the noise. Nothing about that window is
+ * decided by the building.
+ *
+ * (18.6 mm, not the 14 mm this repository carried in four places since the knife
+ * edge was first noticed. 0.1292° × π/180 × 8.25 m = 0.0186 m. The old figure was
+ * an arithmetic slip and it flattered nobody — it made the margin sound thinner
+ * than it is — but a wrong number defending a right conclusion is still a wrong
+ * number, and it had been quoted back three times.)
+ *
+ * THE DECISION: CUT IT, AND STOP CALLING IT A FACT. Not "drop it", and the
+ * reasons are in order of how much they weigh.
+ *
+ *   1. THE RECORD IS EMPTY HERE. `open` for this end is null — [PLACEHOLDER],
+ *      nobody has been asked. This file is explicit that null "is not a shorthand
+ *      for no", and withholding the opening would let a geometric rule fill in a
+ *      fact the record leaves blank. That is the exact move the 2026-08-10 rebuild
+ *      took OUT of this file when `built` became `open`.
+ *
+ *   2. DROPPING IT ASSERTS A NEGATIVE ON THE SAME DATUM THAT COULD NOT ASSERT
+ *      THE POSITIVE. There is a sharper reading available — see mouthDeg below,
+ *      the mouth overlaps the pier by 1.26° — but it comes off the identical
+ *      two-node tracing of the beak. A longer lever arm on the same soft datum
+ *      is not a better source, and using it to delete an opening would be
+ *      spending the doubt in whichever direction happened to be convenient.
+ *
+ *   3. AND THE OVERLAP IS NOT ABOUT THE TOWER. Where an opening sits along its
+ *      landing is a MODEL RULE — planPassageOpenings centres it, on an argument
+ *      about fitting rather than about evidence — and the landing is 20.4° long
+ *      against a 2.78° mouth. Slide the slit 1.3° along its own landing, which
+ *      nothing in any source forbids, and the mouth clears the pier entirely.
+ *      A quantity that can be zeroed by re-reading one of the model's own
+ *      conventions cannot be used to demolish an opening.
+ *
+ * WHAT IS NOT DONE, AND MUST NOT BE. `reachesDaylight`, `blindBecause`,
+ * `buttressDepth` and `built` keep exactly the meanings they had: a radial ray
+ * cast at the landing's centre bearing. They are the vocabulary of the quarter-
+ * turn finding (config/tower.ts → STAIR_FROM_BUTTRESS_DEG and the eleven tests in
+ * lib/stairBearing.test.ts, which measure head-3-4's 10.64 m of pier and the
+ * 8.01°/11.09° rotations out of it). Redefining `reachesDaylight` to mean "the
+ * whole mouth is clear" would silently move that finding's numbers, and a finding
+ * that moves when somebody improves an unrelated check is not a finding. So this
+ * reading is ADDITIVE: it measures more, and it decides nothing that was already
+ * decided.
+ *
+ * WHAT IS DONE INSTEAD: the doubt is published in three places, so that it costs
+ * something to ignore. `insideDatumError` on the opening itself; a line out of
+ * testimonyConflicts() into the dev console on every load; and — the part that
+ * matters, because the other two are for whoever edits the model — a caveat in
+ * the VIEWER's interface, since a visitor standing in that passage is looking at
+ * a window that may not be there. src/components/ui/DatumCaveat.tsx.
+ *
+ * WHAT WOULD RETIRE ALL OF IT. One survey bearing for the beak's root, or the
+ * İçərişəhər plans. Until then the honest state of this opening is "cut, and
+ * unsupported", and the model says both halves.
+ *
+ * THE ONE CLAIM THIS DOES NOT MAKE. It has been suggested that the pier's edge
+ * drifts with height because the beak tapers, so that 113.5 is not one bearing
+ * but a range. THE MODEL'S BEAK DOES NOT TAPER — beakShape() extrudes one plan
+ * straight up and buttressDepthAt() has no height term at all, so in this model
+ * the edge is the same 113.5 at every level and the only height dependence is the
+ * step at the beak's head. Whether the BUILDING's pier tapers is a different
+ * question, and this repository has no measurement of it: no source gives one and
+ * the exterior photographs have not been read for it. It is therefore left alone
+ * rather than assumed — but if it is ever measured it belongs exactly here, as a
+ * second term in edgeToleranceDeg, and it would make this doubt larger and not
+ * smaller.
+ */
+export function pierEdgeReading(
+  azimuthDeg: number,
+  outerWidth: number,
+  b: ButtressPlan,
+  outerRadius: number,
+  aboveBeakHead: boolean,
+): PierEdgeReading {
+  const centreDeg = pierClearanceDeg(azimuthDeg, b)
+  const halfDeg = outerWidth / 2 / outerRadius / DEG
+  return {
+    centreDeg,
+    centreOffset: centreDeg * DEG * outerRadius,
+    mouthDeg: centreDeg - halfDeg,
+    blockedWidth: aboveBeakHead ? 0 : pierBlockedWidth(azimuthDeg, outerWidth, b, outerRadius),
+    mouthWidth: outerWidth,
+    toleranceDeg: b.edgeToleranceDeg,
+    toleranceOffset: b.edgeToleranceDeg * DEG * outerRadius,
+    aboveBeakHead,
+    insideDatumError: !aboveBeakHead && Math.abs(centreDeg) <= b.edgeToleranceDeg,
+  }
 }
 
 // ————————————————————————— fitting the reveal —————————————————————————
@@ -529,8 +730,9 @@ export function planPassageOpenings(input: PlanPassageOpeningsInput): PassageOpe
     const centreY = a.landingY + cfg.sillAboveLanding + f.outerHeight / 2
     const fitted = fitReveal(f, a, centreY, cfg)
 
-    const buttressDepth =
-      centreY > input.buttressTopY ? 0 : buttressDepthAt(azimuthDeg, buttress, outerRadius)
+    const aboveBeakHead = centreY > input.buttressTopY
+    const buttressDepth = aboveBeakHead ? 0 : buttressDepthAt(azimuthDeg, buttress, outerRadius)
+    const pier = pierEdgeReading(azimuthDeg, f.outerWidth, buttress, outerRadius, aboveBeakHead)
 
     /*
      * THE CHECK. Two things can make an end blind, and both are measurements of
@@ -570,6 +772,7 @@ export function planPassageOpenings(input: PlanPassageOpeningsInput): PassageOpe
       reachesDaylight,
       blindBecause,
       buttressDepth,
+      pier,
       built,
       decidedBy,
       conflict,
@@ -636,6 +839,19 @@ export function unresolvedEnds(all: PassageOpening[]): PassageOpening[] {
 }
 
 /**
+ * Ends whose existence the [OSM] trace cannot settle — see pierEdgeReading().
+ *
+ * ONE, AS THIS SHIPS, AND ONE IS THE DANGEROUS NUMBER. A single case reads like
+ * a quirk of one opening and gets written into a comment; the reason it is a
+ * function is that the next turn of STAIR_FROM_BUTTRESS_DEG will produce a
+ * different one, and whoever makes that turn should be told by the model rather
+ * than by rediscovering the arithmetic.
+ */
+export function openingsInsideDatumError(all: PassageOpening[]): PassageOpening[] {
+  return all.filter((o) => o.pier.insideDatumError)
+}
+
+/**
  * Everywhere the model and the testimony disagree, as sentences.
  *
  * REPORTS, DOES NOT REPAIR. This is the function the dev console prints and the
@@ -692,6 +908,38 @@ export function testimonyConflicts(all: PassageOpening[]): string[] {
   }
 
   return lines
+}
+
+/**
+ * The ends the [OSM] trace is too coarse to have ruled on, as sentences.
+ *
+ * A SEPARATE REPORT FROM testimonyConflicts(), AND THE SEPARATION IS THE POINT.
+ * That one is about the RECORD: every line in it can be retired by asking the
+ * owner a question, and a test asserts it falls silent once all twelve ends are
+ * answered — "proof that the report is not always-on noise". Folding this in
+ * would have broken that invariant and deserved to, because no answer of his can
+ * retire this: he is not the person who can say where the beak's root meets the
+ * drum to better than a fifth of a degree. Only a survey can, or the İçərişəhər
+ * plans. So it is its own channel, it stays lit whatever the record says, and it
+ * says out loud which way the model jumped while it could not tell.
+ *
+ * Both numbers in millimetres. Degrees at the fourth decimal place read as
+ * precision — which is exactly how 113.5 came to be used as though it were one —
+ * and 19 mm against 30 mm does not.
+ */
+export function datumWarnings(all: PassageOpening[]): string[] {
+  return openingsInsideDatumError(all).map(
+    (o) =>
+      `${o.id}: ${o.built ? 'CUT' : 'withheld'} on a clearance of ` +
+      `${o.pier.centreDeg.toFixed(3)}° from the pier's traced edge — ` +
+      `${(o.pier.centreOffset * 1000).toFixed(0)} mm on the drum face, against a trace whose own ` +
+      `nodes scatter ±${(o.pier.toleranceOffset * 1000).toFixed(0)} mm ` +
+      `(±${o.pier.toleranceDeg.toFixed(3)}°). The [OSM] footprint does not decide whether this ` +
+      'opening exists, and no testimony can: it is carried as uncertain rather than as a fact — ' +
+      'see pierEdgeReading() and the caveat the viewer is shown. Its outer mouth also overlaps ' +
+      `the root by ${(o.pier.blockedWidth * 1000).toFixed(0)} mm of ` +
+      `${(o.pier.mouthWidth * 1000).toFixed(0)}, which measures the centring rule and not the tower.`,
+  )
 }
 
 /** Problems with one end's record, before any geometry is involved. */
