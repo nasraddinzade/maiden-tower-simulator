@@ -13,8 +13,10 @@ import { ENTRANCE, TOWER } from './tower'
  * The external stair from the paved square up to the raised doorway.
  *
  * Measured off the ascent frames at seconds 0–19 and the descent at 403–419:
- * straight, no turns, no winders, a fabricated steel flight with chequer treads
- * and curved tubular balustrades either side.
+ * straight, no winders, a fabricated steel flight with chequer treads and curved
+ * balustrades either side. STRAIGHT, but not radial — it is laid against the
+ * drum like a chord and turns a quarter circle onto the door at the top. See
+ * ENTRANCE_APPROACH below, which is where that was got wrong.
  *
  * TWO INDEPENDENT FIGURES AGREE HERE, which is worth stating because almost
  * nothing else in this model has that. Counting treads off the video gives 12
@@ -85,6 +87,62 @@ export const EXTERNAL_STAIR = {
 export const EXTERNAL_STAIR_RISE = EXTERNAL_STAIR.risers * EXTERNAL_STAIR.riser
 
 /**
+ * WHICH WAY THE FLIGHT RUNS, and the landing it runs to.
+ *
+ * The flight used to be laid on the entrance's own radius — foot and head at
+ * azimuth 270, the run taken straight out of the radius, the walker climbing
+ * head-on at the door. It does not do that and never did. It runs ALONG the
+ * drum and turns onto the door at the top, and the turn is what this object is
+ * for. The construction is argued where it is computed, in lib/externalStair.ts.
+ *
+ * WHAT THE PHOTOGRAPHS SETTLE. reference-photos/exterior/"Torre de la Doncella,
+ * Baku, Azerbaiyán, 2016-09-26, DD 06.jpg" shows the whole approach in one
+ * frame: a straight flight climbing across the face of the wall, a landing at
+ * its head standing in front of the doorway, and — the detail that cannot be
+ * read any other way — the handrail raking up the flight, breaking to
+ * HORIZONTAL exactly where flight meets landing, and running on flat across the
+ * front of the door to die into the stone past the far jamb. A radial flight
+ * has no landing, nothing for a rail to level off along, and nowhere to turn.
+ * "Qiz qalasi 1.jpg" is the same arrangement from a different bearing, and the
+ * owner's own ascent frame at second 2 is the same thing from the foot: the
+ * drum recedes to one side while the flight climbs across it to a doorway that
+ * is NOT at the end of the climb but square to it.
+ *
+ * WHICH SIDE, which is the half of this that could have been got backwards. In
+ * every photograph that shows the door the flight descends to the LEFT of it,
+ * and left is not an accident of where photographers stand: the visible arc of
+ * a drum always runs from higher azimuth on the image left to lower on the
+ * right, so a flight on the far side of the door would show on the right in all
+ * of them and shows on the right in none. DD 06 fixes the compass on its own —
+ * the buttress and the boulevard stand at its right edge, which is the east and
+ * south of the tower, so the flight's foot lies NORTH of west. Hence +1: the
+ * flight descends toward INCREASING azimuth, 270 → about 296.
+ *
+ * WHAT THEY DO NOT SETTLE is any length. Nothing has put a tape across this
+ * stair and no frame of it contains an object of known size, exactly as the
+ * width note above records. So the landing is not measured; it is DERIVED from
+ * the one relation the photographs do fix — its outer edge and the flight's
+ * outer stringer are one straight line, and it is about as long as it is deep.
+ * A landing shorter than the flight is wide could not be turned on and would
+ * not cover the 1.1 m doorway it serves.
+ */
+export const ENTRANCE_APPROACH = {
+  /**
+   * +1 = the flight descends toward increasing azimuth, i.e. clockwise in plan
+   * from the door. [PHOTO], and the one thing here that is not derived.
+   */
+  handedness: 1,
+  /**
+   * m — how far the landing reaches along the wall. [DERIVED] from the width:
+   * square, because the photographs show it roughly so and because a
+   * quarter-turn landing has to be at least the flight's width in both
+   * directions. Its depth is not a separate figure — it IS the width, the
+   * walking surface simply carrying on past the door.
+   */
+  landingLength: EXTERNAL_STAIR.width,
+} as const
+
+/**
  * World Y of the paved ground outside.
  *
  * Derived from the THRESHOLD, which is the floor of storey 1, less the measured
@@ -117,7 +175,13 @@ export const SITE = {
    * only cost of pushing the edge out is that it is further away.
    */
   radius: TOWER.outerRadius + 110,
-  /** m — how far the player starts from the tower's outer face. */
+  /**
+   * m — how far beyond the FOOT of the entrance flight the player starts.
+   *
+   * It used to be measured from the tower's outer face along the entrance's
+   * radius, which was the same thing while the flight ran that way. It is not
+   * the same thing now: see the note on OUTDOOR_START.
+   */
   spawnDistance: 14,
   /** m — thickness of the ground slab, so it is a solid to stand on. */
   thickness: 0.6,

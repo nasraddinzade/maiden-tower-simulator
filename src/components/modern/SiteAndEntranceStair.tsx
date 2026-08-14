@@ -6,30 +6,46 @@ import {
   stairRampBoxes,
   straightStairGuardBoxes,
 } from '../../lib/collision'
+import { approachNosing, entranceApproach, type ApproachParams } from '../../lib/externalStair'
 import { ENTRANCE, TOWER, innerRadiusAt } from '../../config/tower'
-import { EXTERNAL_STAIR, EXTERNAL_STAIR_RISE, GROUND_Y, SITE } from '../../config/site'
+import {
+  ENTRANCE_APPROACH,
+  EXTERNAL_STAIR,
+  EXTERNAL_STAIR_RISE,
+  GROUND_Y,
+  SITE,
+} from '../../config/site'
 
 const DEG = Math.PI / 180
 
 /** Horizontal run of the flight: one going per riser. */
 const RUN = EXTERNAL_STAIR.risers * EXTERNAL_STAIR.going
 
-/** Where the flight's foot stands, measured from the tower axis. */
-const FOOT_RADIUS = TOWER.outerRadius + RUN
-
 /**
- * The flight's walking line, foot first: the two points everything the walker
- * meets on this stair is hung off.
+ * Everything the walker meets on this stair, from one construction.
  *
- * Written once because the ramp and the guards beside it have to agree about
- * where the flight is to within nothing at all — the guards' inner faces sit on
- * the ramp's own edges, and a second copy of these numbers is the obvious way
- * for that to stop being true.
+ * Written once because the ramp, the guards beside it, the treads and the
+ * balustrade have to agree about where the flight is to within nothing at all,
+ * and a second copy of these numbers is the obvious way for that to stop being
+ * true. It used to be two points on the entrance's own radius. That was the
+ * fault: the flight does not run out from the door, it runs ALONG the drum to a
+ * landing in front of it, and lib/externalStair.ts argues the construction and
+ * config/site.ts the photographs it comes from.
  */
-const WALKING_LINE = [
-  { azimuthDeg: ENTRANCE.azimuthDeg, treadY: GROUND_Y, midRadius: FOOT_RADIUS },
-  { azimuthDeg: ENTRANCE.azimuthDeg, treadY: ENTRANCE.thresholdY, midRadius: TOWER.outerRadius },
-]
+const APPROACH_PARAMS: ApproachParams = {
+  entranceAzimuthDeg: ENTRANCE.azimuthDeg,
+  outerRadius: TOWER.outerRadius,
+  width: EXTERNAL_STAIR.width,
+  landingLength: ENTRANCE_APPROACH.landingLength,
+  risers: EXTERNAL_STAIR.risers,
+  riser: EXTERNAL_STAIR.riser,
+  going: EXTERNAL_STAIR.going,
+  groundY: GROUND_Y,
+  thresholdY: ENTRANCE.thresholdY,
+  handedness: ENTRANCE_APPROACH.handedness,
+}
+
+const APPROACH = entranceApproach(APPROACH_PARAMS)
 
 export interface SiteAndEntranceStairProps {
   visible: boolean
@@ -46,19 +62,26 @@ export interface SiteAndEntranceStairProps {
  * cannot be mistaken for evidence. Its dimensions are marked [ASSUMPTION] in
  * config/site.ts and nothing else depends on them.
  *
- * The stair is not blank. It is a direct count off the owner's own footage —
- * twelve risers at 0.165 m, straight, no winders — and the total rise it gives,
- * 1.98 m, lands 0.02 m from the sill height the reserve publishes. Those two
- * numbers come from completely different places and agree, which is rare enough
- * in this model to be worth saying out loud.
+ * The stair is not blank. Its rise is a direct count off the owner's own footage
+ * — twelve risers at 0.165 m — and the total that gives, 1.98 m, lands 0.02 m
+ * from the sill height the reserve publishes. Those two numbers come from
+ * completely different places and agree, which is rare enough in this model to be
+ * worth saying out loud. Its PLAN is a different kind of knowledge: nothing has
+ * measured a length of it, but the exterior photographs settle beyond argument
+ * that the flight is laid against the drum and turns a quarter circle onto the
+ * door, which is what it now does.
  */
 export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntranceStairProps) {
-  const az = ENTRANCE.azimuthDeg * DEG
-
-  /** The walking surface the walker actually climbs. */
+  /**
+   * The walking surface the walker actually climbs, and the landing after it.
+   *
+   * Three nodes, one straight line in plan: the landing is the flight's own line
+   * carried past the door on the level, so the chain gives a raking box and then
+   * a flat one and the joint between them needs no special case.
+   */
   const ramp = useMemo(() => {
     if (!withColliders) return []
-    return stairRampBoxes(WALKING_LINE, EXTERNAL_STAIR.width, 1, 0.3)
+    return stairRampBoxes(APPROACH.walkingLine, EXTERNAL_STAIR.width, 1, 0.3)
   }, [withColliders])
 
   /**
@@ -74,6 +97,14 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
    * walk through is the same fault as a floor you can see and fall through, and
    * this model keeps finding the second one.
    *
+   * ONE PAIR OF SLABS FOR FLIGHT AND LANDING ALIKE, foot to the far end of the
+   * landing, because in plan that is one straight line. The landing is the place
+   * this matters most — it is the only spot on the approach where the drop is
+   * the whole rise on the open side and a doorway on the other. The inner slab
+   * there ends up buried in the drum, which costs nothing: it is a fixed
+   * collider inside stone the wall already fills, and the alternative is a
+   * special case at the exact joint where a walker turns.
+   *
    * The height is the drawn guard plus a riser. The rail is a guard height above
    * the NOSING line, while the walking line the ramp chain gives passes through
    * the BACK edge of every tread's surface and so runs exactly one riser below
@@ -83,81 +114,105 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
   const guards = useMemo(() => {
     if (!withColliders) return []
     return straightStairGuardBoxes({
-      foot: WALKING_LINE[0],
-      head: WALKING_LINE[1],
+      foot: APPROACH.walkingLine[0],
+      head: APPROACH.walkingLine[2],
       width: EXTERNAL_STAIR.width,
       height: EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser,
     })
   }, [withColliders])
 
   /**
-   * The visible treads: plain boxes, since the flight is straight — but TURNED
-   * to the azimuth, which they were not.
+   * The visible treads: plain boxes, since the flight is straight — turned to
+   * the way it is CLIMBED, which is no longer the entrance's radius.
    *
-   * The box is built width × riser × going in its own axes, and it was dropped
-   * into the world unrotated. The flight runs out along the entrance's azimuth,
-   * so the two horizontal axes were swapped: every tread came out 1.4 m deep
-   * along the climb and 0.30 m across it, a 0.30 m ribbon of steps standing
-   * between balustrades set 1.36 m apart. Consecutive treads are 0.30 m apart
-   * along the run and were 1.4 m long, so they overlapped four deep and read as
-   * one narrow column rather than as steps at all.
-   *
-   * A yaw of π − az sends the box's local +Z along the outward radius and its
-   * local +X across the flight, which is the frame the sizes were written for.
+   * The box is built width × riser × going in its own axes, so the yaw has to
+   * send its local +Z along the travel and its local +X across it. That used to
+   * be π − az, the yaw that points +Z straight out from the door, and it was
+   * right for a flight that ran straight out from the door. This one runs round
+   * the drum, so the yaw is the heading of the walking line and comes from the
+   * same construction the ramp and the guards do.
    */
-  const treads = useMemo(() => {
-    const out: Array<{ position: [number, number, number]; size: [number, number, number] }> = []
-    for (let i = 0; i < EXTERNAL_STAIR.risers; i++) {
-      // tread i is the surface you arrive on after climbing i+1 risers
-      const y = GROUND_Y + EXTERNAL_STAIR.riser * (i + 1)
-      const r = FOOT_RADIUS - EXTERNAL_STAIR.going * (i + 0.5)
-      out.push({
-        position: [Math.sin(az) * r, y - EXTERNAL_STAIR.riser / 2, -Math.cos(az) * r],
-        size: [EXTERNAL_STAIR.width, EXTERNAL_STAIR.riser, EXTERNAL_STAIR.going],
-      })
-    }
-    return out
-  }, [az])
+  const treads = useMemo(
+    () =>
+      APPROACH.treads.map((p) => ({
+        position: [p[0], p[1] - EXTERNAL_STAIR.riser / 2, p[2]] as [number, number, number],
+        size: [EXTERNAL_STAIR.width, EXTERNAL_STAIR.riser, EXTERNAL_STAIR.going] as [
+          number,
+          number,
+          number,
+        ],
+      })),
+    [],
+  )
 
-  /** The yaw that puts a tread's width across the flight. See treads above. */
-  const treadYaw = Math.PI - az
+  /** The landing at the head, one flat plate on the treads' own thickness. */
+  const landing = useMemo(
+    () => ({
+      position: [
+        APPROACH.landing[0],
+        APPROACH.landing[1] - EXTERNAL_STAIR.riser / 2,
+        APPROACH.landing[2],
+      ] as [number, number, number],
+      size: [EXTERNAL_STAIR.width, EXTERNAL_STAIR.riser, ENTRANCE_APPROACH.landingLength] as [
+        number,
+        number,
+        number,
+      ],
+    }),
+    [],
+  )
 
   /**
-   * The balustrades as drawn: a raking handrail either side on plumb standards.
+   * The balustrades as drawn: a raking handrail either side on plumb standards,
+   * levelling off across the landing on the open side.
    *
    * Hung off the NOSING line rather than off the ramp collider's walking line,
    * because a guard height is measured from the surface a visitor's foot is on
    * and that is the drawn tread. The two lines are a riser apart; see the note
    * on `guards` above, which is where that difference has to be paid back.
    *
-   * Standards and a top rail, and nothing between them. The footage records
-   * tubular balustrades either side and resolves no infill at all, so none is
-   * drawn — the same restraint OPENING_GUARD takes indoors, where the panes are
-   * frameless in the frames and so get no posts and no cap rail here either.
+   * WHAT HAPPENS AT THE TOP IS NOW KNOWN. This rail used to stop a going short
+   * of the wall, on the ground that a return nobody had seen would be fabric
+   * invented to tidy up a corner. The exterior photographs show the corner: the
+   * rail rakes up the flight, kinks once where the flight meets the landing, and
+   * runs on horizontally across the front of the doorway to die into the stone
+   * past the far jamb. So it is drawn, and only on the OUTER side — the landing's
+   * other side is the wall, and a rail there would be a rail against masonry.
    *
-   * A standard per tread per side is two dozen tubes at the current count, so
-   * they go in one InstancedMesh — one draw call however many, which is the
-   * addendum's argument for the treads of the stair inside.
+   * Standards and a top rail, and nothing between them. The footage resolves no
+   * infill at all, so none is drawn — the same restraint OPENING_GUARD takes
+   * indoors, where the panes are frameless in the frames and so get no posts and
+   * no cap rail here either.
+   *
+   * The standards run to several dozen a side, so they go in one InstancedMesh —
+   * one draw call however many, which is the addendum's argument for the treads
+   * of the stair inside.
    */
   const balustrade = useMemo(() => {
-    const { going, riser, risers, guardHeight, railRadius, width, postsPerTread } = EXTERNAL_STAIR
+    const { going, guardHeight, railRadius, width, postsPerTread } = EXTERNAL_STAIR
     const perTread = Math.max(1, Math.round(postsPerTread))
-    const rake = riser / going
-    // set in from the tread's edge by the tube's own radius, so the balustrade
+    const spacing = going / perTread
+    // set in from the tread's edge by the rail's own radius, so the balustrade
     // stands ON the flight rather than half off it
     const halfWidth = width / 2 - railRadius
-    // across the flight: perpendicular to the radius the stair runs out along
-    const lateralX = Math.cos(az)
-    const lateralZ = Math.sin(az)
+    // across the flight is the entrance's own radius: the walking line is
+    // tangent to the drum at the door, so its normal there IS that radius
+    const { outward } = APPROACH
+    /** The topmost nosing, where the rake ends and the landing begins. */
+    const dKink = RUN - going
+    const dEnd = RUN + ENTRANCE_APPROACH.landingLength
 
     /** A point on one side's nosing line, `d` in from the foot, lifted by `lift`. */
-    const online = (d: number, side: number, lift: number): THREE.Vector3 => {
-      const r = FOOT_RADIUS - d
-      return new THREE.Vector3(
-        Math.sin(az) * r + side * lateralX * halfWidth,
-        GROUND_Y + riser + d * rake + lift,
-        -Math.cos(az) * r + side * lateralZ * halfWidth,
-      )
+    const online = (d: number, side: number, lift: number) => {
+      const n = approachNosing(APPROACH_PARAMS, d)
+      return {
+        point: new THREE.Vector3(
+          n.position[0] + side * outward.x * halfWidth,
+          n.position[1] + lift,
+          n.position[2] + side * outward.z * halfWidth,
+        ),
+        treadY: n.treadY,
+      }
     }
 
     const posts: Array<{ position: [number, number, number]; height: number }> = []
@@ -167,27 +222,20 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
       length: number
     }> = []
 
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < risers; i++) {
-        for (let k = 0; k < perTread; k++) {
-          const d = going * (i + k / perTread)
-          const head = online(d, side, guardHeight)
-          // a standard is plumb, so it runs from the tread it stands on up to
-          // the raking rail: at a nosing that is exactly the guard height, and
-          // anywhere further into a tread it is longer by the rake
-          const footY = GROUND_Y + riser * (i + 1)
-          posts.push({
-            position: [head.x, (footY + head.y) / 2, head.z],
-            height: head.y - footY,
-          })
-        }
-      }
-      // one rail per side, first nosing to last. It stops a going short of the
-      // wall rather than being levelled off onto the landing: what happens at
-      // the top of this rail is not in any frame, and a return nobody has seen
-      // would be fabric invented to tidy up a corner.
-      const a = online(0, side, guardHeight)
-      const b = online(going * (risers - 1), side, guardHeight)
+    const stand = (d: number, side: number) => {
+      const { point, treadY } = online(d, side, guardHeight)
+      // a standard is plumb, so it runs from the tread it stands on up to the
+      // raking rail: at a nosing that is exactly the guard height, and anywhere
+      // further into a tread it is longer by the rake
+      posts.push({
+        position: [point.x, (treadY + point.y) / 2, point.z],
+        height: point.y - treadY,
+      })
+    }
+
+    const rail = (dA: number, dB: number, side: number) => {
+      const a = online(dA, side, guardHeight).point
+      const b = online(dB, side, guardHeight).point
       const dir = b.clone().sub(a)
       rails.push({
         position: [(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2],
@@ -198,8 +246,17 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
         length: dir.length(),
       })
     }
+
+    for (const side of [-1, 1]) {
+      for (let d = 0; d < RUN - 1e-9; d += spacing) stand(d, side)
+      rail(0, dKink, side)
+    }
+    // and the landing: one side only, at the same density the fan has
+    for (let d = RUN; d < dEnd - 1e-9; d += spacing) stand(d, 1)
+    rail(dKink, dEnd, 1)
+
     return { posts, rails }
-  }, [az])
+  }, [])
 
   const postsRef = useRef<THREE.InstancedMesh>(null)
   useLayoutEffect(() => {
@@ -210,7 +267,7 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     const scale = new THREE.Vector3()
     // a strap is flat, so unlike a tube it has to be turned to face along the
     // flight — broadside to the climb it would read as a solid screen
-    const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI - az, 0))
+    const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, APPROACH.descentYaw, 0))
     balustrade.posts.forEach((p, i) => {
       // the geometry is a unit-length tube, so the standard's height is a scale
       pos.set(p.position[0], p.position[1], p.position[2])
@@ -286,7 +343,7 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
               key={`etread-${i}`}
               material={steel}
               position={t.position}
-              rotation={[0, treadYaw, 0]}
+              rotation={[0, APPROACH.descentYaw, 0]}
               castShadow
               receiveShadow
             >
@@ -294,7 +351,17 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
             </mesh>
           ))}
 
-          {/* the balustrades: standards instanced, one rail per side */}
+          <mesh
+            material={steel}
+            position={landing.position}
+            rotation={[0, APPROACH.descentYaw, 0]}
+            castShadow
+            receiveShadow
+          >
+            <boxGeometry args={landing.size} />
+          </mesh>
+
+          {/* the balustrades: standards instanced, one rail per straight length */}
           <instancedMesh
             ref={postsRef}
             args={[undefined, undefined, balustrade.posts.length]}
@@ -371,12 +438,30 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
   )
 }
 
-/** Where a walker should be dropped to start outside, facing the door. */
+/**
+ * Where a walker should be dropped to start outside, facing the way in.
+ *
+ * OUT ALONG THE FLIGHT'S OWN LINE, not out along the entrance's radius. It used
+ * to be the latter, which was right while the flight ran that way: you spawned
+ * facing the door with the steps between you and it. With the flight laid along
+ * the drum, spawning on the door's radius drops the walker in front of a 2 m
+ * wall with the only way up five metres round the corner and out of shot. So the
+ * spawn goes beyond the FOOT, on the line of the climb, looking up it — which is
+ * where the owner's own footage starts, at second 2.
+ */
+const FOOT = APPROACH.walkingLine[0]
+const FOOT_AZ = FOOT.azimuthDeg * DEG
+const DESCENT = { x: Math.sin(APPROACH.descentYaw), z: Math.cos(APPROACH.descentYaw) }
+
 export const OUTDOOR_START = {
-  x: Math.sin(ENTRANCE.azimuthDeg * DEG) * (TOWER.outerRadius + SITE.spawnDistance),
+  x: Math.sin(FOOT_AZ) * FOOT.midRadius + DESCENT.x * SITE.spawnDistance,
   y: GROUND_Y + 0.05,
-  z: -Math.cos(ENTRANCE.azimuthDeg * DEG) * (TOWER.outerRadius + SITE.spawnDistance),
-  /** Yaw that faces the tower: moveVelocity's forward is (−sin yaw, −cos yaw). */
-  yaw: -ENTRANCE.azimuthDeg * DEG + Math.PI,
+  z: -Math.cos(FOOT_AZ) * FOOT.midRadius + DESCENT.z * SITE.spawnDistance,
+  /**
+   * Yaw that faces up the flight: moveVelocity's forward is (−sin yaw, −cos yaw),
+   * so the yaw whose local +Z is the DESCENT sends the walker's forward the other
+   * way, up the climb.
+   */
+  yaw: APPROACH.descentYaw,
   rise: EXTERNAL_STAIR_RISE,
 }
