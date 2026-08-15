@@ -48,7 +48,6 @@ import {
 } from '../config/tower'
 import { PLAYER } from '../config/player'
 import {
-  headroomStepsFor,
   planAllFlights,
   stairDoorways,
   stairPassageSections,
@@ -247,10 +246,11 @@ describe('the deck is carried, and carried all the way to the parapet', () => {
    * the real ring the walker stands on rather than a model of it.
    */
   const roofFlight = flights[flights.length - 1]
-  const riser = Math.abs(roofFlight[1].treadY - roofFlight[0].treadY)
   const span = stairwellSpanDeg(
     roofFlight,
-    headroomStepsFor(riser, PLAYER.height, TOWER.floorSlab),
+    // the underside of the paving, which is what roofs the last of the climb
+    ROOF.deckY - ROOF.pavingDepth,
+    PLAYER.stairHeadroom,
   )!
   const inner = innerRadiusAt(ROOF.deckY) + STAIR.wallClearance
   const well = {
@@ -271,6 +271,19 @@ describe('the deck is carried, and carried all the way to the parapet', () => {
   const outerReach = (b: (typeof boxes)[number]) =>
     Math.hypot(b.position[0], b.position[2]) + b.halfExtents[0]
 
+  /** Does a box cover this point in plan, in the box's OWN frame? */
+  const containsPlan = (b: (typeof boxes)[number], azimuthDeg: number, radius: number) => {
+    const a = azimuthDeg * DEG
+    const px = Math.sin(a) * radius
+    const pz = -Math.cos(a) * radius
+    const boxAz = Math.atan2(b.position[0], -b.position[2])
+    const dx = px - b.position[0]
+    const dz = pz - b.position[2]
+    const lx = dx * Math.sin(boxAz) - dz * Math.cos(boxAz)
+    const lz = dx * Math.cos(boxAz) + dz * Math.sin(boxAz)
+    return Math.abs(lx) <= b.halfExtents[0] + 1e-9 && Math.abs(lz) <= b.halfExtents[2] + 1e-9
+  }
+
   it('reaches the parapet somewhere on every bearing', () => {
     /*
      * The old deck collider stopped at innerRadiusAt(deckY) — the room face —
@@ -289,23 +302,69 @@ describe('the deck is carried, and carried all the way to the parapet', () => {
      * the well takes the slab's outer lip, so shortening the ring is right; on
      * the roof there is 1.7 m of paving beyond the mouth that a visitor walks
      * round to reach the far side of the terrace. Shortened instead, the deck
-     * would be missing from the mouth out to the parapet over the whole 30-odd
-     * degrees, and the walk round the parapet would end in a fall.
+     * would be missing from the mouth out to the parapet over the whole arc of
+     * the opening, and the walk round the parapet would end in a fall.
+     *
+     * Asserted by standing on it rather than by counting boxes. The count was
+     * what this used to check — two per sector inside the well — and a count is
+     * exactly the kind of assertion that survives the geometry changing under
+     * it: the mouth is now 70° rather than 16°, the sectors it straddles are cut
+     * differently, and none of that is the point. The point is the paving
+     * between the mouth and the parapet.
      */
-    const inWell = boxes.filter(
-      (b) =>
-        Math.abs(
-          ((((Math.atan2(b.position[0], -b.position[2]) / DEG - well.centreAzimuthDeg) % 360) +
-            540) %
-            360) - 180,
-        ) <=
-        well.widthDeg / 2,
-    )
-    expect(inWell.length).toBeGreaterThan(0)
-    // every sector inside the well carries both an inner band and an outer one
-    const outboard = inWell.filter((b) => outerReach(b) > well.outerRadius)
-    expect(outboard.length).toBeGreaterThan(0)
-    expect(inWell.length).toBe(outboard.length * 2)
+    for (let a = 0; a < 360; a += 0.5) {
+      for (const r of [well.outerRadius + 0.2, (well.outerRadius + ROOF.deckOuterRadius) / 2, ROOF.deckOuterRadius - 0.2]) {
+        expect(boxes.some((b) => containsPlan(b, a, r)), `az ${a} r ${r.toFixed(2)}`).toBe(true)
+      }
+    }
+  })
+
+  /**
+   * THE READING THE OWNER'S FAILURE WAS, taken on the shipped roof.
+   *
+   * On 2026-08-15 he could not get out onto the terrace, and the deck's own
+   * arithmetic is where it stopped him. The opening in the paving was sized by
+   * counting treads back from the head of the flight, the count came from a
+   * riser read as zero, and what was cut was four treads' worth — 16.47° — over
+   * a climb that spends 53° of arc under the paving with less than a walker's
+   * height of stone above it. The head of the capsule met the underside of the
+   * deck at azimuth 183, 2.05 m below the terrace and thirteen treads short of
+   * it, and the clearance fell to zero from there on.
+   *
+   * These two say it in metres: every tread that has the paving over it has the
+   * paving OPEN over it, and the way out is wide enough for the walker who has
+   * to use it.
+   */
+  describe('the stair gets out', () => {
+    const soffit = ROOF.deckY - ROOF.pavingDepth
+    const holds = (azDeg: number, r: number) => boxes.some((b) => containsPlan(b, azDeg, r))
+
+    it('has open sky over every tread the paving would come down on', () => {
+      for (const s of roofFlight) {
+        if (s.treadY + PLAYER.stairHeadroom <= soffit) continue
+        expect(
+          holds(s.azimuthDeg, s.midRadius),
+          `tread at ${s.treadY.toFixed(3)} (az ${s.azimuthDeg.toFixed(2)}), ` +
+            `${(soffit - s.treadY).toFixed(3)} m under the paving`,
+        ).toBe(false)
+      }
+    })
+
+    it('leaves the walker a capsule’s width of it at every tread', () => {
+      /*
+       * Open at a point is not enough — the capsule is 0.6 m across and climbs
+       * the middle of a flight 0.9 m wide. Measured across the mouth radially,
+       * which is the direction the ring's boxes close it in.
+       */
+      for (const s of roofFlight) {
+        if (s.treadY + PLAYER.stairHeadroom <= soffit) continue
+        let free = 0
+        for (let r = well.innerRadius; r <= well.outerRadius; r += 0.005) {
+          if (!holds(s.azimuthDeg, r)) free += 0.005
+        }
+        expect(free, `tread at az ${s.azimuthDeg.toFixed(2)}`).toBeGreaterThan(2 * PLAYER.radius)
+      }
+    })
   })
 
   it('raises the parapet as a ring on the terrace, standing where the deck ends', () => {

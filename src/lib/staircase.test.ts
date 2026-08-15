@@ -5,6 +5,7 @@ import {
   flightFitsInWall,
   planAllFlights,
   planFlight,
+  stairwellCutTools,
   stairwellSpanDeg,
   stepAngleDeg,
   stepCountFor,
@@ -123,6 +124,8 @@ describe('planFlight', () => {
 
 describe('flight arc and stairwell', () => {
   const steps = planFlight(base)
+  /** A slab 0.3 m thick whose top is the floor this flight lands on. */
+  const soffit = base.toY - 0.3
 
   it('sweeps a sane arc — a partial turn, not several', () => {
     const arc = flightArcDeg(steps)
@@ -130,13 +133,134 @@ describe('flight arc and stairwell', () => {
     expect(arc).toBeLessThan(360)
   })
   it('places the stairwell over the top of the flight', () => {
-    const span = stairwellSpanDeg(steps)!
+    const span = stairwellSpanDeg(steps, soffit, PLAYER.stairHeadroom)!
     const topAz = steps[steps.length - 1].azimuthDeg
     expect(Math.abs(span.centreAzimuthDeg - topAz)).toBeLessThan(span.widthDeg)
     expect(span.widthDeg).toBeGreaterThan(0)
   })
   it('has no stairwell for an empty flight', () => {
-    expect(stairwellSpanDeg([])).toBeNull()
+    expect(stairwellSpanDeg([], soffit, PLAYER.stairHeadroom)).toBeNull()
+  })
+  it('has none at all where the structure above is out of reach', () => {
+    // a slab three storeys up is nothing this flight has to be let through
+    expect(stairwellSpanDeg(steps, base.toY + 10, PLAYER.stairHeadroom)).toBeNull()
+  })
+
+  /**
+   * THE PROPERTY, stated once and then held against the real tower below.
+   *
+   * The opening exists so that a walker climbing to the head of the flight is
+   * never under closed structure with less than the stair's clear height over
+   * their tread. Every tread that fails that test must be inside the arc; the
+   * ones that pass need not be.
+   */
+  it('opens over every tread the structure above would come down on', () => {
+    const span = stairwellSpanDeg(steps, soffit, PLAYER.stairHeadroom)!
+    for (const s of steps) {
+      if (s.treadY + PLAYER.stairHeadroom <= soffit) continue
+      expect(
+        Math.abs(s.azimuthDeg - span.centreAzimuthDeg),
+        `tread at ${s.treadY.toFixed(3)} (az ${s.azimuthDeg.toFixed(2)})`,
+      ).toBeLessThanOrEqual(span.widthDeg / 2)
+    }
+  })
+
+  /**
+   * AND IT SURVIVES A FLIGHT WHOSE FIRST TREADS DO NOT RISE, which is every
+   * flight in this tower — planFlight lays a level platform at each end (see
+   * FlightParams.endLandingLength) — and a flight with a LANDING in the middle,
+   * which the roof climb has.
+   *
+   * This is the case that broke the rule it replaced. That one asked for the
+   * last N steps, with N derived from a riser read as steps[1] − steps[0]; on a
+   * flight beginning with a platform that difference is exactly zero, N fell to
+   * a hard-coded four, and the opening came out a quarter of the size the
+   * geometry wanted. Even given the true riser it was still wrong here, because
+   * five treads of a mid-flight landing spend arc and gain no height at all, so
+   * N steps back from the top is not N risers below it.
+   *
+   * Measured in metres none of that arises: the two flights below differ by a
+   * landing worth 1.5 m of arc and the opening tracks it without being told.
+   */
+  it('is measured in metres of headroom, not in steps', () => {
+    const level = planFlight({ ...base, endLandingLength: 1.2, landingsAtY: [2.0] })
+    expect(level[0].treadY).toBe(level[1].treadY) // the platform the old rule read
+    const span = stairwellSpanDeg(level, soffit, PLAYER.stairHeadroom)!
+    const needed = level.filter((s) => s.treadY + PLAYER.stairHeadroom > soffit)
+    // every tread short of headroom is inside, landing treads included
+    for (const s of needed) {
+      expect(Math.abs(s.azimuthDeg - span.centreAzimuthDeg)).toBeLessThanOrEqual(span.widthDeg / 2)
+    }
+    // and the arc is the one the heights ask for, not four treads' worth
+    expect(span.widthDeg).toBeGreaterThan(4 * level[0].angularWidthDeg * 2)
+  })
+})
+
+describe('the stairwell cutter follows the arc', () => {
+  /*
+   * A stairwell is an annular sector and the tool that cuts it is a box. Over a
+   * narrow arc one box is a fair sector; over a wide one it is not a sector at
+   * all, because its inner face is a PLANE and the arc's ends stand further from
+   * the axis than its middle. These assert the divided cutter puts stone back
+   * where the single box would have taken it.
+   */
+  const inner = 4.767
+  const outer = 5.767
+  const centre = 158.15
+  const width = 69.97
+  /** Is (az, r) inside any of the tools? */
+  const cut = (tools: ReturnType<typeof stairwellCutTools>, azDeg: number, r: number) => {
+    const a = (azDeg * Math.PI) / 180
+    const px = Math.sin(a) * r
+    const pz = -Math.cos(a) * r
+    return tools.some((t) => {
+      const ta = (t.azimuthDeg * Math.PI) / 180
+      const cx = Math.sin(ta) * t.midRadius
+      const cz = -Math.cos(ta) * t.midRadius
+      const lx = (px - cx) * Math.sin(ta) + (pz - cz) * -Math.cos(ta)
+      const lz = (px - cx) * Math.cos(ta) + (pz - cz) * Math.sin(ta)
+      return Math.abs(lx) <= t.radialDepth / 2 && Math.abs(lz) <= t.tangentialWidth / 2
+    })
+  }
+
+  it('removes the whole sector and nothing a hand-width outside it', () => {
+    const tools = stairwellCutTools(centre, width, inner, outer, 360 / 96)
+    for (let r = inner + 0.01; r < outer; r += 0.05) {
+      for (let az = centre - width / 2 + 0.05; az < centre + width / 2; az += 0.25) {
+        expect(cut(tools, az, r), `inside the sector at az ${az.toFixed(1)} r ${r.toFixed(2)}`).toBe(
+          true,
+        )
+      }
+    }
+    // and it strays no further out than the lathe's own faceting
+    for (let r = inner - 0.5; r < outer + 0.5; r += 0.01) {
+      for (let az = centre - width / 2 - 15; az < centre + width / 2 + 15; az += 0.25) {
+        if (!cut(tools, az, r)) continue
+        expect(r).toBeGreaterThan(inner - 0.02)
+        expect(r).toBeLessThan(outer + 0.02)
+      }
+    }
+  })
+
+  it('needs to be divided at all — one box over this arc misses the stair entirely', () => {
+    /*
+     * The reading that forced this. A single box's inner face at the ends of a
+     * 70° arc stands at inner / cos 35° = 5.82 m, which is OUTSIDE the opening's
+     * outer radius: the tool cuts a hole in the paving near the parapet and
+     * leaves the stair roofed over. Asserted so nobody folds the chain back into
+     * one box on the grounds that it used to be one.
+     */
+    const one = stairwellCutTools(centre, width, inner, outer, 360)
+    expect(one).toHaveLength(1)
+    expect(cut(one, centre - width / 2 + 1, (inner + outer) / 2)).toBe(false)
+    expect(inner / Math.cos((width / 2) * (Math.PI / 180))).toBeGreaterThan(outer)
+  })
+
+  it('divides more finely the finer the surface it cuts', () => {
+    expect(stairwellCutTools(centre, width, inner, outer, 360 / 96).length).toBeGreaterThan(
+      stairwellCutTools(centre, width, inner, outer, 360 / 24).length,
+    )
+    expect(stairwellCutTools(centre, 0, inner, outer, 3.75)).toEqual([])
   })
 })
 
@@ -330,10 +454,34 @@ describe('planAllFlights — one flight per lift', () => {
   })
 
   it('gives every flight a stairwell that sits over its own top', () => {
-    flights.forEach((steps) => {
-      const span = stairwellSpanDeg(steps)!
+    flights.forEach((steps, i) => {
+      const soffit = WALL_LIFTS[i].toY - TOWER.floorSlab
+      const span = stairwellSpanDeg(steps, soffit, PLAYER.stairHeadroom)!
       expect(span.widthDeg).toBeGreaterThan(0)
       expect(span.widthDeg).toBeLessThan(180)
+    })
+  })
+
+  /**
+   * EVERY FLIGHT IN THE SHIPPED TOWER, against the structure it actually lands
+   * on. This is the assertion the owner's roof failed on 2026-08-15: the roof
+   * climb had fifteen treads with less than the stair's clear height under the
+   * terrace paving and the opening covered four of them, so the climb met the
+   * underside of the deck at azimuth 183 — 2.05 m below the terrace — and stopped
+   * there. Held for all six flights so the same arithmetic cannot come back at a
+   * storey either.
+   */
+  it('lets every flight out of the structure it lands on', () => {
+    flights.forEach((steps, i) => {
+      const soffit = WALL_LIFTS[i].toY - TOWER.floorSlab
+      const span = stairwellSpanDeg(steps, soffit, PLAYER.stairHeadroom)!
+      for (const s of steps) {
+        if (s.treadY + PLAYER.stairHeadroom <= soffit) continue
+        expect(
+          Math.abs(s.azimuthDeg - span.centreAzimuthDeg),
+          `flight ${i}, tread at ${s.treadY.toFixed(3)}`,
+        ).toBeLessThanOrEqual(span.widthDeg / 2)
+      }
     })
   })
 })

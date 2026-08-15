@@ -454,11 +454,89 @@ export function floorColliders(p: FloorColliderParams): BoxSpec[] {
   if (p.outerRadius <= p.oculusRadius) return []
   const out: BoxSpec[] = []
   const sectorDeg = 360 / p.sectors
-  const halfChord = p.outerRadius * Math.tan((sectorDeg / 2) * DEG) * 1.06
+  const well = p.stairwell
 
-  const emit = (azimuthDeg: number, inner: number, outer: number) => {
-    if (outer - inner < 0.15) return // nothing worth keeping
-    const rad = azimuthDeg * DEG
+  /**
+   * The radial band the well is cut in. OUTSIDE it the surface is unbroken all
+   * the way round, so a box may overhang its own sector as far as it likes;
+   * inside it, an overhang is a box standing across the hole.
+   */
+  const bandInner = well ? Math.max(well.innerRadius, p.oculusRadius) : 0
+  const bandOuter = well ? Math.min(well.outerRadius ?? p.outerRadius, p.outerRadius) : 0
+  const hasBand = well !== undefined && bandOuter > bandInner + 1e-9
+
+  /**
+   * One segment: an arc of the ring over a radial band.
+   *
+   * THE CHORD IS TAKEN AT THE RING'S OUTER RADIUS and applied at every radius
+   * the box spans, which is the only way a ring of cuboids meets at its rim
+   * without gaps — and it means every box reaches FURTHER IN AZIMUTH the nearer
+   * the axis you read it. On an unbroken ring that costs nothing but overlap.
+   * Beside a hole it is the whole problem: measured on the roof before this was
+   * written, the deck's neighbours either side of a 16.47° stair mouth reached
+   * 11.5° into it at the walking radius and closed it to 6.70° — 0.61 m of arc
+   * where 1.50 m was drawn — and the largest disc that would pass through the
+   * physics was 0.348 m against a 0.320 m capsule. Twenty-eight millimetres of
+   * clearance in a hole that looked a metre and a half wide.
+   *
+   * So a box that would reach into the well SLIDES AWAY FROM IT until its
+   * furthest corner lands on the well's edge, keeping its width. Sliding rather
+   * than narrowing matters, and the alternative was tried on paper first:
+   * narrowing to fit starves the far side of the same box, and beside a well cut
+   * close to the axis that shortfall is a third of a metre of missing ring — a
+   * hole in the floor where the drawing shows stone, which is the one mistake
+   * this module exists to prevent. A slide only ever moves a box AWAY from the
+   * hole and INTO its far neighbour's overlap, so it can open nothing.
+   *
+   * The furthest reach is read at the SMALLEST radius the box has inside the
+   * band, because that is where a chord subtends the most angle. Below the band
+   * the box may overhang the well freely: there the surface is solid, and the
+   * well's inner radius is where its hole begins.
+   */
+  /** How far a box of this width reaches in azimuth at the band's inner radius. */
+  const reachAtBand = (spanDeg: number) => {
+    const halfChord = p.outerRadius * Math.tan((spanDeg / 2) * DEG) * 1.06
+    const rMin = Math.max(0.05, bandInner)
+    return rMin > halfChord ? Math.asin(halfChord / rMin) / DEG : 90
+  }
+
+  /** Would a full-depth segment on this bearing lean over the well? */
+  const slidesOffWell = (azimuthDeg: number) => {
+    if (!well) return false
+    const toLo = angleDelta(well.centreAzimuthDeg - well.widthDeg / 2, azimuthDeg)
+    const toHi = angleDelta(well.centreAzimuthDeg + well.widthDeg / 2, azimuthDeg)
+    if (toLo <= 0 && toHi >= 0) return false
+    return reachAtBand(sectorDeg) > Math.min(Math.abs(toLo), Math.abs(toHi))
+  }
+
+  const emit = (azimuthDeg: number, spanDeg: number, inner: number, outer: number) => {
+    if (outer - inner < 0.15 || spanDeg <= 0) return // nothing worth keeping
+    const halfChord = p.outerRadius * Math.tan((spanDeg / 2) * DEG) * 1.06
+    let centreDeg = azimuthDeg
+
+    if (well && hasBand && outer > bandInner + 1e-9 && inner < bandOuter - 1e-9) {
+      const rMin = Math.max(0.05, Math.max(inner, bandInner))
+      /*
+       * ASIN, NOT ATAN, and the difference is not a rounding matter.
+       *
+       * A box's half-extent `halfChord` is measured across its own local Z, so
+       * the point on its corner nearest the well lies at world radius
+       * hypot(r, halfChord) — not at r. The angle it subtends from the axis is
+       * therefore asin(halfChord / r), and the arctangent, which is what a first
+       * reading of the geometry suggests, is smaller. Measured on the deck the
+       * gap between the two was 0.32°, which put the neighbour 0.09 m INSIDE a
+       * hole this whole clause exists to keep it out of.
+       */
+      const reachDeg = rMin > halfChord ? Math.asin(halfChord / rMin) / DEG : 90
+      const toLo = angleDelta(well.centreAzimuthDeg - well.widthDeg / 2, azimuthDeg)
+      const toHi = angleDelta(well.centreAzimuthDeg + well.widthDeg / 2, azimuthDeg)
+      // a box whose own centre is inside the well has no business in this band
+      if (toLo <= 0 && toHi >= 0) return
+      const near = toLo > 0 ? toLo : toHi
+      if (reachDeg > Math.abs(near)) centreDeg = azimuthDeg + near - Math.sign(near) * reachDeg
+    }
+
+    const rad = centreDeg * DEG
     const half = (outer - inner) / 2
     const mid = (outer + inner) / 2
     out.push({
@@ -472,14 +550,34 @@ export function floorColliders(p: FloorColliderParams): BoxSpec[] {
   for (let s = 0; s < p.sectors; s++) {
     const azimuthDeg = s * sectorDeg + sectorDeg / 2
 
-    const well = p.stairwell
     const inWell =
       well !== undefined &&
       Math.abs(angleDelta(azimuthDeg, well.centreAzimuthDeg)) <= well.widthDeg / 2
 
     if (!well || !inWell) {
+      /*
+       * ONLY THE BAND SLIDES, and the sector is split so that only the band can.
+       *
+       * A slide is right where a box would lean over the hole and wrong
+       * everywhere else, because a box carries its whole radial run with it: the
+       * two sectors flanking the mouth reach it in the paving's band and are
+       * ordinary ring segments out at the parapet, and sliding them bodily left
+       * a 0.03 m wedge of deck uncarried at r 7.3, between a slid box and its
+       * unslid neighbour. Split at the band's two radii, the parts that never
+       * had to move stay on the sector grid with every other box on the ring, and
+       * only the middle one goes.
+       *
+       * Split ONLY where it is needed — one sector at each end of the mouth —
+       * so the ring does not pay three boxes a sector for a hole in one place.
+       */
+      if (well && hasBand && slidesOffWell(azimuthDeg)) {
+        emit(azimuthDeg, sectorDeg, p.oculusRadius, bandInner)
+        emit(azimuthDeg, sectorDeg, bandInner, bandOuter)
+        emit(azimuthDeg, sectorDeg, bandOuter, p.outerRadius)
+        continue
+      }
       // the full ring segment, oculus out to the wall
-      emit(azimuthDeg, p.oculusRadius, p.outerRadius)
+      emit(azimuthDeg, sectorDeg, p.oculusRadius, p.outerRadius)
       continue
     }
 
@@ -492,13 +590,34 @@ export function floorColliders(p: FloorColliderParams): BoxSpec[] {
      * onto floor that was visibly there, with nothing under it, and fell a
      * storey. Reproduced at azimuth 132° on storey 2.
      */
-    emit(azimuthDeg, p.oculusRadius, well.innerRadius)
+    emit(azimuthDeg, sectorDeg, p.oculusRadius, bandInner)
     /*
      * And where the surface carries on OUTBOARD of the well, that band is
      * emitted too — the roof, where the paving crosses the wall to the parapet.
      * See the note on stairwell.outerRadius.
      */
-    if (well.outerRadius !== undefined) emit(azimuthDeg, well.outerRadius, p.outerRadius)
+    if (well.outerRadius !== undefined) emit(azimuthDeg, sectorDeg, bandOuter, p.outerRadius)
+    /*
+     * AND THE PART OF THIS SECTOR THE WELL DOES NOT TAKE.
+     *
+     * A well's edges fall where the flight puts them and never on a sector
+     * boundary, so one sector at each end of the opening is partly hole and
+     * partly floor. Dropping its whole band left that remainder carried by
+     * nothing but the neighbour's overhang — and the overhang is exactly what
+     * the slide above has just taken away. Two slivers of drawn deck with no
+     * collider under them, at the two places a visitor steps round the mouth.
+     */
+    for (const [lo, hi] of subtractRanges(
+      [azimuthDeg - sectorDeg / 2, azimuthDeg + sectorDeg / 2],
+      [
+        [
+          azimuthDeg + angleDelta(well.centreAzimuthDeg - well.widthDeg / 2, azimuthDeg),
+          azimuthDeg + angleDelta(well.centreAzimuthDeg + well.widthDeg / 2, azimuthDeg),
+        ],
+      ],
+    )) {
+      emit((lo + hi) / 2, hi - lo, bandInner, bandOuter)
+    }
   }
   return out
 }

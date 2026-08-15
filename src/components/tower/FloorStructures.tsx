@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from '../../lib/cupola'
 import { azimuthToVector } from '../../lib/geometry'
+import { stairwellCutTools } from '../../lib/staircase'
 import { FLOORS, ROOF, TOWER, innerRadiusAt } from '../../config/tower'
 import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import { isStoreyVisible, lodSegments } from '../../lib/visibility'
@@ -56,32 +57,59 @@ export const WALL_EMBED = 0.25
  * Cut the stairwell out of a lathe surface.
  *
  * The opening is an annular sector — where the flight arrives, spanning the
- * flight's radial band. It is approximated by a box wide enough to cover that
- * band, subtracted with the same CSG evaluator the shell uses, so the result
- * stays a clean mesh rather than a surface with a hole punched by alpha.
+ * flight's radial band — and what cuts it is a chain of boxes rather than one,
+ * for the reason argued at stairwellCutTools(): a single box IS a fair sector
+ * over 16° of arc and is not a sector at all over the 70° the roof opening
+ * needs, where its flat inner face would stand a metre out at the ends and cut
+ * the paving near the parapet while leaving the stair roofed. The shapes come
+ * from lib/staircase.ts so the arithmetic sits in the tested half of the
+ * codebase; this only turns them into boxes and subtracts them with the same
+ * evaluator the shell uses.
+ *
+ * A CUTTER THAT CANNOT REACH THE STONE DOES NOTHING, and says so rather than
+ * running. `maxRadius` is how far out the surface being cut actually goes, and
+ * every storey's is EXACTLY the opening's inner radius: a slab is bedded
+ * WALL_EMBED into the wall, the stair stands STAIR.wallClearance off the same
+ * face, and those two are both 0.25 m. So the tool has always been tangent to
+ * the slab it was handed and has always removed precisely nothing — six
+ * openings, six booleans resolving a tangency for no result, which is the CSG
+ * case that has cost this model a floor twice. Passing the radius retires them.
+ * It is not an optimisation dressed up: a cut that removes nothing is not a
+ * cut, and now the six that never were are not claimed to be.
  */
 export function cutStairwell(
   geometry: THREE.BufferGeometry,
   cut: StairwellCut,
   yCentre: number,
   yHeight: number,
+  /** Outer radius of the surface being cut. Past it the tool meets no stone. */
+  maxRadius: number,
+  /** Angular step of the lathe being cut, so the hole is as round as the stone. */
+  segments = RADIAL_SEGMENTS,
 ): THREE.BufferGeometry {
-  const dir = azimuthToVector(cut.centreAzimuthDeg)
-  const midR = (cut.innerRadius + cut.outerRadius) / 2
-  const radial = cut.outerRadius - cut.innerRadius
-  // chord long enough to span the sector at the outer radius
-  const tangential = 2 * cut.outerRadius * Math.sin(Math.min(Math.PI / 2, (cut.widthDeg * DEG) / 2))
+  if (cut.innerRadius >= maxRadius) return geometry
 
-  const tool = new THREE.BoxGeometry(radial, yHeight, Math.max(0.2, tangential))
-  tool.rotateY(-cut.centreAzimuthDeg * DEG + Math.PI / 2)
-  tool.translate(dir.x * midR, yCentre, dir.z * midR)
+  const tools = stairwellCutTools(
+    cut.centreAzimuthDeg,
+    cut.widthDeg,
+    cut.innerRadius,
+    cut.outerRadius,
+    360 / segments,
+  )
+  if (tools.length === 0) return geometry
 
   const evaluator = new Evaluator()
   evaluator.useGroups = false
-  const result = evaluator.evaluate(new Brush(geometry), new Brush(tool), SUBTRACTION)
-  const out = result.geometry.clone()
-  tool.dispose()
-  return out
+  let result = new Brush(geometry)
+  for (const t of tools) {
+    const dir = azimuthToVector(t.azimuthDeg)
+    const tool = new THREE.BoxGeometry(t.radialDepth, yHeight, Math.max(0.2, t.tangentialWidth))
+    tool.rotateY(-t.azimuthDeg * DEG + Math.PI / 2)
+    tool.translate(dir.x * t.midRadius, yCentre, dir.z * t.midRadius)
+    result = evaluator.evaluate(result, new Brush(tool), SUBTRACTION)
+    tool.dispose()
+  }
+  return result.geometry.clone()
 }
 
 /**
@@ -105,7 +133,8 @@ function useCupolaGeometry(
     // built in world Y so a stairwell cut can be expressed in world coordinates
     const geom = new THREE.LatheGeometry(pts, segments).translate(0, springY, 0)
     if (!cut) return geom
-    return cutStairwell(geom, cut, springY + rise / 2, rise * 3)
+    // a dome reaches its springing and no further
+    return cutStairwell(geom, cut, springY + rise / 2, rise * 3, spanRadius, segments)
   }, [spanRadius, oculusRadius, rise, springY, cut, segments, profileSegments])
 }
 
@@ -135,7 +164,7 @@ function useSlabGeometry(
     ]
     const geom = new THREE.LatheGeometry(pts, segments).translate(0, y, 0)
     if (!cut) return geom
-    return cutStairwell(geom, cut, y - thickness / 2, thickness * 3)
+    return cutStairwell(geom, cut, y - thickness / 2, thickness * 3, outer, segments)
   }, [innerR, holeR, thickness, y, cut, segments])
 }
 
@@ -189,8 +218,16 @@ function CeilingFill({
   const geometry = useMemo(() => {
     if (!base) return null
     if (!cut) return base
-    return cutStairwell(base, cut, (crownY + topY) / 2, (topY - crownY) * 3)
-  }, [base, cut, crownY, topY])
+    // the fill is bedded into the wall like a slab, and widens as the wall thins
+    return cutStairwell(
+      base,
+      cut,
+      (crownY + topY) / 2,
+      (topY - crownY) * 3,
+      innerRadiusAt(topY) + WALL_EMBED,
+      segments,
+    )
+  }, [base, cut, crownY, topY, segments])
   if (!geometry) return null
   if (material) return <mesh geometry={geometry} material={material} receiveShadow />
   return (

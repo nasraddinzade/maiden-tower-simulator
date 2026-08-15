@@ -23,7 +23,6 @@ import {
 } from './config/tower'
 import { LAMP, PLAYER } from './config/player'
 import {
-  headroomStepsFor,
   planAllFlights,
   stairDoorways,
   stairPassageSections,
@@ -274,10 +273,6 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
     flights.forEach((steps, i) => {
       const lift = WALL_LIFTS[i]
       if (!lift) return
-      // the opening has to be open from where the walker's HEAD meets the slab,
-      // not from where their feet do — see headroomStepsFor()
-      const riser = steps.length > 1 ? Math.abs(steps[1].treadY - steps[0].treadY) : STAIR.riserTarget
-      const headroomSteps = headroomStepsFor(riser, PLAYER.height, TOWER.floorSlab)
       /*
        * A flight pierces the slab it LANDS on — and, for 4→6, also the slab it
        * runs PAST. The cut is measured at the pierced storey's own level, not at
@@ -302,11 +297,22 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
       for (const floorNumber of pierces) {
         const onRoof = floorNumber > FLOORS.length
         const piercedY = onRoof ? ROOF.deckY : FLOORS[floorNumber - 1].floorY
+        /*
+         * THE UNDERSIDE OF THE THING BEING PIERCED, which is what the walker's
+         * head actually meets — a floor slab in a storey, a paving course on the
+         * roof. They are the same depth today (ROOF.pavingDepth is borrowed from
+         * FLOOR_SLAB) and they are not the same number, so they are written
+         * separately: the day the terrace gets a measured course of its own, the
+         * opening in it follows without anyone remembering to come back here.
+         */
+        const soffitY = piercedY - (onRoof ? ROOF.pavingDepth : TOWER.floorSlab)
         // for a storey the flight only passes, the opening sits where the flight
         // crosses THAT level, not at the head of the run
         const span = stairwellSpanDeg(
           steps.filter((s) => s.treadY <= piercedY + 1e-9),
-          headroomSteps,
+          soffitY,
+          // the same clear height the vault is cut to — see stairwellSpanDeg()
+          PLAYER.stairHeadroom,
         )
         if (!span) continue
         const inner = innerRadiusAt(piercedY) + stair.wallClearance

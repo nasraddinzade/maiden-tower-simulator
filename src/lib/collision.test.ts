@@ -56,6 +56,26 @@ function innerFaceRadius(b: { halfExtents: number[]; position: number[] }): numb
   return r - b.halfExtents[0]
 }
 
+/**
+ * Does a box cover the point (azimuth, radius) in PLAN?
+ *
+ * Written against the box's own frame rather than against the sector it was
+ * asked for, because the difference between those two is the whole subject of
+ * the stair-mouth readings below: a radial box does not occupy a sector, it
+ * occupies a rectangle, and the rectangle wins.
+ */
+function containsPlan(b: BoxSpec, azimuthDeg: number, radius: number): boolean {
+  const a = azimuthDeg * DEG
+  const px = Math.sin(a) * radius
+  const pz = -Math.cos(a) * radius
+  const boxAz = Math.atan2(b.position[0], -b.position[2])
+  const dx = px - b.position[0]
+  const dz = pz - b.position[2]
+  const lx = dx * Math.sin(boxAz) - dz * Math.cos(boxAz)
+  const lz = dx * Math.cos(boxAz) + dz * Math.sin(boxAz)
+  return Math.abs(lx) <= b.halfExtents[0] + 1e-9 && Math.abs(lz) <= b.halfExtents[2] + 1e-9
+}
+
 describe('yawThenTilt', () => {
   it('returns a unit quaternion', () => {
     for (const [yaw, tilt] of [
@@ -288,16 +308,125 @@ describe('floorColliders', () => {
      */
     const well = { centreAzimuthDeg: 123, widthDeg: 40, innerRadius: 2.9 }
     const boxes = floorColliders({ ...floor, stairwell: well })
-    // the ring is still complete — nothing is missing
-    expect(boxes).toHaveLength(24)
+    // every box still starts at the oculus or at the well's own inner radius —
+    // nothing floats in the middle of the slab
     for (const b of boxes) {
-      const az = ((Math.atan2(b.position[0], -b.position[2]) / DEG) + 360) % 360
-      const d = Math.abs((((az - 123) % 360) + 540) % 360 - 180)
-      const outer = Math.hypot(b.position[0], b.position[2]) + b.halfExtents[0]
-      // inside the well the segment stops at the passage; outside it reaches the wall
-      expect(outer).toBeCloseTo(d <= well.widthDeg / 2 ? well.innerRadius : floor.outerRadius, 6)
-      expect(innerFaceRadius(b)).toBeCloseTo(floor.oculusRadius, 6)
+      const start = innerFaceRadius(b)
+      expect(
+        Math.abs(start - floor.oculusRadius) < 1e-6 || Math.abs(start - well.innerRadius) < 1e-6,
+      ).toBe(true)
     }
+    // and the surface is carried everywhere the well does not take it
+    const holds = (azDeg: number, r: number) => boxes.some((b) => containsPlan(b, azDeg, r))
+    for (let az = 0; az < 360; az += 0.25) {
+      for (const r of [1.25, 2.0, 2.85]) expect(holds(az, r), `az ${az} r ${r}`).toBe(true)
+    }
+    /*
+     * Out in the well's own band the ring is complete except at the mouth, and
+     * "except" carries a measured tolerance rather than a hope: a box's end is a
+     * straight chord and the mouth's edge is a radius, so the two cannot meet
+     * along their whole depth. What is left is a wedge against the mouth's edge,
+     * widest at the band's outer radius, and here it is 0.09 m. A capsule is
+     * 0.60 m across; nothing can be stood in that wedge, let alone fall through
+     * it. What matters is that it is a WEDGE at an edge and not a run of ring.
+     */
+    let widest = 0
+    for (const r of [3.0, 3.2, 3.4]) {
+      let run = 0
+      for (let az = 0; az < 360; az += 0.05) {
+        const inArc = Math.abs((((az - well.centreAzimuthDeg) % 360) + 540) % 360 - 180) <= 20
+        run = holds(az, r) || inArc ? 0 : run + (0.05 * DEG) * r
+        widest = Math.max(widest, run)
+      }
+    }
+    expect(widest).toBeLessThan(0.1)
+  })
+
+  /**
+   * THE HOLE IN THE PHYSICS IS THE HOLE IN THE DRAWING.
+   *
+   * This is the reading that was never taken, and the reason the owner could not
+   * get onto his roof even after the opening in the paving was cut in the right
+   * place. A ring of cuboids takes its chord at the ring's OUTER radius so that
+   * neighbours meet at the rim; applied at every radius the box spans, that
+   * chord reaches further round the circle the nearer the axis you read it, and
+   * beside a hole the two boxes flanking it lean across it from both sides.
+   * Measured on the shipped deck before this was written: a mouth drawn 16.47°
+   * wide — 1.50 m of arc at the walking line — was 6.70° in the physics, 0.61 m,
+   * and the largest disc that would pass was 0.348 m against a 0.320 m capsule.
+   *
+   * Stated as the two things a walker cares about, in both directions.
+   */
+  describe('the mouth in the physics is the mouth in the drawing', () => {
+    const well = { centreAzimuthDeg: 158, widthDeg: 20, innerRadius: 4.77, outerRadius: 5.77 }
+    const deck = {
+      sectors: 24,
+      floorY: 26.749,
+      thickness: 0.3,
+      oculusRadius: 0,
+      outerRadius: 7.5,
+      stairwell: well,
+    }
+    const boxes = floorColliders(deck)
+    const holds = (azDeg: number, r: number) => boxes.some((b) => containsPlan(b, azDeg, r))
+
+    it('leaves a way through as wide as the mouth is drawn, less the ring’s own chord', () => {
+      /*
+       * A capsule has to get through, and it gets through radially: the free run
+       * from the mouth's inner edge to its outer one, at every bearing across the
+       * arc. The tolerance is not slack — it is the corner of a chord box, which
+       * stands hypot(r, halfChord) from the axis and so bulges past the radius
+       * its flat face sits on. That bulge is the same one guardRingBoxes
+       * documents; here it is 0.115 m on a 1.00 m mouth.
+       */
+      const chordBulge = 0.12
+      for (let az = well.centreAzimuthDeg - well.widthDeg / 2 + 1; az < well.centreAzimuthDeg + well.widthDeg / 2 - 1; az += 0.5) {
+        let free = 0
+        for (let r = well.innerRadius; r <= well.outerRadius; r += 0.005) {
+          if (!holds(az, r)) free += 0.005
+        }
+        expect(free, `free radial run at az ${az.toFixed(1)}`).toBeGreaterThan(
+          well.outerRadius - well.innerRadius - 2 * chordBulge,
+        )
+        expect(free).toBeGreaterThan(2 * PLAYER.radius)
+      }
+    })
+
+    it('carries the surface everywhere the mouth is not, so nothing falls through drawn stone', () => {
+      /*
+       * The other direction, and the one that is a fall rather than a stumble.
+       * Sliding a box off the hole must never open a gap behind it — a capsule
+       * is unsupported only where NO part of its footprint meets a box, so this
+       * asks the question the physics asks.
+       */
+      const supported = (x: number, z: number) => {
+        for (let k = 0; k < 16; k++) {
+          const t = (k / 16) * Math.PI * 2
+          const px = x + Math.cos(t) * PLAYER.radius * 0.999
+          const pz = z + Math.sin(t) * PLAYER.radius * 0.999
+          const r = Math.hypot(px, pz)
+          if (r > deck.outerRadius) return true
+          if (holds(((Math.atan2(px, -pz) / DEG) + 360) % 360, r)) return true
+        }
+        return false
+      }
+      const falls: string[] = []
+      for (let r = 0.4; r <= deck.outerRadius - PLAYER.radius; r += 0.05) {
+        for (let az = 0; az < 360; az += 0.5) {
+          const a = az * DEG
+          if (supported(Math.sin(a) * r, -Math.cos(a) * r)) continue
+          // the mouth itself is meant to be open; a capsule's reach either side
+          // of it is the only place standing over it counts as standing over air
+          const d = Math.abs((((az - well.centreAzimuthDeg) % 360) + 540) % 360 - 180)
+          const nearMouth =
+            d <= well.widthDeg / 2 + 6 &&
+            r > well.innerRadius - PLAYER.radius &&
+            r < well.outerRadius + PLAYER.radius
+          if (!nearMouth) falls.push(`az ${az.toFixed(1)} r ${r.toFixed(2)}`)
+        }
+      }
+      expect(falls).toEqual([])
+    })
   })
 
   it('does drop a segment when the well leaves nothing worth keeping', () => {

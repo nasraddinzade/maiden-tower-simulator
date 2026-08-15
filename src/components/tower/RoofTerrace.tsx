@@ -58,7 +58,15 @@ function usePavingGeometry(cut: StairwellCut | undefined, segments = RADIAL_SEGM
     ]
     const geom = new THREE.LatheGeometry(pts, segments)
     if (!cut) return geom
-    return cutStairwell(geom, cut, (top + bottom) / 2, (top - bottom) * 3)
+    /*
+     * THE ONE CUT IN THE TOWER THAT ACTUALLY REMOVES STONE. Every storey's
+     * opening is tangent to the slab it is handed and takes nothing — see
+     * cutStairwell — because a flight runs in the WALL and a slab stops at the
+     * wall's face. The terrace is the exception the whole rebuild turned on: its
+     * paving crosses the full thickness, so the stair comes up THROUGH it, and
+     * this is where the hole is.
+     */
+    return cutStairwell(geom, cut, (top + bottom) / 2, (top - bottom) * 3, outer, segments)
   }, [cut, segments])
 }
 

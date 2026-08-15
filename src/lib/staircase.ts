@@ -214,33 +214,135 @@ export function flightArcDeg(steps: StepPlacement[]): number {
 }
 
 /**
- * How many steps below the landing the opening must already be open.
- *
- * You do not meet the slab when your FEET reach it — you meet it when your HEAD
- * does, which is a whole body height plus the slab's own thickness earlier. With
- * the old flat 4 steps, the walker's head was under the storey-6 slab from
- * azimuth 168.6° while the opening only began at 150°: 18.6° of arc spent
- * wedged under masonry, and every landing had the same trap.
- */
-export function headroomStepsFor(riser: number, walkerHeight: number, slabThickness: number): number {
-  if (riser <= 0) return 4
-  return Math.max(4, Math.ceil((walkerHeight + slabThickness) / riser))
-}
-
-/**
  * Angular span of the opening the flight needs where it breaks through the
- * structure above — the last `headroomSteps` steps plus a landing margin.
+ * structure above it.
+ *
+ * IT IS MEASURED IN METRES OF HEADROOM, NOT IN STEPS, and that substitution is
+ * the whole of this function's history.
+ *
+ * The rule has always meant the same thing: you do not meet the slab when your
+ * FEET reach it, you meet it when your HEAD does, which is a body height and a
+ * slab's thickness earlier. It used to say that by counting steps — round
+ * (walkerHeight + slabThickness) up to a whole number of risers and open the
+ * last N — and a step count is only a height if every step rises. Two things
+ * broke it, and on 2026-08-15 they broke it together, on the roof.
+ *
+ * The riser was read as `steps[1].treadY − steps[0].treadY`, and a flight begins
+ * with a LEVEL PLATFORM (see FlightParams.endLandingLength), so steps 0, 1 and 2
+ * are all at fromY and that difference is exactly zero. Zero fell through to the
+ * old function's fallback of four steps, so EVERY opening in the tower — six of
+ * them — was cut over the last four treads: 16.5° to 19.8° of arc where the rule
+ * asked for 36° to 44°.
+ *
+ * And four-times-too-small was still not the fault, because the step count is
+ * the wrong unit even when the riser is right. The roof climb has a LANDING in
+ * it, five level treads at 25.109, 1.34 m under the paving's underside; they
+ * spend 16.7° of arc and gain no height at all. Counting back ten steps from the
+ * top gets you 36.4° of arc and lands in the middle of that landing, still 1.3 m
+ * short of headroom. Counting back in METRES gets you the 70° the geometry
+ * actually needs, and it gets there without knowing a landing exists.
+ *
+ * WHAT THE OWNER MET, before this was measured: he could not get out onto his
+ * own roof. The paving is what roofs the last stretch of the roof climb — the
+ * passage cutter is clamped to ROOF.masonryTopY, its underside — so the deck is
+ * the ceiling there, and the opening cut in it began 43° too late. Walked, the
+ * capsule's head met the underside of the paving at azimuth 183, 2.05 m below
+ * the terrace and thirteen treads short of it, and the clearance fell to zero
+ * from there on. The hole in the deck was real, correctly placed and visible
+ * through the stair; nobody could reach it.
+ *
+ * `clearHeight` is PLAYER.stairHeadroom — the SAME number the vault over the
+ * treads is cut to. That is deliberate and it is the point: the stair keeps one
+ * clear height over every tread for its whole length, and whether the ceiling
+ * there is a barrel vault in the drum or the slab it is about to come up
+ * through makes no difference to the walker under it. Any second number here
+ * would be a second answer to one question.
+ *
+ * The survivors are a contiguous tail because treads never descend, so the
+ * opening is one arc at the head of the flight and never two.
  */
 export function stairwellSpanDeg(
   steps: StepPlacement[],
-  headroomSteps = 4,
+  /** Underside of the structure being pierced — its top less its thickness. */
+  soffitY: number,
+  /** Clear height the stair must keep over every tread; see the note above. */
+  clearHeight: number,
 ): { centreAzimuthDeg: number; widthDeg: number } | null {
   if (steps.length === 0) return null
-  const tail = steps.slice(Math.max(0, steps.length - headroomSteps))
+  const tail = steps.filter((s) => s.treadY + clearHeight > soffitY)
+  if (tail.length === 0) return null
   const first = tail[0].azimuthDeg
   const last = tail[tail.length - 1].azimuthDeg
+  // a whole tread's width of margin at each end, so the opening never stops on
+  // a nosing — the landing at the head is walked over, not aimed at
   const widthDeg = Math.abs(last - first) + tail[0].angularWidthDeg * 2
   return { centreAzimuthDeg: (first + last) / 2, widthDeg }
+}
+
+/**
+ * The stairwell opening as a chain of straight tools, one arc at a time.
+ *
+ * A stairwell is an ANNULAR SECTOR — an arc of the surface, a metre deep
+ * radially — and the thing that cuts it out of a lathe is a box. Over 16° of arc
+ * a single box is a fair sector: its chord departs from the arc by 5.767 ×
+ * (1/cos 8.2° − 1) = 0.06 m at the ends, which is lost in the paving's own
+ * faceting. Over the 70° the roof needs it is not a sector at all. The box's
+ * inner face is a PLANE at `innerRadius` along the arc's mid bearing, so at the
+ * ends of a 70° arc it stands at 4.767 / cos 35° = 5.82 m: the tool cuts a hole
+ * out near the parapet and leaves the stair roofed over. Widening the opening
+ * without this would have replaced one wrong hole with a wronger one.
+ *
+ * So the arc is divided until each piece is no coarser than the surface being
+ * cut, and each piece gets its own box on its own bearing. `maxArcDeg` is the
+ * lathe's own angular step, passed in rather than chosen here: at that size the
+ * chord error is 5.767 × (1/cos 1.875° − 1) = 3 mm, which is exactly the
+ * faceting error the lathe already has, so the cut is as round as the stone.
+ *
+ * The pieces OVERLAP by `overlapFraction`. Butted exactly, two neighbouring
+ * boxes share one plane down the middle of the opening and the CSG is asked to
+ * resolve a coincident face — the tangency case this model has twice lost a
+ * floor to. The overlap costs 6% of one piece's arc at each end of the opening,
+ * two centimetres, and buys a boolean that cannot be coplanar with itself.
+ *
+ * Returned as plain numbers so the arithmetic stays out of the component and
+ * inside the tested half of the codebase (CLAUDE.md rule 6).
+ */
+export interface StairwellCutTool {
+  /** Bearing of this piece's own box. */
+  azimuthDeg: number
+  /** Radius of the box's centre: the opening's mid radius on that bearing. */
+  midRadius: number
+  /** Depth of the box radially — the opening's full radial band. */
+  radialDepth: number
+  /** Width of the box across the arc. */
+  tangentialWidth: number
+}
+
+export function stairwellCutTools(
+  centreAzimuthDeg: number,
+  widthDeg: number,
+  innerRadius: number,
+  outerRadius: number,
+  maxArcDeg: number,
+  overlapFraction = 0.06,
+): StairwellCutTool[] {
+  if (widthDeg <= 0 || outerRadius <= innerRadius) return []
+  const pieces = Math.max(1, Math.ceil(widthDeg / Math.max(1e-6, maxArcDeg)))
+  const pieceDeg = widthDeg / pieces
+  const start = centreAzimuthDeg - widthDeg / 2
+  const out: StairwellCutTool[] = []
+  for (let i = 0; i < pieces; i++) {
+    out.push({
+      azimuthDeg: start + pieceDeg * (i + 0.5),
+      midRadius: (innerRadius + outerRadius) / 2,
+      radialDepth: outerRadius - innerRadius,
+      // the chord this piece subtends at the opening's OUTER edge, so the box
+      // covers the sector out there rather than stopping short of it
+      tangentialWidth:
+        2 * outerRadius * Math.sin(((pieceDeg * (1 + overlapFraction)) / 2) * (Math.PI / 180)),
+    })
+  }
+  return out
 }
 
 export interface StairSettings {
