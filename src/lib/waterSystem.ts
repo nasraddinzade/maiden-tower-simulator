@@ -235,10 +235,98 @@ export function besideDoorwayBearing(
   mouthDiameter: number,
   side: 1 | -1,
 ): number {
-  const ratio = Math.min(1, Math.max(0, mouthDiameter / 2 / Math.max(1e-9, mouthRadius)))
-  const clearDeg = (Math.asin(ratio) * 180) / Math.PI
+  const clearDeg = mouthHalfAngleDeg(mouthRadius, mouthDiameter)
   const a = doorwayAzimuthDeg + side * (Math.abs(doorwayHalfWidthDeg) + clearDeg)
   return ((a % 360) + 360) % 360
+}
+
+/**
+ * Half the arc a round mouth of this diameter takes up, seen from the axis.
+ *
+ * Exact rather than small-angle, and clamped rather than left to return NaN —
+ * see besideDoorwayBearing(), which is this function plus a jamb. Pulled out so
+ * that the two placements built on it, "beside one doorway" and "between two",
+ * cannot come to different answers about how wide the mouth is.
+ */
+export function mouthHalfAngleDeg(mouthRadius: number, mouthDiameter: number): number {
+  const ratio = Math.min(1, Math.max(0, mouthDiameter / 2 / Math.max(1e-9, mouthRadius)))
+  return (Math.asin(ratio) * 180) / Math.PI
+}
+
+/** Where a mouth may stand between two doorways, and where in that band it goes. */
+export interface BetweenDoorways {
+  /**
+   * The bearing equidistant from both jambs — the only point in the band that
+   * does not prefer one doorway to the other.
+   */
+  bearingDeg: number
+  /** Anticlockwise end of the band: the mouth's rim tangent to the nearer jamb. */
+  fromDeg: number
+  /** Clockwise end, likewise. */
+  toDeg: number
+  /** Half the band. How far the mouth may be shifted either way before it touches. */
+  freedomDeg: number
+  /** Jamb to facing jamb, before the mouth's own width is taken off. */
+  clearSpanDeg: number
+}
+
+/**
+ * WHERE A ROUND MOUTH STANDS BETWEEN TWO DOORWAYS.
+ *
+ * The companion to besideDoorwayBearing(), and it answers a different sentence.
+ * "Beside the passage" names ONE opening and leaves the side open, so that
+ * function takes the side as an argument — nothing in the arithmetic knows which
+ * hand of a door a well was sunk on. "Between the entrances" names TWO, and two
+ * jambs facing each other across a gap have a middle. There is nothing left to
+ * choose: the side question dissolves, and what was a [PLACEHOLDER] with a
+ * witness beside it becomes a derivation with a stated tolerance.
+ *
+ * THE GAP TAKEN IS THE SHORTER ONE. Two doorways divide the drum into two arcs
+ * and a wellhead is "between" them in the ordinary sense of the word, not in the
+ * sense that every point of a circle is between any two others. On storey 3 the
+ * choice is 81.8° against 263.9°, so nothing turns on it here; it is written down
+ * because the day a storey has its doorways near each other, the long way round
+ * would put the well across the room and still pass a test called "between".
+ *
+ * THE MIDDLE IS OF THE JAMBS, NOT OF THE DOORWAY CENTRES. They coincide exactly
+ * when the two doorways subtend the same angle, which on storey 3 they do — both
+ * are STAIR.doorwayWidth at the same storey radius, so 154.496 comes out of
+ * either. Bisecting the JAMBS is the one that stays right when they differ, and
+ * it is also the sentence: a walker between two openings is between their edges.
+ *
+ * `freedomDeg` is the honest part. The mouth is 1.08 m across on a 2.4 m radius
+ * and the gap is 81.8°, so the band is 55.8° wide: his sentence fixes the bearing
+ * to within ±27.9°, or 1.17 m of travel along the floor, and NOT to a degree.
+ * A caller that wants the number without the tolerance is claiming a precision
+ * the sentence has not got.
+ */
+export function betweenDoorways(
+  aAzimuthDeg: number,
+  aHalfWidthDeg: number,
+  bAzimuthDeg: number,
+  bHalfWidthDeg: number,
+  mouthRadius: number,
+  mouthDiameter: number,
+): BetweenDoorways {
+  const norm = (x: number) => ((x % 360) + 360) % 360
+  const aHalf = Math.abs(aHalfWidthDeg)
+  const bHalf = Math.abs(bHalfWidthDeg)
+  // clockwise from a to b, so the two gaps are the arc's remainder either side
+  const d = norm(bAzimuthDeg - aAzimuthDeg)
+  const clockwise = d - aHalf - bHalf
+  const anticlockwise = 360 - d - aHalf - bHalf
+  const [lo, span] =
+    clockwise <= anticlockwise
+      ? [aAzimuthDeg + aHalf, clockwise]
+      : [bAzimuthDeg + bHalf, anticlockwise]
+  const mouthHalf = mouthHalfAngleDeg(mouthRadius, mouthDiameter)
+  return {
+    bearingDeg: norm(lo + span / 2),
+    fromDeg: norm(lo + mouthHalf),
+    toDeg: norm(lo + span - mouthHalf),
+    freedomDeg: span / 2 - mouthHalf,
+    clearSpanDeg: span,
+  }
 }
 
 /** One length of chase found standing inside one passage. */
@@ -343,6 +431,59 @@ export function wellProfile(
 export function flowPosition(topY: number, bottomY: number, t: number): number {
   const u = ((t % 1) + 1) % 1
   return topY + (bottomY - topY) * u
+}
+
+export interface Point3 {
+  x: number
+  y: number
+  z: number
+}
+
+/**
+ * Where along a BENT run a droplet sits at time t — same wrap as flowPosition(),
+ * but the run is a polyline and t is a fraction of its LENGTH, not of its legs.
+ *
+ * It exists because the wellhead and the shaft stopped sharing a bearing. While
+ * they did, the fall was one plumb line and a single Y was the whole answer; with
+ * the shaft on the far side of the chamber the water goes down the wall, across
+ * the floor and only then into the mouth, and a droplet animated on Y alone rains
+ * through four rooms at a bearing no pipe stands on.
+ *
+ * Parametrised by arc length rather than by segment index so the drop does not
+ * pause at the elbow: on storey 3 the leg is 6.23 m against a 13 m fall, and
+ * splitting t evenly between the three legs would run the horizontal one at twice
+ * the speed of the vertical.
+ */
+export function flowAlongPath(points: readonly Point3[], t: number): Point3 {
+  if (points.length === 0) return { x: 0, y: 0, z: 0 }
+  if (points.length === 1) return { ...points[0] }
+  const legs: number[] = []
+  let total = 0
+  for (let i = 1; i < points.length; i += 1) {
+    const a = points[i - 1]
+    const b = points[i]
+    const len = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z)
+    legs.push(len)
+    total += len
+  }
+  const u = ((t % 1) + 1) % 1
+  if (total <= 0) return { ...points[0] }
+  let want = u * total
+  for (let i = 0; i < legs.length; i += 1) {
+    if (want > legs[i] && i < legs.length - 1) {
+      want -= legs[i]
+      continue
+    }
+    const f = legs[i] <= 0 ? 0 : Math.min(1, want / legs[i])
+    const a = points[i]
+    const b = points[i + 1]
+    return {
+      x: a.x + (b.x - a.x) * f,
+      y: a.y + (b.y - a.y) * f,
+      z: a.z + (b.z - a.z) * f,
+    }
+  }
+  return { ...points[points.length - 1] }
 }
 
 /**

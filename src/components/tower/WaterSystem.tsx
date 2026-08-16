@@ -5,11 +5,19 @@ import { azimuthToVector } from '../../lib/geometry'
 import {
   buriedRunRadii,
   channelRings,
-  flowPosition,
+  flowAlongPath,
   pipeOuterDiameter,
   wellProfile,
 } from '../../lib/waterSystem'
-import { ENTRANCE, FLOORS, TOWER, WATER, WELL, innerRadiusAt } from '../../config/tower'
+import {
+  ENTRANCE,
+  FLOORS,
+  TOWER,
+  WALL_SHAFT,
+  WATER,
+  WELL,
+  innerRadiusAt,
+} from '../../config/tower'
 import { isStoreyVisible } from '../../lib/visibility'
 
 export interface WaterSystemProps {
@@ -60,16 +68,28 @@ const TUBE_AROUND = 40
  *   - the ring channels. [ref] puts them inside the masonry; not a metre of them
  *     is visible in the building.
  *   - the buried intakes, under the paving, for the same reason.
- *   - the junction leg from the chase across to the mouth. The real pipe's last
- *     courses were lifted long ago (see WATER.downpipeElbowRise) and the museum
- *     draws that junction schematically; drawn by default it lays a 0.3 m pipe
- *     across storey 3's floor at ankle height, exactly where the footage shows
- *     visitors standing at the glass.
+ *   - the junction leg from the chase across to the mouth, and it is the reason
+ *     this split exists at all. The real pipe's last courses were lifted long ago
+ *     (see WATER.downpipeElbowRise) and the museum draws that junction
+ *     schematically; drawn by default it lays a 0.3 m pipe across storey 3's
+ *     floor at ankle height, exactly where the footage shows visitors standing at
+ *     the glass. SINCE 2026-08-17 IT IS 6.23 m LONG, because the owner put the
+ *     wall slot on the opposite side of the chamber from the mouth and no source
+ *     says how the pipe crosses between them. A straight line is the only line
+ *     that can be derived, and a derived-only line is a diagram.
  *   - the falling droplets, which animate a process rather than model a thing.
  */
 export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, showAll = true }: WaterSystemProps) {
   const wellY = FLOORS[WELL.startsAtFloorIndex].floorY
+  /*
+   * TWO BEARINGS, NOT ONE. The mouth in the floor and the slot in the wall are
+   * different openings on opposite sides of storey 3 [OWNER 2026-08-17], so
+   * everything below either hangs off the wellhead — collar, rim, glass, bore —
+   * or off the shaft — the standing pipe. Only the elbow and the droplets touch
+   * both, and they are the junction between them.
+   */
   const wellDir = azimuthToVector(WELL.azimuthDeg)
+  const shaftDir = azimuthToVector(WALL_SHAFT.azimuthDeg)
   const wellX = wellDir.x * WELL.offsetFromAxis
   const wellZ = wellDir.z * WELL.offsetFromAxis
 
@@ -117,16 +137,16 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
   const pipeClearance = -WATER.downpipeDiameter * 0.55
   const bottomRadius = innerRadiusAt(wellY + WATER.downpipeElbowRise) - pipeClearance
   const topRadius = innerRadiusAt(downpipeTopY) - pipeClearance
-  const downpipeX = wellDir.x * bottomRadius
-  const downpipeZ = wellDir.z * bottomRadius
+  const downpipeX = shaftDir.x * bottomRadius
+  const downpipeZ = shaftDir.z * bottomRadius
 
   const downpipeLean = useMemo(() => {
     const a = new THREE.Vector3(
-      wellDir.x * bottomRadius,
+      shaftDir.x * bottomRadius,
       wellY + WATER.downpipeElbowRise,
-      wellDir.z * bottomRadius,
+      shaftDir.z * bottomRadius,
     )
-    const b = new THREE.Vector3(wellDir.x * topRadius, downpipeTopY, wellDir.z * topRadius)
+    const b = new THREE.Vector3(shaftDir.x * topRadius, downpipeTopY, shaftDir.z * topRadius)
     const dir = b.clone().sub(a)
     return {
       length: Math.max(0.5, dir.length()),
@@ -136,7 +156,7 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
         dir.clone().normalize(),
       ),
     }
-  }, [wellDir.x, wellDir.z, bottomRadius, topRadius, wellY, downpipeTopY])
+  }, [shaftDir.x, shaftDir.z, bottomRadius, topRadius, wellY, downpipeTopY])
 
   /** Lays the elbow's local +Y along the horizontal run to the wellhead. */
   const elbowQuaternion = useMemo(() => {
@@ -150,6 +170,27 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
 
   const dropletsRef = useRef<THREE.InstancedMesh>(null)
 
+  /**
+   * THE PATH THE WATER ACTUALLY TAKES, as a polyline: down the shaft, across the
+   * chamber on the elbow, into the mouth and away down the bore.
+   *
+   * It was a single Y before the split, because the pipe and the mouth shared a
+   * bearing and the fall was one plumb line. They no longer do: run on Y alone
+   * the droplets would rain down the wellhead's column through four rooms that
+   * have nothing in them. The bend is also the one thing in this layer worth
+   * looking at — 6.23 m of junction across storey 3 by a route no source gives —
+   * so the animation is where it gets shown rather than where it gets hidden.
+   */
+  const flowPath = useMemo(
+    () => [
+      { x: shaftDir.x * topRadius, y: downpipe.top, z: shaftDir.z * topRadius },
+      { x: downpipeX, y: downpipe.bottom, z: downpipeZ },
+      { x: wellX, y: downpipe.bottom, z: wellZ },
+      { x: wellX, y: wellY - WELL.depth * 0.35, z: wellZ },
+    ],
+    [shaftDir.x, shaftDir.z, topRadius, downpipe.top, downpipe.bottom, downpipeX, downpipeZ, wellX, wellZ, wellY],
+  )
+
   useFrame((state) => {
     const mesh = dropletsRef.current
     if (!mesh || !highlighted) return
@@ -158,8 +199,8 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
     for (let i = 0; i < DROPLETS; i++) {
       // stagger the droplets so the fall reads as continuous
       const phase = (t * 0.35 + i / DROPLETS) % 1
-      const y = flowPosition(downpipe.top, downpipe.bottom - WELL.depth * 0.35, phase)
-      m.makeTranslation(wellX, y, wellZ)
+      const p = flowAlongPath(flowPath, phase)
+      m.makeTranslation(p.x, p.y, p.z)
       mesh.setMatrixAt(i, m)
     }
     mesh.instanceMatrix.needsUpdate = true
@@ -265,10 +306,12 @@ export function WaterSystem({ showSchematic, highlighted, viewerStorey = 0, show
         coming "из ниш" — out of the niches — and the niches are in the masonry;
         a free-standing column of pipe crossing every chamber is both wrong and
         the single most intrusive thing in the interior. It meets the wellhead
-        with a short horizontal leg at the bottom.
+        with a horizontal leg at the bottom — no longer a short one, see the
+        header, since the slot and the mouth were separated.
 
-        Fabric, not diagram: the chase it stands in was photographed with the
-        pipe in it. Only its LEG into the well is schematic — see the header.
+        ON WALL_SHAFT'S BEARING, NOT THE WELLHEAD'S. Fabric, not diagram: the
+        chase it stands in was photographed with the pipe in it, and up/076 shows
+        it from inside storey 3. Only its LEG into the well is schematic.
       */}
       <mesh position={downpipeLean.mid.toArray()} quaternion={downpipeLean.quaternion}>
         <cylinderGeometry

@@ -1,10 +1,30 @@
+/**
+ * THE WELLHEAD AND THE SLOT IN THE WALL, MEASURED APART.
+ *
+ * [OWNER] 2026-08-17, of the model on screen: «на третьем ярусе вот это отверстие
+ * внутри стены стоит на противоположной стороне, а колодец внутри стены между
+ * входами на лестницу. А ты взял их поставил вместе.»
+ *
+ * Until that day WELL.azimuthDeg drove the mouth in the floor AND the chase the
+ * downpipe stands in, so no evidence could ever have put them apart — the fault
+ * was not a wrong bearing but one bearing where the building has two. This file
+ * asserts the two derivations that replace it and then prices them: the wellhead
+ * as the bisector of its storey's two stair doorways, the shaft opposite, and the
+ * chase measured against every doorway, every reveal and every passage tube in
+ * azimuth AND height, the way 4f3e197 established.
+ *
+ * Everything here is a difference of azimuths, a chord or an arc (CLAUDE.md rule
+ * 6). Nothing reads a mesh.
+ */
 import { describe, expect, it } from 'vitest'
 import {
   ENTRANCE,
   FLOORS,
+  SHAFT_FROM_WELLHEAD_DEG,
   STAIR,
   TOWER,
   WALL_LIFTS,
+  WALL_SHAFT,
   WATER,
   WELL,
   innerRadiusAt,
@@ -14,9 +34,11 @@ import { PLAYER } from '../config/player'
 import { approachAzimuthDeg, planAllFlights, stairDoorways, stairPassageSections } from './staircase'
 import {
   besideDoorwayBearing,
+  betweenDoorways,
   chaseBreaches,
   clearArcsFor,
   downpipeChases,
+  mouthHalfAngleDeg,
   type PassageRun,
   type PlanBlock,
 } from './waterSystem'
@@ -43,11 +65,12 @@ const tubes = stairPassageSections(
   STAIR.doorwayWidth,
 )
 
+/** The chase now runs on the SHAFT's bearing. That is the whole change. */
 const chases = downpipeChases(
   FLOORS,
   WATER.channelFloorRange,
   WELL.startsAtFloorIndex,
-  WELL.azimuthDeg,
+  WALL_SHAFT.azimuthDeg,
   WATER.downpipeDiameter,
 )
 
@@ -60,31 +83,57 @@ function chaseHalfDeg(y: number) {
  * The widest the chase ever is in plan. The drum's face moves outward with
  * height, so the run's half-angle is largest at the lowest storey it occupies;
  * taking that one everywhere errs toward MORE separation, which is the only
- * direction a guard on a placeholder may err in.
+ * direction a guard on a derived bearing may err in.
  */
 const CHASE_HALF_MAX = Math.max(...chases.map((c) => chaseHalfDeg((c.bottomY + c.topY) / 2)))
 
 const sep = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180)
+const STOREY = WELL.startsAtFloorIndex
+const FLOOR_Y = FLOORS[STOREY].floorY
+const FACE_R = innerRadiusAt(FLOOR_Y)
 
-/** The flight the visitor LEAVES the wellhead's storey by. */
-const DEPARTURE = WALL_LIFTS.findIndex(
-  (l) => Math.abs(l.fromY - FLOORS[WELL.startsAtFloorIndex].floorY) < 1e-6,
-)
-const DEPARTURE_FOOT = flights[DEPARTURE][0]
-/** Its doorway, planned exactly as stairDoorways() plans it. */
-const DEPARTURE_DOORWAY = {
-  azimuthDeg: approachAzimuthDeg(flights[DEPARTURE], DEPARTURE_FOOT, STAIR.width),
-  halfWidthDeg:
-    (STAIR.doorwayWidth / Math.max(0.5, DEPARTURE_FOOT.midRadius) / 2) * (180 / Math.PI),
+/**
+ * THE TWO WAYS ONTO THE STAIR FROM THE WELLHEAD'S STOREY, planned exactly as
+ * stairDoorways() plans them: the head of the flight the walker ARRIVES by and
+ * the foot of the flight he LEAVES by. His sentence names both, so both are
+ * derived here rather than one being chosen.
+ */
+const ARRIVAL = WALL_LIFTS.findIndex((l) => Math.abs(l.toY - FLOOR_Y) < 1e-6)
+const DEPARTURE = WALL_LIFTS.findIndex((l) => Math.abs(l.fromY - FLOOR_Y) < 1e-6)
+const doorwayOf = (flightIndex: number, end: 'foot' | 'head') => {
+  const steps = flights[flightIndex]
+  const tread = end === 'foot' ? steps[0] : steps[steps.length - 1]
+  return {
+    azimuthDeg: approachAzimuthDeg(steps, tread, STAIR.width),
+    halfWidthDeg: (STAIR.doorwayWidth / Math.max(0.5, tread.midRadius) / 2) * (180 / Math.PI),
+  }
 }
+const ARRIVAL_DOORWAY = doorwayOf(ARRIVAL, 'head')
+const DEPARTURE_DOORWAY = doorwayOf(DEPARTURE, 'foot')
+const BETWEEN = betweenDoorways(
+  ARRIVAL_DOORWAY.azimuthDeg,
+  ARRIVAL_DOORWAY.halfWidthDeg,
+  DEPARTURE_DOORWAY.azimuthDeg,
+  DEPARTURE_DOORWAY.halfWidthDeg,
+  WELL.offsetFromAxis,
+  WELL.mouthDiameter,
+)
+
+/** Distance from the mouth's RIM to a jamb's inner corner, in metres. */
+const rimToJamb = (bearingDeg: number, jambDeg: number) =>
+  Math.sqrt(
+    FACE_R ** 2 +
+      WELL.offsetFromAxis ** 2 -
+      2 * FACE_R * WELL.offsetFromAxis * Math.cos(((jambDeg - bearingDeg) * Math.PI) / 180),
+  ) -
+  WELL.mouthDiameter / 2
 
 /**
  * EVERY VOID IN THE DRUM, FLATTENED ONTO PLAN.
  *
  * A tube's plan footprint is simply its whole azimuth span — there is no height
  * in this list, so the sections in between add nothing to the union its ends do
- * not already give. The entrance is deliberately absent; see the note on
- * WELL.azimuthDeg and the entrance test below.
+ * not already give. The entrance is deliberately absent; see the entrance test.
  */
 const PLAN_BLOCKS: PlanBlock[] = [
   ...SHIPPED_CUTS.map((w) => ({
@@ -117,6 +166,11 @@ describe('besideDoorwayBearing', () => {
   /*
    * The property, stated once: the mouth's rim just touches the radial plane of
    * the jamb. Everything else in this block is a corollary of it.
+   *
+   * KEPT THOUGH THE WELL NO LONGER USES IT. betweenDoorways() is built out of the
+   * same clearance and the two ends of its band ARE these tangents, so this is
+   * the base case of the placement that replaced it — and the day a storey turns
+   * out to have one doorway rather than two, this is the rule that applies.
    */
   const perpendicular = (bearingDeg: number, jambDeg: number, r: number) =>
     r * Math.sin(Math.abs(((bearingDeg - jambDeg + 540) % 360) - 180) * (Math.PI / 180))
@@ -159,26 +213,141 @@ describe('besideDoorwayBearing', () => {
   })
 })
 
-describe('the well stands where the owner says it stands', () => {
-  it('is beside the doorway of the passage that leaves its own storey', () => {
+describe('betweenDoorways', () => {
+  it('bisects the gap, and takes the shorter of the two gaps', () => {
     /*
-     * [OWNER] 2026-08-16: «колодец должен стоять рядом с проходом». The passage
-     * is identified by his footage, not chosen: up/080 has the wellhead's recess
-     * and the stair's mouth as two openings in one wall with a single pier
-     * between them, up/085 is the first tread of the climb out of storey 3.
-     *
-     * THIS IS THE TEST THAT MOVES WITH THE STAIR, AND IT HAS NOW MOVED ONCE. The
-     * doorway is re-planned here from the live flight plan by the same call
-     * stairDoorways() makes. On 2026-08-17 approachAzimuthDeg() stopped putting
-     * foot doorways on the flight's own treads, this doorway went from 190.772 to
-     * 202.628, and the assertion below caught the well 11.856° behind it rather
-     * than leaving it where the old sign had put it. The same will happen the day
-     * STAIR_FROM_BUTTRESS_DEG is corrected — it is known to be at least 8° too
-     * small.
+     * The property. Two doorways cut the drum into two arcs and only one of them
+     * is what anybody means by "between"; the function takes the shorter. Here
+     * with 30° doorways at 0 and 90 the short gap runs 15..75 and its middle is
+     * 45, while the long one would answer 225.
      */
-    expect(WALL_LIFTS[DEPARTURE].fromFloorNumber).toBe(3)
-    expect(DEPARTURE_DOORWAY.azimuthDeg).toBeCloseTo(202.628, 3)
+    const b = betweenDoorways(0, 15, 90, 15, 2.4, 0)
+    expect(b.bearingDeg).toBeCloseTo(45, 9)
+    expect(b.clearSpanDeg).toBeCloseTo(60, 9)
+    // and it does not depend on which doorway is named first
+    expect(betweenDoorways(90, 15, 0, 15, 2.4, 0).bearingDeg).toBeCloseTo(45, 9)
+  })
 
+  it('is the middle of the band its own ends describe', () => {
+    /*
+     * The two ends ARE besideDoorwayBearing()'s tangents, one per jamb, so the
+     * band and the bisector cannot come from different arithmetic.
+     */
+    const b = betweenDoorways(10, 8, 150, 6, 3, 1.2)
+    expect(b.fromDeg).toBeCloseTo(besideDoorwayBearing(10, 8, 3, 1.2, 1), 9)
+    expect(b.toDeg).toBeCloseTo(besideDoorwayBearing(150, 6, 3, 1.2, -1), 9)
+    expect((b.fromDeg + b.toDeg) / 2).toBeCloseTo(b.bearingDeg, 9)
+    expect(b.freedomDeg).toBeCloseTo((b.toDeg - b.fromDeg) / 2, 9)
+  })
+
+  it('spends the mouth’s own width on the freedom and never on the bearing', () => {
+    /*
+     * THE PROPERTY THAT MADE THIS DERIVATION WORTH HAVING, and the one the old
+     * tangent placement did not have. A tangent to ONE jamb carries the mouth's
+     * half-angle in its answer, so widening the mouth — or moving it out toward
+     * the wall, which is the correction WELL.offsetFromAxis is waiting for —
+     * drags the bearing. Between two jambs the same half-angle is taken off both
+     * ends and cancels in the middle.
+     */
+    const wide = betweenDoorways(10, 8, 150, 6, 3, 2.4)
+    const narrow = betweenDoorways(10, 8, 150, 6, 3, 0.2)
+    expect(wide.bearingDeg).toBeCloseTo(narrow.bearingDeg, 9)
+    expect(wide.freedomDeg).toBeLessThan(narrow.freedomDeg)
+  })
+
+  it('reports a negative freedom rather than pretending a mouth fits', () => {
+    // a 2 m mouth on a 1.2 m radius between doorways 20° apart: it does not fit
+    const b = betweenDoorways(0, 5, 20, 5, 1.2, 2)
+    expect(b.freedomDeg).toBeLessThan(0)
+  })
+})
+
+describe('the wellhead stands between the two ways onto the stair', () => {
+  it('names the right two doorways, and they are the storey’s only ones', () => {
+    /*
+     * «Между входами на лестницу» — between the ENTRANCES, plural. Storey 3 has
+     * exactly two and this pins them: the head of 2→3 and the foot of 3→4, at the
+     * same floor level, a little under a quarter turn apart.
+     */
+    expect(WALL_LIFTS[ARRIVAL].toFloorNumber).toBe(3)
+    expect(WALL_LIFTS[DEPARTURE].fromFloorNumber).toBe(3)
+    const atThisFloor = doorways.filter((d) => Math.abs(d.bottomY - FLOOR_Y) < 1e-6)
+    expect(atThisFloor).toHaveLength(2)
+    expect(atThisFloor.map((d) => Number(d.azimuthDeg.toFixed(3))).sort((a, b) => a - b)).toEqual([
+      106.365, 202.628,
+    ])
+  })
+
+  it('puts the mouth at the bisector of their facing jambs', () => {
+    /*
+     * THE DERIVATION, AND IT IS NOT A CHOICE. The jambs that face each other
+     * across the gap stand at 113.610 and 195.383 — 81.772° of wall between them
+     * — and the mouth goes in the middle: 154.496 → 154, a whole degree because
+     * nothing has measured this bearing and a decimal would imply something had.
+     *
+     * THE BISECTOR IS OF THE JAMBS, NOT OF THE CENTRES, and here the two agree to
+     * the last digit because both doorways are STAIR.doorwayWidth at the same
+     * storey radius. Asserted together so that the day they differ — a storey
+     * with one wide opening and one narrow — the file says which one is the rule.
+     */
+    const jambA = ARRIVAL_DOORWAY.azimuthDeg + ARRIVAL_DOORWAY.halfWidthDeg
+    const jambD = DEPARTURE_DOORWAY.azimuthDeg - DEPARTURE_DOORWAY.halfWidthDeg
+    expect(jambA).toBeCloseTo(113.61, 2)
+    expect(jambD).toBeCloseTo(195.383, 3)
+    expect(jambD - jambA).toBeCloseTo(81.772, 3)
+
+    expect(BETWEEN.bearingDeg).toBeCloseTo(154.496, 3)
+    expect(BETWEEN.bearingDeg).toBeCloseTo((jambA + jambD) / 2, 9)
+    expect(BETWEEN.bearingDeg).toBeCloseTo(
+      (ARRIVAL_DOORWAY.azimuthDeg + DEPARTURE_DOORWAY.azimuthDeg) / 2,
+      9,
+    )
+    expect(Number.isInteger(WELL.azimuthDeg)).toBe(true)
+    expect(sep(WELL.azimuthDeg, BETWEEN.bearingDeg)).toBeLessThan(1)
+  })
+
+  it('leaves ±27.88° of freedom, which is 1.17 m along the floor', () => {
+    /*
+     * HOW MUCH THE SENTENCE ACTUALLY FIXES. The mouth is 1.08 m across on a
+     * 2.4 m radius, so it takes 13.003° of arc and can stand anywhere from
+     * 126.613 to 182.380 before its rim touches a jamb. That is the whole claim:
+     * the middle of a band 1.17 m wide, not a degree.
+     */
+    expect(mouthHalfAngleDeg(WELL.offsetFromAxis, WELL.mouthDiameter)).toBeCloseTo(13.0029, 4)
+    expect(BETWEEN.fromDeg).toBeCloseTo(126.613, 3)
+    expect(BETWEEN.toDeg).toBeCloseTo(182.38, 3)
+    expect(BETWEEN.freedomDeg).toBeCloseTo(27.8834, 4)
+    expect((BETWEEN.freedomDeg * Math.PI * WELL.offsetFromAxis) / 180).toBeCloseTo(1.168, 3)
+  })
+
+  it('does not move when the mouth is pushed out to the wall, only the freedom does', () => {
+    /*
+     * WHY THIS DERIVATION SURVIVES THE NEXT MEASUREMENT. WELL.offsetFromAxis is a
+     * [PLACEHOLDER] and up/081 says it is too small — the mouth is in the floor of
+     * a recess, so nearer 3.1–3.2 than 2.4. Under the old tangent placement that
+     * correction moved the bearing 8°, from 182 to 174. Here it moves nothing.
+     */
+    const out = betweenDoorways(
+      ARRIVAL_DOORWAY.azimuthDeg,
+      ARRIVAL_DOORWAY.halfWidthDeg,
+      DEPARTURE_DOORWAY.azimuthDeg,
+      DEPARTURE_DOORWAY.halfWidthDeg,
+      3.2,
+      WELL.mouthDiameter,
+    )
+    expect(out.bearingDeg).toBeCloseTo(BETWEEN.bearingDeg, 9)
+    expect(out.freedomDeg).toBeCloseTo(31.171, 3)
+  })
+
+  it('contains the bearing his first sentence gave, at the very edge of the band', () => {
+    /*
+     * 182 IS NOT OVERTURNED, IT IS CENTRED. «Колодец должен стоять рядом с
+     * проходом» (2026-08-16) put the mouth tangent to the departure doorway's
+     * jamb at 182.380 — which is this band's clockwise END, to four decimals.
+     * «Между входами» (2026-08-17) names the other doorway as well and so picks
+     * out the middle. The move is 28.4° and the two sentences do not disagree;
+     * the second is the more constrained reading of the same wall.
+     */
     const tangent = besideDoorwayBearing(
       DEPARTURE_DOORWAY.azimuthDeg,
       DEPARTURE_DOORWAY.halfWidthDeg,
@@ -186,228 +355,203 @@ describe('the well stands where the owner says it stands', () => {
       WELL.mouthDiameter,
       -1,
     )
-    expect(tangent).toBeCloseTo(182.380, 3)
-    expect(Number.isInteger(WELL.azimuthDeg)).toBe(true)
-    expect(sep(WELL.azimuthDeg, tangent)).toBeLessThan(1)
+    expect(tangent).toBeCloseTo(182.38, 3)
+    expect(BETWEEN.toDeg).toBeCloseTo(tangent, 9)
+    expect(sep(WELL.azimuthDeg, 182)).toBeCloseTo(28, 6)
   })
 
-  it('leaves the mouth 0.87 m from the jamb it stands against', () => {
+  it('stands 1.86 m and 1.90 m from the two jambs, where 182 stood 0.89 m from one', () => {
     /*
-     * The tangency in metres, which is the only form of it anyone can picture.
-     * Measured to the jamb's INNER CORNER — the nearest stone, at the room face
-     * — and not to the plane, because the plane is a construction line and the
-     * corner is a thing you can walk into.
+     * THE TANGENCY IN METRES, which is the only form of it anyone can picture,
+     * measured to each jamb's INNER CORNER — the nearest stone, at the room face
+     * — rather than to the construction plane.
      *
-     * up/080 reads the pier between the two openings at roughly this width. That
-     * is a corroboration and NOT the derivation: a pier read off a handheld
-     * wide-angle frame with no scale in it is not a measurement in this project,
-     * and if it were, it would be one that disagreed with 2.4 m of offsetFromAxis
-     * rather than one that confirmed 171.
+     * AND IT IS WHAT THE MOVE COSTS. up/080 shows the wellhead's recess and the
+     * stair's mouth as two openings in one wall with ONE pier between them, and
+     * at 182 that pier came out 0.887 m, near enough the frame to read as
+     * support. Centred it is 1.896 m, a wider pier than the frame looks. That is
+     * recorded and not argued away — it was never a measurement, a pier read off
+     * a handheld wide-angle frame with no scale is not one in this project, and a
+     * sentence naming BOTH doorways outranks a single frame naming one.
      */
-    const jambAz = DEPARTURE_DOORWAY.azimuthDeg - DEPARTURE_DOORWAY.halfWidthDeg
-    const jambR = innerRadiusAt(FLOORS[WELL.startsAtFloorIndex].floorY)
-    const d = Math.sqrt(
-      jambR ** 2 +
-        WELL.offsetFromAxis ** 2 -
-        2 * jambR * WELL.offsetFromAxis * Math.cos((jambAz - WELL.azimuthDeg) * (Math.PI / 180)),
+    const jambA = ARRIVAL_DOORWAY.azimuthDeg + ARRIVAL_DOORWAY.halfWidthDeg
+    const jambD = DEPARTURE_DOORWAY.azimuthDeg - DEPARTURE_DOORWAY.halfWidthDeg
+    expect(rimToJamb(WELL.azimuthDeg, jambA)).toBeCloseTo(1.855, 3)
+    expect(rimToJamb(WELL.azimuthDeg, jambD)).toBeCloseTo(1.896, 3)
+    expect(rimToJamb(182, jambD)).toBeCloseTo(0.887, 3)
+    // very nearly equal, which is what "between" buys and what 182 did not have
+    expect(Math.abs(rimToJamb(WELL.azimuthDeg, jambA) - rimToJamb(WELL.azimuthDeg, jambD))).toBeLessThan(
+      0.05,
     )
-    expect(d - WELL.mouthDiameter / 2).toBeCloseTo(0.887, 3)
+  })
+
+  it('is under the flight’s own arc now, and kept out of the floor opening by radius alone', () => {
+    /*
+     * A HAZARD THE MOVE CREATED AND ARITHMETIC DISPOSES OF. At 182 the wellhead
+     * sat near the end of the stair's sweep; at 154 it is squarely inside it —
+     * flight 3→4's passage runs 95.9° to 216.5°. What stops the mouth opening
+     * into the stairwell cut in the floor slab is not bearing but RADIUS: that
+     * opening starts one wall clearance outside the room face, at 3.899 m, and
+     * the mouth's rim reaches 2.940 m. Nearly a metre of slab between them.
+     *
+     * It is asserted because it is the kind of clearance that stops being one
+     * when somebody corrects offsetFromAxis: at the 3.2 m up/081 suggests, the
+     * rim reaches 3.740 and the margin is 0.159 m. Still clear, and no longer
+     * comfortably.
+     */
+    const tube = tubes[DEPARTURE]
+    const lo = Math.min(...tube.map((s) => s.azimuthDeg))
+    const hi = Math.max(...tube.map((s) => s.azimuthDeg))
+    expect(WELL.azimuthDeg).toBeGreaterThan(lo)
+    expect(WELL.azimuthDeg).toBeLessThan(hi)
+
+    const openingInner = FACE_R + STAIR.wallClearance
+    expect(openingInner).toBeCloseTo(3.899, 3)
+    expect(WELL.offsetFromAxis + WELL.mouthDiameter / 2).toBeCloseTo(2.94, 3)
+    expect(openingInner - (WELL.offsetFromAxis + WELL.mouthDiameter / 2)).toBeGreaterThan(0.9)
+    expect(openingInner - (3.2 + WELL.mouthDiameter / 2)).toBeCloseTo(0.159, 3)
   })
 })
 
-describe('what his placement costs, measured rather than argued', () => {
-  it('costs no doorway — the fault of 2026-08 is not reopened', () => {
+describe('the shaft stands opposite, and the chase costs nothing there', () => {
+  it('is the wellhead’s bearing plus half a turn', () => {
     /*
-     * IT WAS 20 ONCE, AND AT 20 THE PIPE STOOD IN THE DOOR. The chase is cut
-     * down the room-side face and the head doorways came out at about az 15 while
-     * the flights started at 100, so a visitor leaving the stair on storey 3
-     * walked into a 0.30 m pipe across the opening. The owner photographed it and
-     * called it, exactly, pipes in the entrances.
-     *
-     * "Beside the passage" is not "in it", and this is where the difference is
-     * kept. The nearest doorway is the very one the well stands against.
+     * «На противоположной стороне». The whole derivation, and it is relational in
+     * the same way the wellhead's is, so it follows the stair wherever the stair
+     * goes. SHAFT_FROM_WELLHEAD_DEG is a named 180 for the same reason
+     * STAIR_FROM_BUTTRESS_DEG is a named 90: it is the entire content of a
+     * sentence somebody said about the building, and the day the sentence is
+     * refined there is exactly one number to change.
      */
-    const gaps = doorways.map((d) => ({
+    expect(SHAFT_FROM_WELLHEAD_DEG).toBe(180)
+    expect(WALL_SHAFT.azimuthDeg).toBe(
+      ((WELL.azimuthDeg + SHAFT_FROM_WELLHEAD_DEG) % 360 + 360) % 360,
+    )
+    expect(sep(WALL_SHAFT.azimuthDeg, WELL.azimuthDeg)).toBeCloseTo(180, 9)
+    expect(Number.isInteger(WALL_SHAFT.azimuthDeg)).toBe(true)
+  })
+
+  it('breaks into no stair passage at all, where the shared bearing broke four', () => {
+    /*
+     * THE BILL THE SPLIT PAYS, IN FULL. While one number did both jobs the chase
+     * stood in the same wall the stair is in and opened the jamb between room and
+     * passage on four of the five storeys it runs up — 36.6–39.6° into each,
+     * biting 0.34 m past a jamb 0.25 m thick, and on storey 3 opening onto the
+     * treads of flight 3→4 at floor level with no threshold between room and
+     * stair at all. Two agents reported that and left it standing.
+     *
+     * At 334 chaseBreaches() returns EMPTY. This asserts the empty list rather
+     * than a margin, because the empty list is the finding.
+     *
+     * BOTH DIMENSIONS, of the same pair: only the sections of a passage that share
+     * a length of chase's HEIGHT are compared with it in bearing. That is the
+     * lesson of downpipeChases() and clearArcsFor() applied together — see
+     * chaseBreaches().
+     */
+    expect(chases.map((c) => c.floorIndex)).toEqual([2, 3, 4, 5, 6])
+    expect(chaseBreaches(chases, PASSAGES, innerRadiusAt)).toEqual([])
+
+    // and it would not be empty on the old shared bearing — the fault is real
+    const shared = downpipeChases(
+      FLOORS,
+      WATER.channelFloorRange,
+      WELL.startsAtFloorIndex,
+      182,
+      WATER.downpipeDiameter,
+    )
+    expect(chaseBreaches(shared, PASSAGES, innerRadiusAt)).toHaveLength(4)
+  })
+
+  it('clears every doorway, reveal and passage by 58° or more, in plan', () => {
+    /*
+     * THE INVENTORY 4f3e197 ASKED FOR, run over all three kinds of void. Plan
+     * margins, with the chase's own half-width counted in on every one, and the
+     * height flag carried alongside so that no clearance here is a vertical
+     * accident: the four nearest things to the chase all share its height, and it
+     * still misses them by nearly sixty degrees.
+     */
+    const doorwayGaps = doorways.map((d) => ({
       label: `doorway at az ${d.azimuthDeg.toFixed(1)}, y ${d.bottomY.toFixed(2)}`,
-      gap: sep(WELL.azimuthDeg, d.azimuthDeg) - (chaseHalfDeg((d.bottomY + d.topY) / 2) + d.widthDeg / 2),
+      gap:
+        sep(WALL_SHAFT.azimuthDeg, d.azimuthDeg) -
+        (chaseHalfDeg((d.bottomY + d.topY) / 2) + d.widthDeg / 2),
     }))
-    expect(gaps.filter((g) => g.gap <= 0)).toEqual([])
-    const worst = gaps.reduce((a, b) => (b.gap < a.gap ? b : a))
-    expect(worst.gap).toBeGreaterThan(8)
+    expect(doorwayGaps.filter((g) => g.gap <= 0)).toEqual([])
+    const nearestDoorway = doorwayGaps.reduce((a, b) => (b.gap < a.gap ? b : a))
+    expect(nearestDoorway.label).toContain('az 50.4')
+    expect(nearestDoorway.gap).toBeCloseTo(65.268, 2)
+
+    const revealGaps = SHIPPED_CUTS.map((w) => ({
+      id: w.id,
+      gap:
+        sep(WALL_SHAFT.azimuthDeg, w.azimuthDeg) -
+        (CHASE_HALF_MAX + (w.innerWidth / 2 / w.revealEndRadius) * (180 / Math.PI)),
+    }))
+    expect(revealGaps.filter((g) => g.gap <= 0)).toEqual([])
+    const nearestReveal = revealGaps.reduce((a, b) => (b.gap < a.gap ? b : a))
+    expect(nearestReveal.id).toBe('head-4-6')
+    expect(nearestReveal.gap).toBeCloseTo(59.748, 2)
+
+    const passageGaps = PASSAGES.map((p) => {
+      const lo = Math.min(...p.sections.map((s) => s.azimuthDeg))
+      const hi = Math.max(...p.sections.map((s) => s.azimuthDeg))
+      const yl = Math.min(...p.sections.map((s) => s.bottomY))
+      const yh = Math.max(...p.sections.map((s) => s.topY))
+      return {
+        label: p.label,
+        gap: sep(WALL_SHAFT.azimuthDeg, (lo + hi) / 2) - ((hi - lo) / 2 + CHASE_HALF_MAX),
+        sharesHeight: chases.some((c) => !(yh < c.bottomY || yl > c.topY)),
+      }
+    })
+    expect(passageGaps.filter((g) => g.gap <= 0)).toEqual([])
+    const nearestPassage = passageGaps.reduce((a, b) => (b.gap < a.gap ? b : a))
+    expect(nearestPassage.label).toBe('4→6')
+    expect(nearestPassage.gap).toBeCloseTo(58.748, 2)
+    // and it is not a near miss held off by height: they occupy the same storeys
+    expect(nearestPassage.sharesHeight).toBe(true)
   })
 
-  it('costs no window reveal, which the other side of the door would have', () => {
-    /*
-     * The side is [VIDEO] and rests on one frame, so it is worth recording what
-     * the arithmetic thinks of it independently. Anticlockwise, every reveal in
-     * the tower is 10.5° clear. Clockwise — 223, the mirror tangent — the chase
-     * lands in foot-8-9's reveal: a pipe out of a window, which is the fault
-     * 4f3e197 was written to prevent.
-     *
-     * THE MARGIN COLLAPSED ON 2026-08-17 AND THE CONCLUSION DID NOT. While the
-     * foot doorways stood on their own treads the mirror tangent was 211 and cost
-     * SIX reveals against nought, which read as strong independent support for
-     * the anticlockwise side. Straightened, the two tangents are 182 and 223 and
-     * the bill is one reveal against nought. The side still rests where the note
-     * on WELL.azimuthDeg always said it rested — on up/080 — and this test now
-     * measures a much weaker corroboration honestly rather than a strong one that
-     * has quietly stopped being true.
-     */
-    const revealGap = (az: number) =>
-      SHIPPED_CUTS.map((w) => ({
-        id: w.id,
-        gap: sep(az, w.azimuthDeg) - (CHASE_HALF_MAX + (w.innerWidth / 2 / w.revealEndRadius) * (180 / Math.PI)),
-      }))
-    expect(revealGap(WELL.azimuthDeg).filter((g) => g.gap <= 0)).toEqual([])
-    expect(Math.min(...revealGap(WELL.azimuthDeg).map((g) => g.gap))).toBeGreaterThan(10.5)
-
-    const mirrored = besideDoorwayBearing(
-      DEPARTURE_DOORWAY.azimuthDeg,
-      DEPARTURE_DOORWAY.halfWidthDeg,
-      WELL.offsetFromAxis,
-      WELL.mouthDiameter,
-      1,
-    )
-    expect(Math.round(mirrored)).toBe(223)
-    expect(revealGap(Math.round(mirrored)).filter((g) => g.gap <= 0).map((g) => g.id)).toEqual([
-      'foot-8-9',
-    ])
-  })
-
-  it('costs the stair, on every storey the chase runs up', () => {
-    /*
-     * THE BILL, AND IT IS NOT PAID BY PRETENDING IT IS SMALL.
-     *
-     * One number does two jobs: it places the mouth the owner saw AND the chase
-     * the pipe stands in, and the chase is a wall thing in a wall the stair is
-     * already inside. Four lengths of it land in a passage. This asserts the
-     * whole list rather than a worst case, because a list that shrinks silently
-     * is how "clear" came to mean "not touching anything today".
-     *
-     * BOTH DIMENSIONS, of the same pair: only the sections of a passage that
-     * share a length of chase's HEIGHT are compared with it in bearing. That is
-     * the lesson of downpipeChases() and of clearArcsFor() applied together —
-     * see chaseBreaches().
-     */
-    const breaches = chaseBreaches(chases, PASSAGES, innerRadiusAt)
-    expect(breaches.map((b) => `storey ${b.floorIndex + 1} × ${b.passage}`)).toEqual([
-      'storey 3 × 3→4',
-      'storey 4 × 4→6',
-      'storey 6 × 6→7',
-      'storey 7 × 7→8',
-    ])
-    /*
-     * The depths, apart from the order, because a rounded degree on a tie is the
-     * kind of assertion that breaks for no reason. Worst first, as returned.
-     */
-    const deg = breaches.map((b) => b.overlapDeg)
-    /*
-     * THE BILL HAS BEEN RE-PRICED TWICE AND IT GOT SHORTER AND DEEPER.
-     *
-     * 22.61° over eight lengths → 34.21° over eight on 2026-08-16, when the
-     * springing rose 0.65 m with CUPOLA_RISE and each length of chase became
-     * 2.25 m of wall instead of 1.60. Then 34.21 over eight → 39.57 over FOUR on
-     * 2026-08-17, and that one is not the chase changing at all: the well follows
-     * its doorway, the doorway moved 11.856° with the way in, and 182 sits
-     * squarely under the flights instead of glancing past the corners of six
-     * passages. It stops touching 2→3, 3→4-at-storey-4, 4→6-at-storey-5 and
-     * 6→7-at-storey-7 altogether, and goes half again as deep into the four it
-     * still meets. Fewer wounds, each of them worse.
-     */
-    expect(deg[0]).toBeCloseTo(39.57, 2)
-    expect(deg[deg.length - 1]).toBeCloseTo(36.56, 2)
-    // the storeys it runs up that it also breaks into — no longer all five
-    expect(new Set(breaches.map((b) => b.floorIndex))).toEqual(new Set([2, 3, 5, 6]))
-  })
-
-  it('takes the whole jamb between the room and the stair where it does', () => {
-    /*
-     * The dimension that decides whether the overlap matters. STAIR.wallClearance
-     * is 0.25 m of masonry between the room's face and the passage's inner cheek;
-     * the chase bites 0.48 m past that face. Where the two arcs cross there is
-     * nothing left between them — a slot 0.66 m wide, wider than the walker's
-     * own shoulder, standing open from the floor to the springing.
-     */
-    const breaches = chaseBreaches(chases, PASSAGES, innerRadiusAt)
-    expect(breaches).toHaveLength(4)
-    for (const b of breaches) expect(b.biteMetres).toBeGreaterThan(STAIR.wallClearance)
-    /*
-     * ALL FOUR BITE THE SAME 0.340 m NOW, and the flatness is the finding rather
-     * than a coincidence. The bite is how far past the room face the chase
-     * reaches against how far in the passage starts, and both are functions of
-     * the drum's radius at that height; while the well glanced the CORNERS of
-     * eight passages the sample included four shallow ones cut higher up, at
-     * 0.44. Sitting under the flights themselves, the four that remain are all
-     * measured at their own storey's floor and the spread has gone.
-     */
-    expect(Math.min(...breaches.map((b) => b.biteMetres))).toBeCloseTo(0.34, 3)
-    expect(Math.max(...breaches.map((b) => b.biteMetres))).toBeCloseTo(0.34, 3)
-  })
-
-  it('opens onto walkable treads on storey 3, which is the worst of it', () => {
-    /*
-     * The single number to quote if only one is quoted. On storey 3 the slot does
-     * not open into the crown of a tunnel or into a stretch of blind cheek — it
-     * opens onto the treads of flight 3→4 themselves.
-     *
-     * IT GOT WORSE ON 2026-08-17, and this is where the straightened way in is
-     * felt. The chase used to meet those treads between 0.41 and 1.44 m above the
-     * room floor — waist height, an opening you look through. Following its
-     * doorway round, it now meets the flight AT ITS FIRST TREAD: the slot starts
-     * level with the paving the walker is standing on and runs up 0.82 m of
-     * climb. There is no longer a lip between the room and the stair at all on
-     * that bearing; you could step through the wall.
-     */
-    const chase = chases.find((c) => c.floorIndex === WELL.startsAtFloorIndex)!
-    const half = chaseHalfDeg((chase.bottomY + chase.topY) / 2)
-    const inArc = flights[DEPARTURE].filter(
-      (s) => sep(WELL.azimuthDeg, s.azimuthDeg) < half + (STAIR.width / 2 / s.midRadius) * (180 / Math.PI),
-    )
-    expect(inArc.length).toBe(6)
-    const ys = inArc.map((s) => s.treadY)
-    expect(Math.min(...ys) - chase.bottomY).toBeCloseTo(0.0, 2)
-    expect(Math.max(...ys) - chase.bottomY).toBeCloseTo(0.82, 2)
-    // and they are inside the chase's own height, so the slot really reaches them
-    expect(Math.min(...ys)).toBeGreaterThanOrEqual(chase.bottomY)
-    expect(Math.max(...ys)).toBeLessThan(chase.topY)
-  })
-
-  it('is not in the entrance passage, and is further from it than 312 was', () => {
+  it('is not in the entrance passage, though it is nearer to it than 182 was', () => {
     /*
      * Kept as a bearing-only check, alone among these, and on purpose. The
      * entrance is the one void here that is SOURCED — 270, west, İçərişəhər and
      * photographs — so it is not going to move, and it sits 7 m below the lowest
      * chase, so nothing brings the two together.
+     *
+     * AND THE COMPARISON IS RECORDED THE WAY IT COMES OUT, not the way it would
+     * flatter the change. 334 stands 64° off the entrance where 182 stood 88°, so
+     * on this one measure the split moves the chase TOWARD the only sourced void
+     * in the tower. It is still 48.9° clear with both half-widths counted, and it
+     * is further off than 312 — the bearing the free-arc rule chose — ever was,
+     * at 42°. A test that only ever reports improvements is not a measurement.
      */
     const half = chaseHalfDeg(0)
     const eHalf = (ENTRANCE.width / 2 / innerRadiusAt(0)) * (180 / Math.PI)
-    expect(sep(WELL.azimuthDeg, ENTRANCE.azimuthDeg)).toBeGreaterThan(half + eHalf)
-    expect(sep(WELL.azimuthDeg, ENTRANCE.azimuthDeg)).toBeGreaterThan(
+    expect(sep(WALL_SHAFT.azimuthDeg, ENTRANCE.azimuthDeg) - half - eHalf).toBeCloseTo(48.896, 2)
+    expect(sep(WALL_SHAFT.azimuthDeg, ENTRANCE.azimuthDeg)).toBeLessThan(
+      sep(182, ENTRANCE.azimuthDeg),
+    )
+    expect(sep(WALL_SHAFT.azimuthDeg, ENTRANCE.azimuthDeg)).toBeGreaterThan(
       sep(312, ENTRANCE.azimuthDeg),
     )
   })
 })
 
-describe('where the chase could have stood, kept because it is what was given up', () => {
+describe('the free arc, which the shaft has walked back into', () => {
   const arcs = clearArcsFor(PLAN_BLOCKS, CHASE_HALF_MAX)
 
   it('leaves exactly one free arc, and the stair closes both its ends', () => {
     /*
-     * A FINDING ABOUT THE LAYOUT, not about the well, and it survives the well
-     * moving away from it. Every opening this model cuts is an end of a flight
-     * and every flight hangs off one bearing, so the stair and its consequences
-     * occupy 37.9° to 227.0 and the rest of the drum is empty.
-     *
-     * This is no longer where the well is. It is kept because it is the size of
-     * what his sentence cost: there was one place a chase could stand clear of
-     * everything, 160° wide, and the wellhead is 130° away from the middle of it.
+     * A FINDING ABOUT THE LAYOUT, not about the well. Every opening this model
+     * cuts is an end of a flight and every flight hangs off one bearing, so the
+     * stair and its consequences occupy 32.75° to 232.12 and the rest of the drum
+     * is empty.
      */
     expect(arcs).toHaveLength(1)
     const arc = arcs[0]
-    expect(arc.fromDeg).toBeCloseTo(232.14, 1)
-    expect(arc.toDeg).toBeCloseTo(32.73, 1)
-    expect(arc.widthDeg).toBeCloseTo(160.59, 1)
-    expect(sep(WELL.azimuthDeg, arc.middleDeg)).toBeCloseTo(130.43, 1)
+    expect(arc.fromDeg).toBeCloseTo(232.12, 1)
+    expect(arc.toDeg).toBeCloseTo(32.75, 1)
+    expect(arc.widthDeg).toBeCloseTo(160.63, 1)
 
     const upperEdge = (b: PlanBlock) => b.azimuthDeg + b.halfWidthDeg + CHASE_HALF_MAX
     const lowerEdge = (b: PlanBlock) => b.azimuthDeg - b.halfWidthDeg - CHASE_HALF_MAX
@@ -421,43 +565,78 @@ describe('where the chase could have stood, kept because it is what was given up
     expect(closesAbove.label).toBe('passage 4→6')
   })
 
-  it('has a nearer end than 312, and the near end is 20° from the doorway', () => {
+  it('holds the shaft, and holds the wellhead nowhere near it', () => {
     /*
-     * THE QUESTION THIS PUTS TO HIM, and the reason the report asks about the
-     * side before anything else.
+     * THE RULE AND THE WITNESS AGREE FOR THE FIRST TIME, and it is worth saying
+     * why they ever disagreed. clearArcsFor() answers "where may a VERTICAL RUN
+     * IN THE WALL stand"; it was used to place 312 back when one bearing carried
+     * both the run and the mouth, and then testimony beat it and the run followed
+     * the mouth to 182 — two degrees outside the arc, and by 2026-08-17 forty
+     * degrees inside the stair. Split, the run is asked the question that suits
+     * it and lands at 334, inside the arc with 58.75° to its nearer end.
      *
-     * The chase only ever meets the passages it shares a HEIGHT with, and the
-     * roof climb is not one of them — it runs 23.14–27.50 and the topmost chase
-     * stops at 21.79. Drop it and the free arc opens at 222.25 instead of 232.12.
-     * That bearing is 19.6° CLOCKWISE of the storey-3 doorway, 0.46 m of arc from
-     * its far jamb along the room face: still "next to the passage" by any
-     * ordinary reading of the words — nearer to it now than before the way in was
-     * straightened, since the doorway moved toward it — and it costs nothing at
-     * all.
-     *
-     * It is not what the model builds, because up/080 puts the well on the other
-     * side and this repository does not choose the cheaper reading of a witness.
-     * It is measured here so that one sentence from him can collect it.
+     * The wellhead is outside the arc and that is not a fault: a hole in the FLOOR
+     * between two doorways is not competing for wall.
      */
-    const meetsInHeight = PASSAGES.filter((p) =>
-      chases.some((c) =>
-        p.sections.some((s) => !(s.topY < c.bottomY || s.bottomY > c.topY)),
-      ),
-    ).map((p) => {
-      const lo = Math.min(...p.sections.map((s) => s.azimuthDeg))
-      const hi = Math.max(...p.sections.map((s) => s.azimuthDeg))
-      return { label: p.label, azimuthDeg: (lo + hi) / 2, halfWidthDeg: (hi - lo) / 2 }
-    })
-    const relaxed = clearArcsFor(meetsInHeight, CHASE_HALF_MAX)
-    expect(relaxed).toHaveLength(1)
-    expect(relaxed[0].fromDeg).toBeCloseTo(222.27, 1)
-    expect(relaxed[0].fromDeg - DEPARTURE_DOORWAY.azimuthDeg).toBeCloseTo(19.6, 1)
-    const jambToChase =
-      ((relaxed[0].fromDeg -
-        CHASE_HALF_MAX -
-        (DEPARTURE_DOORWAY.azimuthDeg + DEPARTURE_DOORWAY.halfWidthDeg)) *
-        Math.PI) /
-      180
-    expect(jambToChase * innerRadiusAt(FLOORS[WELL.startsAtFloorIndex].floorY)).toBeCloseTo(0.46, 2)
+    const arc = arcs[0]
+    const into = (az: number) => (((az - arc.fromDeg) % 360) + 360) % 360
+    expect(into(WALL_SHAFT.azimuthDeg)).toBeLessThan(arc.widthDeg)
+    expect(into(WALL_SHAFT.azimuthDeg)).toBeCloseTo(101.88, 1)
+    expect(arc.widthDeg - into(WALL_SHAFT.azimuthDeg)).toBeCloseTo(58.75, 1)
+    expect(sep(WALL_SHAFT.azimuthDeg, arc.middleDeg)).toBeCloseTo(21.57, 1)
+    expect(into(WELL.azimuthDeg)).toBeGreaterThan(arc.widthDeg)
+  })
+})
+
+describe('what the split costs: the junction nobody has measured', () => {
+  /*
+   * The one debt the change leaves, and the reason it is here in metres rather
+   * than in prose. The pipe stands on the far side of the chamber from the mouth
+   * it delivers into, so the leg between them crosses storey 3.
+   *
+   * The radius of the pipe's foot is the component's own: the chase is cut into
+   * the wall, so the run stands a little BEYOND the room face rather than in
+   * front of it — face plus 0.55 of a bore.
+   */
+  const footRadius = innerRadiusAt(FLOOR_Y + WATER.downpipeElbowRise) + WATER.downpipeDiameter * 0.55
+  const at = (r: number, azDeg: number) => ({
+    x: r * Math.sin((azDeg * Math.PI) / 180),
+    z: -r * Math.cos((azDeg * Math.PI) / 180),
+  })
+  const legLength = (wellAz: number, shaftAz: number) => {
+    const a = at(WELL.offsetFromAxis, wellAz)
+    const b = at(footRadius, shaftAz)
+    return Math.hypot(a.x - b.x, a.z - b.z)
+  }
+
+  it('is 6.23 m of pipe across a room 7.30 m wide', () => {
+    expect(footRadius).toBeCloseTo(3.825, 3)
+    expect(legLength(WELL.azimuthDeg, WALL_SHAFT.azimuthDeg)).toBeCloseTo(6.225, 3)
+    // the chamber's clear span at that level, for scale: the leg crosses 85% of it
+    expect(2 * FACE_R).toBeCloseTo(7.299, 3)
+    expect(legLength(WELL.azimuthDeg, WALL_SHAFT.azimuthDeg) / (2 * FACE_R)).toBeCloseTo(0.853, 3)
+  })
+
+  it('is what the shared bearing was buying, and the price is stated rather than hidden', () => {
+    /*
+     * WHILE THE TWO SHARED A BEARING THE LEG WAS 1.43 m — a plumber's reach from
+     * the wall to a mouth in open floor, which is why nobody ever looked at it.
+     * The split multiplies it by 4.4. Nothing in [ref] or in the footage says how
+     * the real pipe crosses; the museum's cutaway draws the junction
+     * schematically because its last courses were lifted long ago.
+     *
+     * So the model draws the only line that can be DERIVED — straight, at
+     * WATER.downpipeElbowRise above the rim — and draws it in the schematic half
+     * of the water layer, with the droplets running along it so the crossing is
+     * the most visible thing there rather than the least. Inventing a route under
+     * the floor would be inventing a dimension, which rule 1 forbids; drawing
+     * nothing would be hiding the consequence of his own sentence.
+     */
+    expect(legLength(182, 182)).toBeCloseTo(1.425, 3)
+    expect(
+      legLength(WELL.azimuthDeg, WALL_SHAFT.azimuthDeg) / legLength(182, 182),
+    ).toBeGreaterThan(4)
+    // the leg clears the floor by the elbow rise and no more
+    expect(WATER.downpipeElbowRise).toBeCloseTo(0.25, 10)
   })
 })

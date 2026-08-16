@@ -3,6 +3,7 @@ import {
   buriedRunRadii,
   channelRings,
   clearArcsFor,
+  flowAlongPath,
   flowPosition,
   pipeOuterDiameter,
   segmentsForRing,
@@ -143,6 +144,70 @@ describe('flow animation', () => {
       expect(y).toBeLessThanOrEqual(8 + 1e-9)
       expect(y).toBeGreaterThanOrEqual(2 - 1e-9)
     }
+  })
+})
+
+describe('flow down a bent run', () => {
+  /*
+   * flowPosition() was enough while the downpipe and the wellhead shared a
+   * bearing: the water fell down one plumb line and a single Y said where it
+   * was. Since [OWNER] 2026-08-17 put the slot in the wall on the far side of
+   * storey 3 from the mouth, the run turns twice — down the shaft, across the
+   * chamber, into the well — and a droplet animated on Y alone rains through
+   * four rooms nothing stands in.
+   */
+  const L = [
+    { x: 0, y: 10, z: 0 },
+    { x: 0, y: 0, z: 0 },
+    { x: 30, y: 0, z: 0 },
+  ]
+
+  it('runs from the first point to the last', () => {
+    expect(flowAlongPath(L, 0)).toEqual({ x: 0, y: 10, z: 0 })
+    expect(flowAlongPath(L, 1)).toEqual({ x: 0, y: 10, z: 0 }) // wraps, as flowPosition does
+    const nearEnd = flowAlongPath(L, 0.999999)
+    expect(nearEnd.x).toBeCloseTo(30, 4)
+    expect(nearEnd.y).toBeCloseTo(0, 9)
+  })
+
+  it('is parametrised by LENGTH, so the drop does not change speed at a bend', () => {
+    /*
+     * THE PROPERTY, and the reason this is not three lerps. The legs here are 10
+     * and 30, so the corner falls at t = 0.25 — not at 0.5. Splitting t evenly
+     * between the legs would run the long one at three times the speed of the
+     * short one, and on storey 3 the two legs really are that unequal: 13 m of
+     * fall against a 6.23 m crossing.
+     */
+    expect(flowAlongPath(L, 0.25)).toEqual({ x: 0, y: 0, z: 0 })
+    expect(flowAlongPath(L, 0.125).y).toBeCloseTo(5, 9)
+    expect(flowAlongPath(L, 0.625).x).toBeCloseTo(15, 9)
+    // equal steps of t cover equal distance wherever they are taken
+    const d = (a: number, b: number) => {
+      const p = flowAlongPath(L, a)
+      const q = flowAlongPath(L, b)
+      return Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z)
+    }
+    expect(d(0.05, 0.15)).toBeCloseTo(d(0.7, 0.8), 9)
+  })
+
+  it('wraps cleanly for any t, including negatives, and stays on the path', () => {
+    for (const t of [-3.2, -0.4, 0, 0.37, 2.7, 11.9]) {
+      const p = flowAlongPath(L, t)
+      // the path is the two axes, so one coordinate is always pinned to zero
+      expect(p.z).toBeCloseTo(0, 12)
+      expect(p.x >= -1e-9 && p.y >= -1e-9).toBe(true)
+    }
+  })
+
+  it('degrades safely on a path that is not one', () => {
+    expect(flowAlongPath([], 0.5)).toEqual({ x: 0, y: 0, z: 0 })
+    expect(flowAlongPath([{ x: 1, y: 2, z: 3 }], 0.5)).toEqual({ x: 1, y: 2, z: 3 })
+    // a zero-length run has nowhere to be but its own start
+    const stuck = [
+      { x: 1, y: 2, z: 3 },
+      { x: 1, y: 2, z: 3 },
+    ]
+    expect(flowAlongPath(stuck, 0.5)).toEqual({ x: 1, y: 2, z: 3 })
   })
 })
 

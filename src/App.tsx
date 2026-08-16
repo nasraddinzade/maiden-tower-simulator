@@ -17,6 +17,7 @@ import {
   STAIR_BEARING_QUESTION,
   TOWER,
   WALL_LIFTS,
+  WALL_SHAFT,
   WATER,
   WELL,
   WELL_BEARING_CONFLICT,
@@ -371,7 +372,13 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
    *
    * Photographed: an open rectangular recess through several courses, floor to
    * springing, with the pipe inside it. [ref] has the pipe coming out of the
-   * niches, and this is the niche.
+   * niches, and this is the niche. up/076 is it from inside storey 3.
+   *
+   * ITS BEARING IS WALL_SHAFT'S, NOT THE WELLHEAD'S, since 2026-08-17. It ran on
+   * WELL.azimuthDeg for as long as this model had one bearing for both, which
+   * meant the slot could not be anywhere but over the mouth however the footage
+   * read. The storey the run STARTS at is still the wellhead's — whatever route
+   * the pipe takes at the bottom, both features are on storey 3.
    *
    * Kept as DownpipeChase rather than narrowed to WallChase on the way out: the
    * extra field is which storey each length belongs to, TowerShell has no use
@@ -383,7 +390,7 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
         FLOORS,
         WATER.channelFloorRange,
         WELL.startsAtFloorIndex,
-        WELL.azimuthDeg,
+        WALL_SHAFT.azimuthDeg,
         WATER.downpipeDiameter,
       ),
     [],
@@ -695,18 +702,18 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
    * SAME KIND AS THE ROOF: a conflict between a witness and the geometry, with
    * both halves standing.
    *
-   * [OWNER] 2026-08-16 put the wellhead beside the stair passage and the model
-   * obeyed him. The bearing that does it also drives the downpipe's chase up
-   * five storeys of wall the stair is already in, so the cutter opens the jamb
-   * between room and passage eight times. Nothing has been softened to hide
-   * that: the chase is cut, the slots are there to walk up to, and this prints
-   * what they are.
+   * [OWNER] 2026-08-17 separated the wellhead from the slot in the wall, and the
+   * model now carries two bearings where it carried one. That paid the whole of
+   * the stair bill this block used to print — the live measurement below has
+   * been empty since — and left a 6.23 m junction across storey 3 by a route
+   * nobody has measured. The report says both.
    *
-   * THE LIST IS COMPUTED, NOT QUOTED. WELL_BEARING_CONFLICT carries the argument
-   * and the shipped figures; chaseBreaches() re-derives them here from the LIVE
-   * flight plan, so turning the stair in the leva panel changes the report on the
-   * spot. It falls silent when there is nothing to report, which is the only way
-   * anyone will notice the day something fixes it.
+   * THE LIST IS COMPUTED, NOT QUOTED, and the silent case is the point. Every
+   * figure in WELL_BEARING_CONFLICT is the shipped configuration's; chaseBreaches()
+   * re-derives them here from the LIVE flight plan, so turning the stair in the
+   * leva panel changes the report on the spot. It went silent the day the split
+   * landed, which is exactly what it was built to be able to do — a report that
+   * can only ever grow is a report nobody believes when it shrinks.
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -723,8 +730,9 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
         ...WELL_BEARING_CONFLICT,
         '',
         breaches.length === 0
-          ? 'ЖИВОЙ ЗАМЕР: штраба сейчас не задевает ни один проход.'
-          : `ЖИВОЙ ЗАМЕР при az ${WELL.azimuthDeg}° и текущей лестнице — ${breaches.length}:`,
+          ? `ЖИВОЙ ЗАМЕР при устье ${WELL.azimuthDeg}° / штрабе ${WALL_SHAFT.azimuthDeg}° и текущей ` +
+            'лестнице: штраба не задевает ни один проход.'
+          : `ЖИВОЙ ЗАМЕР при штрабе ${WALL_SHAFT.azimuthDeg}° и текущей лестнице — ${breaches.length}:`,
         ...breaches.map(
           (b) =>
             `  ярус ${b.floorIndex + 1} × проход ${b.passage}: ${b.overlapDeg.toFixed(2)}° внутрь, ` +
