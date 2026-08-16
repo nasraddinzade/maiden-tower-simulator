@@ -79,10 +79,12 @@ describe('hotspot markers agree with the config', () => {
       if (steps.length === 0) return
       const lift = WALL_LIFTS[i]
       if (lift.fromFloorNumber === storey!.floorNumber) {
-        doorways.push(approachAzimuthDeg(steps, steps[0], STAIR.width))
+        doorways.push(approachAzimuthDeg(steps, steps[0], STAIR.width, STAIR.doorwayWidth))
       }
       if (lift.toFloorNumber === storey!.floorNumber) {
-        doorways.push(approachAzimuthDeg(steps, steps[steps.length - 1], STAIR.width))
+        doorways.push(
+          approachAzimuthDeg(steps, steps[steps.length - 1], STAIR.width, STAIR.doorwayWidth),
+        )
       }
     })
     expect(doorways.length, `storey ${storey!.floorNumber} has no wall stair at all`).toBeGreaterThan(0)

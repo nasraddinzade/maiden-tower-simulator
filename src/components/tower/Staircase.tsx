@@ -157,6 +157,11 @@ function useRampBoxes(p: StaircaseProps) {
       innerRadiusAt,
       (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
       WALL_LIFTS.map((l) => l.opensAtY),
+      // the doorway's clear width, which sizes the landing the ramps stand on and
+      // the doorway's own bearing along it. NOT p.width: the leva panel moves the
+      // flight, and a landing planned off the flight's width would be a landing
+      // the shell was never cut for. See passageLeadSteps().
+      STAIR.doorwayWidth,
     )
     return [
       ...flights.flatMap((steps) => stairRampBoxes(steps, p.width)),

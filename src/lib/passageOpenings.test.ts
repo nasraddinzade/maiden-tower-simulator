@@ -10,7 +10,12 @@ import {
   stairSettings,
 } from '../config/tower'
 import { PLAYER } from '../config/player'
-import { planAllFlights, stairPassageSections, approachAzimuthDeg } from './staircase'
+import {
+  planAllFlights,
+  stairDoorways,
+  stairPassageSections,
+  approachAzimuthDeg,
+} from './staircase'
 import {
   buttressDepthAt,
   ladderResidual,
@@ -61,7 +66,23 @@ function layout(overrides: Partial<Parameters<typeof stairSettings>[0]> = {}) {
     buttressTopY: BEAK_TOP_Y,
     towerTopY: TOWER.topY,
   })
-  return { settings, flights, tubes, anchors, openings }
+  /*
+   * The doorways of the SAME layout, because a slit and the doorway at its end
+   * are two holes in one landing and this file now asserts how they sit relative
+   * to each other. Planned here rather than imported so an override that turns
+   * the stair moves both together.
+   */
+  const doorways = stairDoorways(
+    flights,
+    settings.width,
+    STAIR.doorwayHeight,
+    innerRadiusAt,
+    (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+    TOWER.topY,
+    WALL_LIFTS.map((l) => l.opensAtY),
+    STAIR.doorwayWidth,
+  )
+  return { settings, flights, tubes, anchors, openings, doorways }
 }
 
 const BASE = layout()
@@ -737,12 +758,68 @@ describe('a slit at a passage end cannot be entered', () => {
     }
   })
 
-  it('sits clear of the doorway at the same end, so the two are separate holes', () => {
+  it('shares a bearing with the doorway at the same end and is told apart by radius', () => {
+    /*
+     * THIS ASSERTION USED TO READ "SITS CLEAR OF THE DOORWAY", more than 3° of
+     * drum away, and that was the fault rather than the property. The two holes
+     * are at opposite ends of the same radial: the doorway runs from inside the
+     * chamber out to the passage, the reveal from the passage's far cheek out to
+     * the drum face, and the void a man stands in is what separates them. Nothing
+     * ever required them to be on different bearings, and while they were, the
+     * man standing in one was looking 25° off the other — see
+     * stairApproachSide.test.ts and [OWNER] 2026-08-16 and -08-17.
+     *
+     * So the separation is stated where it actually lives. The doorway's tool
+     * overshoots the passage's outer cheek by exactly (doorwayWidth − width) / 2
+     * = 0.100 m, which is the margin that makes the opening a hole rather than a
+     * blind recess, and stops 2.57–3.44 m short of the drum.
+     */
     for (const o of BUILT) {
       const steps = BASE.flights[o.flightIndex]
       const tread = o.end === 'foot' ? steps[0] : steps[steps.length - 1]
-      const doorAz = approachAzimuthDeg(steps, tread, BASE.settings.width)
-      expect(Math.abs(delta(o.azimuthDeg, doorAz))).toBeGreaterThan(3)
+      const doorAz = approachAzimuthDeg(steps, tread, BASE.settings.width, STAIR.doorwayWidth)
+      expect(Math.abs(delta(o.azimuthDeg, doorAz)), `${o.id} bearing`).toBeCloseTo(0, 9)
+      const doorway = BASE.doorways.find(
+        (d) =>
+          Math.abs(delta(d.azimuthDeg, o.azimuthDeg)) < 1e-9 &&
+          d.bottomY < o.centreY &&
+          d.topY > o.centreY - o.innerHeight / 2,
+      )
+      expect(doorway, `${o.id} has no doorway on its own bearing`).toBeTruthy()
+      expect(doorway!.outerRadius - o.revealEndRadius, `${o.id} overshoot`).toBeCloseTo(
+        (STAIR.doorwayWidth - BASE.settings.width) / 2,
+        9,
+      )
+      expect(TOWER.outerRadius - doorway!.outerRadius, `${o.id} reach`).toBeGreaterThan(2.5)
+    }
+  })
+
+  it('swallows that overshoot in its own reveal, all but a strip at the sill', () => {
+    /*
+     * WHAT THE CONCENTRIC ARRANGEMENT BOUGHT, measured because the overshoot is
+     * the one thing that could have gone wrong by putting the two holes on one
+     * radial. The doorway's 0.100 m of overreach recesses the passage's outer
+     * cheek across its own width and height. On a bearing of its own that was a
+     * shallow blind pocket 1.69 m tall standing BESIDE the window. On the slit's
+     * bearing it is inside the reveal — the mouth is 3.2–3.5° wider than the
+     * doorway either side and its head stands 0.56 m above the doorway's — except
+     * for a 0.250 m strip under the sill, which reads as the reveal's own base
+     * rather than as a second hole.
+     */
+    for (const o of BUILT) {
+      const doorway = BASE.doorways.find(
+        (d) => Math.abs(delta(d.azimuthDeg, o.azimuthDeg)) < 1e-9 && d.bottomY < o.centreY,
+      )!
+      const mouthHalfDeg = (o.innerWidth / 2 / o.revealEndRadius) * (180 / Math.PI)
+      expect(mouthHalfDeg - doorway.widthDeg / 2, `${o.id} width`).toBeGreaterThan(1.1)
+      expect(
+        o.centreY + o.innerHeight / 2 - doorway.topY,
+        `${o.id} head`,
+      ).toBeGreaterThan(0.5)
+      expect(
+        o.centreY - o.innerHeight / 2 - doorway.bottomY,
+        `${o.id} strip below the sill`,
+      ).toBeCloseTo(0.25, 3)
     }
   })
 

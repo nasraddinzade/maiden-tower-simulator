@@ -247,36 +247,43 @@ describe('a slit at a passage end is walled off by the passage’s own colliders
     expect(holes).toEqual([])
   })
 
-  it('tells a doorway and a slit at the same end apart', () => {
+  it('tells a doorway and a slit at the same end apart, by radius and not by bearing', () => {
     /*
-     * They are two different holes in one landing and the wall-integrity sampler
-     * would happily credit one for the other: it samples at floorY + 0.9, which
-     * is inside a slit's height AND inside a doorway's, and the two are only a
-     * few degrees apart at a flight's head. A test that passed because the
+     * They are two different holes in one landing and the sampler would happily
+     * credit one for the other: it looks at floorY + 0.9, which is inside a
+     * slit's height AND inside a doorway's, so a check that passed because the
      * doorway was there would say nothing at all about the slit.
+     *
+     * IT USED TO TELL THEM APART BY BEARING, demanding more than 3° between any
+     * doorway and any slit sharing a height band. That is gone, and its going is
+     * the repair of 2026-08-17 rather than a weakening: a doorway now stands in
+     * the middle of its landing, which is exactly where the slit is, because a
+     * man walking in through one is supposed to be looking straight down the
+     * other. Every end has a doorway 0.000° from its slit and the old
+     * discriminator would now reject the correct building.
+     *
+     * WHAT SEPARATES THEM IS THE RADIUS, and always did. They are cut in opposite
+     * cheeks of one passage: the doorway from inside the chamber out to the
+     * passage, stopping 0.100 m past its outer cheek so the opening is a hole and
+     * not a blind recess; the reveal from that same cheek out to the drum's face,
+     * 3.4 m further. No ray reaches the sky through a doorway, and this is the
+     * property the sampler needs.
      */
     for (const o of built) {
-      const sill = o.centreY - o.outerHeight / 2
-      const head = o.centreY + o.outerHeight / 2
-      /*
-       * In azimuth ALONE they can be a degree apart and still be different
-       * things, because the flights stack: the head doorway of 2→3 stands at
-       * bearing 9.7 and the slit at the head of 3→4 at 8.8, four and a half
-       * metres higher. The pair that would actually be confused is one that
-       * shares a height band as well.
-       */
-      const confusable = doorways.filter((d) => {
+      const sameEnd = doorways.filter((d) => {
         const gap = Math.abs(((d.azimuthDeg - o.azimuthDeg + 540) % 360) - 180)
-        return gap < 3 && d.topY > sill && d.bottomY < head
+        return gap < 1e-6 && d.topY > o.centreY - o.innerHeight / 2 && d.bottomY < o.centreY
       })
-      expect(
-        confusable.map((d) => `az ${d.azimuthDeg.toFixed(1)} y ${d.bottomY.toFixed(2)}`),
-        `${o.id} cannot be told apart from a doorway`,
-      ).toEqual([])
-
-      // and they are cut the opposite ways: the doorway breaks INTO the room,
-      // the slit runs from the same cheek out to the drum face
-      for (const d of doorways) expect(d.innerRadius).toBeLessThan(o.revealEndRadius)
+      expect(sameEnd.length, `${o.id} has no doorway on its own bearing`).toBe(1)
+      for (const d of doorways) {
+        // no doorway starts outside a reveal, and none reaches anywhere near the drum
+        expect(d.innerRadius, `${o.id} vs doorway at ${d.azimuthDeg.toFixed(1)}`).toBeLessThan(
+          o.revealEndRadius,
+        )
+        expect(d.outerRadius, `doorway at ${d.azimuthDeg.toFixed(1)}`).toBeLessThan(
+          TOWER.outerRadius - 2,
+        )
+      }
     }
   })
 })

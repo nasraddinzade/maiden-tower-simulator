@@ -577,6 +577,72 @@ export function entryLandingTreads(steps: StepPlacement[]): number {
 }
 
 /**
+ * HOW LONG THE LANDING AT EACH END OF A FLIGHT IS, in whole steps of lead.
+ *
+ * ONE DERIVATION, READ BY THREE THINGS. The tube's lead-in and lead-out are cut
+ * from it, the doorway is centred on it (approachAzimuthDeg), and the slit is
+ * centred on it too (planPassageOpenings, off the tube's own cap). Those three
+ * used to be sized from three different arithmetics and the walker paid for the
+ * difference — see the note on approachAzimuthDeg().
+ *
+ * THE RULE: the landing carries the doorway, with stone left at both jambs.
+ *
+ * It used to read `width / 2 + doorwayWidth / 2 + one step`, which is where a
+ * doorway pushed half a FLIGHT width off the end tread reaches to. The doorway
+ * is no longer put there, so that expression no longer describes anything; the
+ * requirement it was standing in for is simply that the whole opening fits
+ * between the end tread and the end cap. Half a step of masonry at each jamb is
+ * the margin, expressed the way the rest of this function is — the lead runs out
+ * in whole steps, so one step of slack shared between the two jambs.
+ *
+ * Note it comes to `ceil(doorwayWidth / going) + 1` almost exactly, since an arc
+ * in degrees divided by the step angle in degrees is a length divided by the
+ * going. Five steps at every flight in this tower, which is what the old
+ * expression gave as well: the two differ by 0.1 m of arc and the ceiling
+ * swallows it. So the passage this returns is bit-identical to the shipped one,
+ * and the repair is carried entirely by where the doorway sits on it.
+ *
+ * The radius is the LAST tread's at both ends, which is the radius the old
+ * expression used and is kept for that reason: it is the wider of the two, so
+ * sizing both leads by it can only ever leave the foot with more jamb than it
+ * asked for.
+ */
+export function passageLeadSteps(steps: StepPlacement[], doorwayWidth: number): number {
+  if (steps.length < 2) return 1
+  const stepAngle = Math.abs(steps[1].azimuthDeg - steps[0].azimuthDeg)
+  if (stepAngle < 1e-9) return 1
+  const last = steps[steps.length - 1]
+  const doorwayDeg = (doorwayWidth / Math.max(0.5, last.midRadius)) * (180 / Math.PI)
+  return Math.max(1, Math.ceil((doorwayDeg + stepAngle) / stepAngle))
+}
+
+/**
+ * That landing as an arc, degrees, measured from the end tread to the end cap.
+ *
+ * Unsigned. The direction is AWAY from the flight at both ends — leadIn walks
+ * back from the bottom tread and leadOut on past the top one — and every caller
+ * that needs the sign has the climb direction to hand.
+ *
+ * The two ends do not come out equal, because the lead is laid in steps of the
+ * flight's own angular pitch and that pitch narrows as the stair climbs into a
+ * thicker part of the wall: `stepAngle` at the foot, the last step's angle at
+ * the head. 16.47–20.44° across the twelve.
+ */
+export function passageLeadArcDeg(
+  steps: StepPlacement[],
+  doorwayWidth: number,
+  end: 'foot' | 'head',
+): number {
+  if (steps.length < 2) return 0
+  const n = steps.length
+  const spacing =
+    end === 'foot'
+      ? Math.abs(steps[1].azimuthDeg - steps[0].azimuthDeg)
+      : Math.abs(steps[n - 1].azimuthDeg - steps[n - 2].azimuthDeg)
+  return passageLeadSteps(steps, doorwayWidth) * spacing
+}
+
+/**
  * THE PAVING OF A LANDING: the level stone that carries its floor from the end
  * tread out to the passage's end cap.
  *
@@ -946,26 +1012,7 @@ export function stairPassageSections(
     const last = flight[flight.length - 1]
     const lastAngle = last.azimuthDeg - flight[flight.length - 2].azimuthDeg
 
-    /*
-     * THE TUBE HAS TO REACH PAST THE DOORWAY, not one step past the last tread.
-     *
-     * A doorway is not centred on the end tread: approachAzimuthDeg pushes it
-     * half a flight-width ALONG the climb so it stops straddling the treads
-     * below, and then it spreads its own half-width either side. Measured, that
-     * puts its far edge 13.3° beyond the last tread while a one-step lead-out
-     * reached 4.1°. The 9° in between is doorway cut into masonry the passage
-     * never reached — a blind rectangular pocket, 1.36 m deep and 2.4 m tall,
-     * standing in the wall beside every stair exit. That is what the owner has
-     * been calling unhewn.
-     *
-     * So each end runs out in whole steps until it covers the opening, and the
-     * end section repeats the end tread's height, which keeps the lead flat and
-     * makes it read as the landing continuing to the door.
-     */
-    const overrunDeg =
-      ((width / 2 + doorwayWidth / 2) / Math.max(0.5, last.midRadius)) * (180 / Math.PI) +
-      Math.abs(stepAngle)
-    const leadSteps = Math.max(1, Math.ceil(overrunDeg / Math.abs(stepAngle)))
+    const leadSteps = passageLeadSteps(flight, doorwayWidth)
 
     const leadIn: PassageSection[] = []
     for (let k = leadSteps; k >= 1; k--) {
@@ -1102,15 +1149,17 @@ export function stairTreadVertices(
  * Where a flight is entered or left at one of its ends — the ONE rule the
  * doorway and the ramp up to it must both obey.
  *
- * Half a flight-width along the climb from the end tread. Both the opening in
+ * THE MIDDLE OF THE LANDING, at both ends of every flight. Both the opening in
  * the masonry and the walking surface leading to it are placed by this, because
- * when they were placed separately they drifted apart by exactly that half width
- * and the walker met a jamb where the ramp said there was a way through.
+ * when they were placed separately they drifted apart and the walker met a jamb
+ * where the ramp said there was a way through.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * "ALONG THE CLIMB" IS NOT THE SAME DIRECTION AT THE TWO ENDS, AND THE SLIT AT
- * A FOOT IS WHAT PAYS FOR IT. Measured 2026-08-16, and NOT acted on — see the
- * bill at the bottom, which is the owner's to settle and not this file's.
+ * IT WAS HALF A FLIGHT WIDTH FROM THE END TREAD UNTIL 2026-08-17, AND THAT IS
+ * WHAT THE OWNER HAS BEEN LOOKING AT ALL WEEK. The slit is centred on the
+ * landing; the doorway was not; a walker standing in a doorway that is not on
+ * the slit's own radial sees the slit's shaft running away to one side. Twice
+ * reported, once mis-repaired, and the whole of it is written out below.
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * THE COMPLAINT. [OWNER] 2026-08-16, of the model on screen: «окно при входе на
@@ -1155,13 +1204,50 @@ export function stairTreadVertices(
  *     head-7-8    119.417  116.028   3.389°  10.296° of 14.94°
  *     head-8-9    121.588  118.293   3.295°   9.983° of 14.47°
  *
- * That is the table AS THE FAULT LEFT IT, kept because it is the measurement the
+ * That is the table AS THE FIRST FAULT LEFT IT, kept because it is what the
  * repair is measured against. Six of six feet stood OUTSIDE the mouth of the
  * recess they serve; six of six heads stood inside it, more than half way across.
  * Standing in a foot doorway at r 4.2 the slit's outer mouth bore 222.5° against
- * a facing of 190.6 — 31.9° off the shoulder — and that is the picture he sent.
- * The six feet now read 202.628, 202.834 and so on, each one flight width round
- * from the figure above, and stairApproachSide.test.ts holds both columns.
+ * a facing of 190.6 — 31.9° off the shoulder — and that is the first picture he
+ * sent. Flipping the sign moved the six feet one flight width of arc, to 202.628,
+ * 202.834 and so on, and every end then read like a head: 3.3–4.1° of drum from
+ * its slit instead of 13.6–16.4°.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * AND HE LOOKED AGAIN AND THE WINDOW WAS STILL TO THE RIGHT: «окна при входе на
+ * лестницу опять направо смотрят». 3.3–4.1° OF DRUM IS NOT «ПРЯМО», AND THE
+ * MISTAKE WAS MEASURING THE FAULT AT THE CENTRE OF THE TOWER INSTEAD OF AT HIS
+ * EYE.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Degrees of drum are the separation of two radials seen from the axis, and the
+ * walker is not at the axis — he is standing IN the doorway, 0.72 m from the
+ * cheek the slit is cut through. Measured at his eye, on his own doorway's
+ * radial, one shoulder off the inner cheek because that is as far back as the
+ * passage lets him stand, with the twelve ends as they shipped this morning:
+ *
+ *     the slit's INNER mouth, on the passage cheek   24.9…25.4° to the RIGHT
+ *     its OUTER mouth, 3.5 m of stone further on      7.9…8.4° to the RIGHT
+ *
+ * That is a shaft of light entering the room at 25° off his nose and running away
+ * to 8°, i.e. bending 16.5…17.5° across his view as it goes: «на кривую направо».
+ * At the six heads it is the same two numbers with the sign reversed — the stair
+ * is on the other hand there — and he climbs, so what he reports is the feet. On
+ * 2026-08-16, with the shift sent along the climb, it read 66.5…68.3° and
+ * 30.6…31.9°; the sign flip bought two thirds of it and stopped.
+ *
+ * WHY IT IS SIX TIMES BIGGER AT THE EYE THAN AT THE AXIS. 4.088° of drum is
+ * 0.335 m of arc at the cheek, and the cheek is 0.72 m in front of him: 0.335
+ * against 0.72 is 25°. A separation measured from the middle of the building is
+ * not the angle anybody standing in the building turns their head by, and a test
+ * that only ever reported the first was always going to certify a skew he can
+ * see.
+ *
+ * SO THE DOORWAY GOES TO THE MIDDLE OF THE LANDING, WHICH IS WHERE THE SLIT IS.
+ * Then the walker's radial IS the slit's radial, both mouths are dead ahead, and
+ * the reveal is symmetric about his facing at every height — 0.000° at both
+ * mouths at all twelve ends, exactly, because they are the same bearing and not
+ * because a bracket has been widened.
  *
  * THE SLIT CANNOT BE THE THING THAT MOVES, which is why this note is here and
  * not in passageOpenings.ts. Its inner mouth is 18.23° of a 20.44° landing at the
@@ -1172,80 +1258,96 @@ export function stairTreadVertices(
  * that fits at every end" — and adds that choosing any other position would be
  * choosing one for its result, which is rule 7.
  *
- * THE ONE-LINE CHANGE, AND ITS BILL, WHICH HAS BEEN PAID. Sending the shift away
- * from the flight at both ends moves the six foot doorways 10.166…12.264° — one
- * flight width of arc, by construction — and makes every end read like a head:
- * 3.4–4.1° from its slit, 10.3–12.5° of overlap, and foot-N sitting exactly where
- * head-(N−1) sits, because the two share a landing. It moves NO opening: the
- * slits are placed off the tube's cap and tread bearings, and the tube does not
- * depend on this. Nor any doorway sill, head or rake — bottomY, topY and
- * bottomRake come out identical at all twelve ends. What it cost was 14
- * assertions in three files, and three of those are findings rather than
- * bookkeeping:
+ * HALF A FLIGHT WIDTH, ON THE OTHER HAND, WAS NEVER A MEASUREMENT OF ANYTHING.
+ * Nothing in docs/ puts a doorway that distance from a first tread. It came from
+ * stairApproaches(): "an approach centred on the end tread straddles it, reaching
+ * back over the treads below, and a slab laid over a descending flight is a wall
+ * across it". That is an argument about a shift sent ALONG THE CLIMB, and since
+ * 2026-08-17 the shift is sent away from it, onto a landing which is level for
+ * its whole length. The reason retired; the magnitude stayed on out of habit.
+ * The landing's own middle is a described place: the arc between the end tread
+ * and the end cap, which is what the tube cuts, what the bed is laid at and what
+ * the slit is centred on.
  *
- *   · chamberDaylight — the census goes from FOUR chambers of eight seeing the
- *     sky to SEVEN, with only storey 5 left dark, because a foot's slit now
- *     lights the room it opens off instead of only the steps. That retires
- *     chamberDaylight.test.ts's central finding and the argument built on it,
- *     that the quarter turn "is worth exactly two rooms": storeys 3 and 4 come
- *     lit at 90 with no turn at all, and STAIR_FROM_BUTTRESS_DEG has lost its
- *     most expensive consequence.
- *   · WELL.azimuthDeg — 171 was [OWNER] 2026-08-16's «колодец должен стоять рядом
- *     с проходом» turned into arithmetic, tangent to the near jamb of THIS
- *     doorway: 190.772 − 7.245 − 13.003 = 170.52. The doorway is at 202.628 now
- *     and the same derivation gives 182.38 → 182. His sentence is RELATIONAL, so
- *     the well follows its passage; leaving it at 171 would have kept the letter
- *     of his placement and lost all of its meaning. Its bill was re-priced with
- *     it — four passages breached instead of eight, half again as deep.
- *   · junctions — its "doorway inside its passage" check attributed a doorway to
- *     the first tube spanning its height, so foot-8-9 was measured against 7→8's
- *     tube and ran 7.2° off the end of the wrong one. That was the check's
- *     heuristic and not the geometry; it asks the flight now.
+ * WHAT IT COSTS, AND ALL OF IT IS PAID HERE.
  *
- * WHY IT WAS NOT DONE ON 2026-08-16, and why that was wrong. The reasoning then
- * was that a screenshot may not re-decide how many rooms see daylight or move a
- * thing the owner placed by name the day before — the same treatment
- * STAIR_FROM_BUTTRESS_DEG gets. But those are not the same case. That number is
- * a MEASUREMENT nobody has, and this one is a SIGN that contradicts the passage
- * the doorway opens into; the model was not carrying an open question here, it
- * was carrying an error, and an error is not the owner's to ratify. He walked the
- * tower a second time and found it still there.
+ *   · THE WALKING SURFACE HAD TO BE REBUILT, and this is the real bill. The
+ *     approach ramp is one box a flight-width across, laid on the doorway's own
+ *     bearing, and half a flight width was exactly the offset that made its near
+ *     edge land ON the end tread. Measured on the shipped colliders at the foot
+ *     of 2→3: floor from 12.27° of drum past the tread back down the flight, and
+ *     NOTHING from there to the cap at 20.44° — 0.60 m of landing, the far third,
+ *     the part the slit is cut over, with no collider under it at all. So the
+ *     surface was never the landing; it was a patch under the doorway that
+ *     happened to touch the stair. Moving the doorway without noticing that would
+ *     have opened a 0.25 m hole between the two. stairApproaches() lays the whole
+ *     landing now, end tread to end cap, and the walker can stand at his window.
+ *   · WELL.azimuthDeg 182 → 186. Untouched arithmetic, moved doorway: the well is
+ *     tangent to the near jamb of foot-3-4, and that jamb goes 195.383 → 199.335.
+ *     206.580 − 7.245 − 13.003 = 186.33. [OWNER] 2026-08-16's «колодец должен
+ *     стоять рядом с проходом» is RELATIONAL and the well follows its passage,
+ *     the same reading 4f92518 gave it. Re-priced with it; see WELL_BEARING_CONFLICT.
+ *   · the daylight census, re-measured and reported in chamberDaylight.test.ts.
+ *     Concentric holes admit more than offset ones, so the bands widen; nothing
+ *     that was dark becomes lit and nothing lit goes dark.
  *
- * approachOffsetTowardLandingDeg() below is the ruler. It reads +4.94…+5.93° at
- * all twelve ends now, and a negative number from it is the fault returning.
+ * WHAT IT DOES NOT MOVE: no slit, no cap, no tube. passageLeadSteps() returns the
+ * same five steps at every flight it always did — see the note there for why the
+ * two expressions agree — so the passage is bit-identical and the openings with
+ * it. Nor any sill: bottomY, topY and bottomRake come out identical at all twelve
+ * doorways, because the sill is taken from the tread nearest the opening and the
+ * landing is level, so 4° of arc along it changes nothing.
+ *
+ * approachOffsetTowardLandingDeg() below is the ruler. It reads half the landing
+ * at all twelve ends now, and anything else out of it is the fault returning.
  */
 export function approachAzimuthDeg(
   steps: StepPlacement[],
   endTread: StepPlacement,
   width: number,
+  /**
+   * Clear width of the OPENING, which sizes the landing this is the middle of.
+   * Required rather than defaulted to `width`: a caller that has forgotten it is
+   * a caller placing a doorway on a landing of the wrong length, and that is the
+   * class of drift this function exists to make impossible.
+   */
+  doorwayWidth: number,
 ): number {
   if (steps.length < 2) return endTread.azimuthDeg
-  const halfWidthDeg = ((width / Math.max(0.5, endTread.midRadius)) * (180 / Math.PI)) / 2
   const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
-  // AWAY FROM THE FLIGHT AT BOTH ENDS, which is against the climb at the bottom
-  // tread and along it everywhere else — the sign that was wrong. A doorway
-  // partway up a flight (only storey 5's, on the 4→6 run) has no landing to be
-  // sent toward and keeps the shift it always had.
-  const onward = endTread === steps[0] ? -climbDir : climbDir
-  return endTread.azimuthDeg + halfWidthDeg * onward
+  const atFoot = endTread === steps[0]
+  const atHead = endTread === steps[steps.length - 1]
+  if (!atFoot && !atHead) {
+    /*
+     * A doorway partway up a flight — only storey 5's, on the 4→6 run — has no
+     * landing to stand in the middle of. The flight runs straight past it, so
+     * the old shift is still the right one there: half a flight width along the
+     * climb, which keeps the ramp off the treads below it.
+     */
+    const halfWidthDeg = ((width / Math.max(0.5, endTread.midRadius)) * (180 / Math.PI)) / 2
+    return endTread.azimuthDeg + halfWidthDeg * climbDir
+  }
+  // the landing runs AWAY from the flight at both ends: against the climb at the
+  // bottom tread, along it at the top one
+  const onward = atFoot ? -climbDir : climbDir
+  const landingDeg = passageLeadArcDeg(steps, doorwayWidth, atFoot ? 'foot' : 'head')
+  return endTread.azimuthDeg + (landingDeg / 2) * onward
 }
 
 /**
  * WHICH SIDE OF THE END TREAD THE WAY IN STANDS ON. Positive toward the landing.
  *
- * A RULER, NOT A REPAIR, in the sense rotationToDaylightDeg() is one: it reports
- * a quantity the model is currently wrong about and applies nothing. A caller
- * that adds this to a bearing is moving six doorways, a well and a daylight
- * census on its own authority — see the note on approachAzimuthDeg() for what
- * that costs and whose decision it is.
+ * A RULER, NOT A REPAIR. It reports where the way in stands and applies nothing.
+ * Read it against passageLeadArcDeg()/2, which is the middle of the landing and
+ * therefore the slit's own bearing: equal is straight ahead, less is short of the
+ * slit and toward the treads, negative is the 2026-08-16 fault back again with
+ * the doorway on the flight's own steps.
  *
  * Positive means the doorway stands on the landing, which is the far side of the
  * end tread from the flight and the side stairPassageSections() carries its lead
- * out to. Negative means it stands over the flight's own treads, and then the
- * landing — with the slit planPassageOpenings() centres on it — is behind the
- * walker rather than in front of him. As shipped it is +4.94…+5.93° at the six
- * heads and −5.08…−6.13° at the six feet, the same magnitude either way because
- * the magnitude is half a flight width and only the sign is in question.
+ * out to. It read −5.08…−6.13° at the six feet until 2026-08-17, then
+ * +4.94…+5.93° at all twelve — half a flight width, which is short of the
+ * landing's middle by 3.30…4.09° — and it is half the landing at all twelve now.
  *
  * Which end an anchor is, taken by proximity rather than by identity: the
  * doorway partway along the 4→6 run belongs to neither end, and asking a tread
@@ -1257,6 +1359,7 @@ export function approachOffsetTowardLandingDeg(
   steps: StepPlacement[],
   endTread: StepPlacement,
   width: number,
+  doorwayWidth: number,
 ): number {
   if (steps.length < 2) return 0
   const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
@@ -1266,7 +1369,9 @@ export function approachOffsetTowardLandingDeg(
   // the lead runs away from the flight at both ends, so "toward the landing" is
   // against the climb at a foot and along it at a head
   const towardLanding = atFoot ? -climbDir : climbDir
-  return (approachAzimuthDeg(steps, endTread, width) - endTread.azimuthDeg) * towardLanding
+  return (
+    (approachAzimuthDeg(steps, endTread, width, doorwayWidth) - endTread.azimuthDeg) * towardLanding
+  )
 }
 
 /** An arched doorway between a room and the stair passage. */
@@ -1351,10 +1456,12 @@ export function stairDoorways(
    * turning into a 0.9 m hole catches on the jamb. Measured, that stopped the
    * climb at storey 3.
    *
-   * Note carefully that the AZIMUTH still comes from the flight width, via
-   * approachAzimuthDeg — the opening and the ramp up to it must share a centre
-   * line or they drift apart and the walker meets a jamb where the ramp says
-   * there is a way through. Only the opening's angular EXTENT widens.
+   * Note carefully that the AZIMUTH comes from approachAzimuthDeg — the opening
+   * and the ramp up to it must share a centre line or they drift apart and the
+   * walker meets a jamb where the ramp says there is a way through. Since
+   * 2026-08-17 this width is an input to that bearing as well as to the extent:
+   * the landing is sized to carry the opening and the opening stands in the
+   * middle of it.
    */
   doorwayWidth = width,
 ): StairDoorway[] {
@@ -1373,7 +1480,7 @@ export function stairDoorways(
     // reach past the room face so the opening is a hole, not a blind recess
     const inner = Math.min(innerFaceRadiusAt(floorY) - 0.25, s.midRadius - doorwayWidth / 2)
     // the same azimuth the ramp up to it uses — see approachAzimuthDeg()
-    const azimuthDeg = approachAzimuthDeg(all, s, width)
+    const azimuthDeg = approachAzimuthDeg(all, s, width, doorwayWidth)
     const widthDeg = (doorwayWidth / Math.max(0.5, s.midRadius)) * (180 / Math.PI)
 
     /*
@@ -1611,6 +1718,27 @@ export function stairDoorways(
  * from the last tread back into the room above. Nothing vertical anywhere along
  * the way in. Once placed ON the stair the walker already climbed all seven
  * flights without a stumble, which is what made this so hard to see.
+ *
+ * AND THE LANDING IS A RUN OF ITS OWN SINCE 2026-08-17, which is the half of this
+ * that was missing for as long as the function has existed.
+ *
+ * The radial run above is one box a flight-width across, and a flight width of
+ * arc is all the landing it ever covered. That was invisible while the doorway
+ * stood half a flight width from the end tread, because half a flight width is
+ * exactly the offset that lands the box's near edge ON the tread — so the patch
+ * touched the stair at one end and everybody took the hand-off for a floor.
+ * Measured on the shipped colliders at the foot of 2→3, sampling the walking line
+ * every degree: floor at 3.781 from the treads out to 12.27° past the end tread,
+ * then NOTHING from there to the end cap at 20.44°. Six tenths of a metre of
+ * landing — the far third of it, the part the slit is cut over — with no collider
+ * under it at all. A walker who stepped toward his own window fell out of the
+ * building.
+ *
+ * So the landing is laid as what it is: one level box from the end tread to the
+ * end cap, the width of the flight, at the end tread's own height, which is the
+ * height stairPassageSections() beds the whole lead at. The radial run then only
+ * has to carry the walker in off the chamber floor, and where the doorway stands
+ * on the landing stops being a question the walking surface has an opinion about.
  */
 export function stairApproaches(
   flights: StepPlacement[][],
@@ -1619,6 +1747,15 @@ export function stairApproaches(
   floorYOf: (flightIndex: number, end: 'foot' | 'head') => number,
   /** Per flight, floor levels it runs PAST and opens onto — see stairDoorways(). */
   opensAtYPerFlight: number[][] = [],
+  /**
+   * Clear width of the doorway, which sizes the landing — see
+   * passageLeadSteps(). It falls back to the flight's width the way
+   * stairDoorways()' does, and for the same reason: it is the last argument of a
+   * long list. The two must be given the SAME value or the ramp and the opening
+   * are placed on landings of different lengths; junctions.test.ts asserts they
+   * agree end by end rather than trusting the two call sites to match.
+   */
+  doorwayWidth: number = width,
 ): Array<[StepApproachPoint, StepApproachPoint]> {
   const out: Array<[StepApproachPoint, StepApproachPoint]> = []
   flights.forEach((steps, i) => {
@@ -1640,16 +1777,21 @@ export function stairApproaches(
       )
 
     /*
-     * EVERY approach is pushed one half-width ALONG the climb, and then anchored
-     * on whatever tread it actually lands next to.
+     * EVERY approach stands where its doorway does, and is then anchored on
+     * whatever tread it actually lands next to.
      *
      * Both halves of that matter, and both were learnt the hard way.
      *
-     * The shift: an approach centred on the end tread straddles it, reaching back
-     * over the treads below, which are a riser and two risers lower. A slab laid
-     * over a descending flight is a wall across it. Unshifted at the foot, this
-     * put the next flight's ramp 0.19 m proud of the top treads of the flight
-     * below, and the climb stopped two steps short of storey 3 at az 145.
+     * The bearing: it is approachAzimuthDeg()'s, always, because the ramp and the
+     * opening it leads through cannot be two different places. It used to be half
+     * a flight width ALONG the climb, and the reason was that an approach centred
+     * on the end tread straddles it, reaching back over the treads below, which
+     * are a riser and two risers lower — a slab laid over a descending flight is
+     * a wall across it. Unshifted at the foot that put the next flight's ramp
+     * 0.19 m proud of the top treads of the flight below, and the climb stopped
+     * two steps short of storey 3 at az 145. It is the middle of the LANDING now,
+     * which is further from the treads still, so that hazard is further away than
+     * the argument ever asked for.
      *
      * The anchor: having moved along the flight, the approach must meet it at the
      * height the flight HAS THERE, not at the height of the end tread it was
@@ -1667,7 +1809,7 @@ export function stairApproaches(
      * is not this.
      */
     const approach = (endTread: StepPlacement, floorY: number, level: boolean) => {
-      const azimuthDeg = approachAzimuthDeg(steps, endTread, width)
+      const azimuthDeg = approachAzimuthDeg(steps, endTread, width, doorwayWidth)
       const anchor = level ? endTread : nearestTo(azimuthDeg)
       out.push([
         /*
@@ -1710,6 +1852,40 @@ export function stairApproaches(
      */
     approach(steps[0], floorYOf(i, 'foot'), false)
     approach(steps[steps.length - 1], floorYOf(i, 'head'), true)
+
+    /*
+     * AND THE LANDING ITSELF, at both ends: end tread to end cap, level, the
+     * width of the flight. See the note at the head of this function for what was
+     * under it before, which was six tenths of a metre of nothing.
+     *
+     * At the END TREAD'S OWN HEIGHT and not at floorY, because that is where
+     * stairPassageSections() beds the lead — sectionAt(..., landing = true)
+     * repeats the end tread's tread level all the way to the cap. The two agree
+     * to a hair at every end (the foot's platform is laid at fromY and the head's
+     * top tread flush with the floor above), and taking it from the tread means
+     * they cannot come apart if that ever stops being true.
+     *
+     * It runs from the tread OUTWARD, so it overlaps the flight's own first ramp
+     * box at one end and stops on the cap at the other. Overlap is how every
+     * other joint in this chain is made; a butt joint is a seam the controller
+     * catches on.
+     */
+    const landing = (endTread: StepPlacement, end: 'foot' | 'head') => {
+      const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
+      const onward = end === 'foot' ? -climbDir : climbDir
+      const arcDeg = passageLeadArcDeg(steps, doorwayWidth, end)
+      if (arcDeg < 1e-9) return
+      out.push([
+        { azimuthDeg: endTread.azimuthDeg, treadY: endTread.treadY, midRadius: endTread.midRadius },
+        {
+          azimuthDeg: endTread.azimuthDeg + arcDeg * onward,
+          treadY: endTread.treadY,
+          midRadius: endTread.midRadius,
+        },
+      ])
+    }
+    landing(steps[0], 'foot')
+    landing(steps[steps.length - 1], 'head')
 
     /*
      * And a landing where the flight merely PASSES a storey — 4→6 opening onto

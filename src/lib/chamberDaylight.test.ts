@@ -182,30 +182,38 @@ describe('the number, and it is seven chambers out of eight', () => {
     for (const c of CHAMBERS) expect(c.lit, `storey ${c.floorNumber}`).toBe(c.arcDeg > 0)
   })
 
-  it('gives the whole building twenty-nine degrees of sky, a quarter of it to the door', () => {
+  it('gives the whole building thirty-one degrees of sky, a quarter of it to the door', () => {
     /*
      * Storey 5 contributes exactly zero, so the total is a fact about seven
-     * rooms. Twenty-nine degrees out of 2880 (eight rooms × 360) is 1.0% of the
-     * sky the model's chambers could in principle see — still a dark building,
-     * twice as bright as it was.
+     * rooms. Thirty-one degrees out of 2880 (eight rooms × 360) is 1.1% of the
+     * sky the model's chambers could in principle see — still a dark building.
      *
      * 14.196 → 14.109 on 2026-08-16, when the walker's eye came down from 1.65 to
      * 1.50 m and the doorway heads from 2.100 to 1.688: storey 1 gained, the
      * three stair-lit rooms each lost a quarter of a degree to the curve of an
      * arch the eye now sits inside, and the two nearly cancelled.
      *
-     * 14.109 → 29.385 on 2026-08-17, which is not a cancellation of anything.
-     * Six FOOT slits started lighting the rooms they open off instead of only the
-     * treads: storeys 2, 3 and 4 gained a band each where they had none, and
-     * storeys 6, 7 and 8 gained a second band apiece on top of the head's.
+     * 14.109 → 29.385 on the morning of 2026-08-17, which is not a cancellation
+     * of anything. Six FOOT slits started lighting the rooms they open off
+     * instead of only the treads: storeys 2, 3 and 4 gained a band each where
+     * they had none, and storeys 6, 7 and 8 gained a second band apiece on top
+     * of the head's.
      *
-     * The door is no longer half the tower's daylight. It is 26% of it, which is
-     * the honest way round for a building with twelve slits in it.
+     * 29.385 → 31.358 the same evening, and this one is the arch giving back the
+     * quarter-degree it took in the paragraph above. The doorway stands on the
+     * slit's own bearing now (approachAzimuthDeg), so the slit sits at the CROWN
+     * of the arch instead of 3.3–4.1° off toward one springing, and the clear
+     * half-span there is the arch's widest. NOTHING WAS LIT OR DARKENED BY IT:
+     * seven rooms of eight before and after, the same eleven bands through the
+     * same eleven holes, each of them now the full width of its own slit.
+     *
+     * The door is 24% of the tower's daylight, which is the honest way round for
+     * a building with twelve slits in it.
      */
     const total = CHAMBERS.reduce((s, c) => s + c.arcDeg, 0)
-    expect(total).toBeCloseTo(29.385, 2)
-    expect(of(1).arcDeg / total).toBeGreaterThan(0.25)
-    expect(of(1).arcDeg / total).toBeLessThan(0.27)
+    expect(total).toBeCloseTo(31.358, 2)
+    expect(of(1).arcDeg / total).toBeGreaterThan(0.24)
+    expect(of(1).arcDeg / total).toBeLessThan(0.25)
     expect(of(5).arcDeg).toBe(0)
     // three rooms lit through a foot alone, three through a head and a foot
     for (const n of [2, 3, 4]) expect(of(n).bands, `storey ${n}`).toHaveLength(1)
@@ -260,7 +268,7 @@ describe('why a head and a foot now light the room in the same way', () => {
     }
   })
 
-  it('lights a chamber through the SLIT’s width, all but the last tenth of a degree', () => {
+  it('lights a chamber through the SLIT’s width exactly, the doorway clipping nothing', () => {
     /*
      * Which of the two holes is the aperture. The slit is 0.4 m at the drum face
      * and the doorway five times wider, so the slit's own 2.778° is very nearly
@@ -268,17 +276,21 @@ describe('why a head and a foot now light the room in the same way', () => {
      * stood 2.100 m tall and the walker's eye at 1.65 m passed 0.45 m below its
      * head with the arch nowhere near.
      *
-     * THAT MARGIN IS GONE, and it is the visible consequence of the doorway
-     * ceasing to be sized from the walker. The head is 1.688 m now — measured,
-     * see STAIR.doorwayHeight — and the eye stands 0.19 m under it, INSIDE the
-     * curve of a head struck across the opening. doorwayAdmits() reads that curve
-     * (archHalfSpan), so one edge of every stair-lit band is now the arch and not
-     * the slit, and each room loses a quarter of a degree.
+     * THAT MARGIN WENT ON 2026-08-16 AND CAME BACK ON THE 17th. The head is
+     * 1.688 m now — measured, see STAIR.doorwayHeight — and the eye stands 0.19 m
+     * under it, INSIDE the curve of a head struck across the opening.
+     * doorwayAdmits() reads that curve (archHalfSpan), so while the slit stood
+     * 3.3–4.1° off the doorway's centre line, one edge of every stair-lit band
+     * was the arch rather than the slit and each room lost a quarter of a degree.
      *
-     * The slit still sets the band's WIDTH to within 10%; what changed is that
-     * the doorway is no longer irrelevant to it. If a survey ever raises the
-     * doorway, these three numbers go back up to 2.778 and this test should be
-     * the thing that notices.
+     * The two are concentric now — that is the whole of the «прямо» repair — so
+     * the slit sits at the crown, where an arch is widest, and the doorway is
+     * irrelevant to the band again. Irrelevant for a reason this time, rather
+     * than by having 0.45 m of slack.
+     *
+     * EQUALITY, not a bracket: these are the same 2.77825° to nine decimal
+     * places, because the aperture IS the slit. If a doorway ever drifts off its
+     * slit's bearing again, this is the test that reports it in degrees of sky.
      */
     for (const o of BUILT) expect(o.outerWidth, o.id).toBeCloseTo(BUILT[0].outerWidth, 9)
     expect(SLIT_HALF_DEG * 2).toBeCloseTo(2.778, 3)
@@ -287,14 +299,13 @@ describe('why a head and a foot now light the room in the same way', () => {
       for (const b of c.bands) {
         if (b.through === 'entrance' || b.through === 'head-6-7') continue
         const w = b.toDeg - b.fromDeg
-        expect(w, `${c.floorNumber} via ${b.through}`).toBeLessThan(SLIT_HALF_DEG * 2)
-        expect(w, `${c.floorNumber} via ${b.through}`).toBeGreaterThan(SLIT_HALF_DEG * 2 * 0.88)
+        expect(w, `${c.floorNumber} via ${b.through}`).toBeCloseTo(SLIT_HALF_DEG * 2, 9)
       }
     }
     expect(of(6).bands.map((b) => b.through)).toEqual(['head-4-6', 'foot-6-7'])
     expect(of(8).bands.map((b) => b.through)).toEqual(['head-7-8', 'foot-8-9'])
-    expect(of(6).arcDeg).toBeCloseTo(5.03, 2)
-    expect(of(8).arcDeg).toBeCloseTo(4.925, 3)
+    expect(of(6).arcDeg).toBeCloseTo(SLIT_HALF_DEG * 4, 9)
+    expect(of(8).arcDeg).toBeCloseTo(SLIT_HALF_DEG * 4, 9)
   })
 
   it('leaves storey 5 with a doorway that stands at no passage end at all', () => {
@@ -409,10 +420,10 @@ describe('what the pier takes off the top, over and above the ends it buries', (
     const viaHead = of(7).bands.find((b) => b.through === 'head-6-7')!
     expect(viaHead.fromDeg).toBeCloseTo(edgeDeg, 3)
     expect(viaHead.toDeg - viaHead.fromDeg).toBeCloseTo(1.518, 3)
-    // …and it is the pier and nothing else: lift the beak away and the slit returns,
-    // less the same tenth of a degree the doorway's arch takes off every band
+    // …and it is the pier and nothing else: lift the beak away and the slit
+    // returns whole, with nothing at all taken off it since 2026-08-17
     const noBeak = chamberDaylight({ ...SHIPPED, buttress: undefined })
-    expect(noBeak.find((c) => c.floorNumber === 7)!.arcDeg).toBeCloseTo(4.976, 3)
+    expect(noBeak.find((c) => c.floorNumber === 7)!.arcDeg).toBeCloseTo(SLIT_HALF_DEG * 4, 9)
     /*
      * AND WHAT LIFTING THE BEAK NO LONGER DOES is light anything. It used to
      * leave storeys 2, 3, 4 and 5 dark — the two ends it buries are not cut at

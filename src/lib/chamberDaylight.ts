@@ -28,19 +28,16 @@
  *
  * WHAT IT FINDS, at the shipped bearing, and it has two quite different causes:
  *
- *   storeys 6, 7, 8   a band 2.78° wide — 1.52° at storey 7, where the pier eats
- *                     the rest — out of the HEAD of the climb that arrives
- *                     there. At a head the doorway and the slit are on the SAME
- *                     side of the last tread, both standing on the landing
- *                     between the top step and the end cap, so their arcs
- *                     overlap and you can see out of the room. The band is the
- *                     SLIT's own width and not the doorway's: 0.4 m of hole at
- *                     8.25 m of radius. The doorway is five times wider and
- *                     never the thing in the way.
+ *   storeys 6, 7, 8   TWO bands of 2.78° apiece — one out of the HEAD of the
+ *                     climb that arrives there and one out of the FOOT of the
+ *                     climb that leaves — except at storey 7, where the pier eats
+ *                     all but 1.52° of the head's. The band is the SLIT's own
+ *                     width: 0.4 m of hole at 8.25 m of radius. The doorway is
+ *                     five times wider and is never the thing in the way.
  *   storey 1          the entrance, 7.61° of it, and no stair involved.
- *   storeys 2, 3, 4   a band 2.57–2.64° wide out of the FOOT of the climb that
- *                     leaves there — foot-2-3, foot-3-4, foot-4-6 — and nothing
- *                     else, because no head above them is cut.
+ *   storeys 2, 3, 4   one band of 2.78° out of the FOOT of the climb that leaves
+ *                     there — foot-2-3, foot-3-4, foot-4-6 — and nothing else,
+ *                     because no head above them is cut.
  *   storey 5          NOTHING, and structurally so. It is reached from halfway
  *                     along the 4→6 run, which is not a passage end at all, so
  *                     its doorway has no slit within a storey of it in height.
@@ -53,6 +50,13 @@
  * That was approachAzimuthDeg() taking the shift along the climb at both ends
  * when a passage carries its landing AWAY from the flight at both. A foot reads
  * like a head now and a foot slit lights its room like a head's.
+ *
+ * AND EVERY BAND IS THE SLIT'S FULL WIDTH SINCE THAT EVENING, where they read
+ * 2.57–2.64° in the morning. The doorway stands on the slit's own bearing now
+ * rather than 3.3–4.1° off it, so the slit lies at the CROWN of the doorway's
+ * arch, where archHalfSpan() is widest, instead of out toward a springing where
+ * the curve was clipping a quarter of a degree off each room. The census total
+ * went 29.385 → 31.358 on that alone; no room was lit or darkened by it.
  *
  * WHAT THE QUARTER TURN STILL COSTS, and it is much less than it was.
  * STAIR.startAzimuthDeg is BUTTRESS.azimuthDeg + STAIR_FROM_BUTTRESS_DEG, the
@@ -388,11 +392,10 @@ export function daylightCensus(all: ChamberDaylight[]): string[] {
   if (dark.length > 0) {
     lines.push(
       `Storeys ${dark.join(', ')} have no sight line to the sky at all. The tower's slits are at ` +
-        'the ends of the stair passages [OWNER 2026-08-10], and a slit only lights the ROOM ' +
-        'behind it where the doorway and the slit overlap in bearing — which happens at a ' +
-        "flight's head and never at its foot. Two of these are dark because the pier stands " +
-        'in front of the head that serves them; see STAIR_BEARING_QUESTION. Not a bug and not ' +
-        'to be repaired by turning the stair (rule 7).',
+        'the ends of the stair passages [OWNER 2026-08-10], so a room is lit only where its ' +
+        'doorway onto the stair stands at a passage END and the slit there is cut. A doorway ' +
+        'partway ALONG a flight has no slit within a storey of it in height, and no turn of ' +
+        'the stair reaches that. Not a bug and not to be repaired by turning the stair (rule 7).',
     )
   }
   return lines

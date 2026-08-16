@@ -203,9 +203,10 @@ const EXTERIOR_SLIT = BUILT_OPENINGS.reduce((best, o) => {
  * [PLACEHOLDER] — the moment anyone learns where the first flight really begins,
  * every flight rotates and a written-down azimuth would drift off again silently.
  *
- * It is the DOORWAY's azimuth, not the first tread's: those differ by half a
- * flight width (approachAzimuthDeg), and the doorway is the thing you can stand
- * in front of and photograph.
+ * It is the DOORWAY's azimuth, not the first tread's: the doorway stands in the
+ * middle of the landing at the end of the passage (approachAzimuthDeg), half its
+ * lead round from the first tread, and the doorway is the thing you can stand in
+ * front of and photograph.
  */
 function atStairDoorway(fromFloorNumber: number): [number, number, number] {
   const i = WALL_LIFTS.findIndex((l) => l.fromFloorNumber === fromFloorNumber)
@@ -213,7 +214,10 @@ function atStairDoorway(fromFloorNumber: number): [number, number, number] {
   if (steps.length === 0) {
     throw new Error(`hotspots: no wall flight leaves storey ${fromFloorNumber}`)
   }
-  return insideAt(fromFloorNumber - 1, approachAzimuthDeg(steps, steps[0], STAIR.width))
+  return insideAt(
+    fromFloorNumber - 1,
+    approachAzimuthDeg(steps, steps[0], STAIR.width, STAIR.doorwayWidth),
+  )
 }
 
 /** Storey indices whose vault is pierced by a modern stair well, not by an oculus. */

@@ -104,7 +104,7 @@ const doorwayOf = (flightIndex: number, end: 'foot' | 'head') => {
   const steps = flights[flightIndex]
   const tread = end === 'foot' ? steps[0] : steps[steps.length - 1]
   return {
-    azimuthDeg: approachAzimuthDeg(steps, tread, STAIR.width),
+    azimuthDeg: approachAzimuthDeg(steps, tread, STAIR.width, STAIR.doorwayWidth),
     halfWidthDeg: (STAIR.doorwayWidth / Math.max(0.5, tread.midRadius) / 2) * (180 / Math.PI),
   }
 }
@@ -274,16 +274,24 @@ describe('the wellhead stands between the two ways onto the stair', () => {
     const atThisFloor = doorways.filter((d) => Math.abs(d.bottomY - FLOOR_Y) < 1e-6)
     expect(atThisFloor).toHaveLength(2)
     expect(atThisFloor.map((d) => Number(d.azimuthDeg.toFixed(3))).sort((a, b) => a - b)).toEqual([
-      106.365, 202.628,
+      102.413, 206.58,
     ])
   })
 
   it('puts the mouth at the bisector of their facing jambs', () => {
     /*
      * THE DERIVATION, AND IT IS NOT A CHOICE. The jambs that face each other
-     * across the gap stand at 113.610 and 195.383 — 81.772° of wall between them
+     * across the gap stand at 109.658 and 199.335 — 89.677° of wall between them
      * — and the mouth goes in the middle: 154.496 → 154, a whole degree because
      * nothing has measured this bearing and a decimal would imply something had.
+     *
+     * BOTH JAMBS MOVED ON THE EVENING OF 2026-08-17 AND THE BISECTOR DID NOT, to
+     * the last digit. Each doorway went to the middle of its own landing — 3.952°
+     * further from its end tread, the «прямо» repair in approachAzimuthDeg() —
+     * and the two ends of storey 3 are mirror images, so the pair opened by
+     * 7.904° about a bearing that did not move. The gap is wider and the wellhead
+     * is where it was, which is the strongest thing that could be said for a
+     * derivation of this kind.
      *
      * THE BISECTOR IS OF THE JAMBS, NOT OF THE CENTRES, and here the two agree to
      * the last digit because both doorways are STAIR.doorwayWidth at the same
@@ -292,9 +300,9 @@ describe('the wellhead stands between the two ways onto the stair', () => {
      */
     const jambA = ARRIVAL_DOORWAY.azimuthDeg + ARRIVAL_DOORWAY.halfWidthDeg
     const jambD = DEPARTURE_DOORWAY.azimuthDeg - DEPARTURE_DOORWAY.halfWidthDeg
-    expect(jambA).toBeCloseTo(113.61, 2)
-    expect(jambD).toBeCloseTo(195.383, 3)
-    expect(jambD - jambA).toBeCloseTo(81.772, 3)
+    expect(jambA).toBeCloseTo(109.658, 3)
+    expect(jambD).toBeCloseTo(199.335, 3)
+    expect(jambD - jambA).toBeCloseTo(89.677, 3)
 
     expect(BETWEEN.bearingDeg).toBeCloseTo(154.496, 3)
     expect(BETWEEN.bearingDeg).toBeCloseTo((jambA + jambD) / 2, 9)
@@ -306,18 +314,18 @@ describe('the wellhead stands between the two ways onto the stair', () => {
     expect(sep(WELL.azimuthDeg, BETWEEN.bearingDeg)).toBeLessThan(1)
   })
 
-  it('leaves ±27.88° of freedom, which is 1.17 m along the floor', () => {
+  it('leaves ±31.84° of freedom, which is 1.33 m along the floor', () => {
     /*
      * HOW MUCH THE SENTENCE ACTUALLY FIXES. The mouth is 1.08 m across on a
      * 2.4 m radius, so it takes 13.003° of arc and can stand anywhere from
-     * 126.613 to 182.380 before its rim touches a jamb. That is the whole claim:
-     * the middle of a band 1.17 m wide, not a degree.
+     * 122.661 to 186.332 before its rim touches a jamb. That is the whole claim:
+     * the middle of a band 1.33 m wide, not a degree.
      */
     expect(mouthHalfAngleDeg(WELL.offsetFromAxis, WELL.mouthDiameter)).toBeCloseTo(13.0029, 4)
-    expect(BETWEEN.fromDeg).toBeCloseTo(126.613, 3)
-    expect(BETWEEN.toDeg).toBeCloseTo(182.38, 3)
-    expect(BETWEEN.freedomDeg).toBeCloseTo(27.8834, 4)
-    expect((BETWEEN.freedomDeg * Math.PI * WELL.offsetFromAxis) / 180).toBeCloseTo(1.168, 3)
+    expect(BETWEEN.fromDeg).toBeCloseTo(122.661, 3)
+    expect(BETWEEN.toDeg).toBeCloseTo(186.332, 3)
+    expect(BETWEEN.freedomDeg).toBeCloseTo(31.8354, 4)
+    expect((BETWEEN.freedomDeg * Math.PI * WELL.offsetFromAxis) / 180).toBeCloseTo(1.3335, 3)
   })
 
   it('does not move when the mouth is pushed out to the wall, only the freedom does', () => {
@@ -336,17 +344,24 @@ describe('the wellhead stands between the two ways onto the stair', () => {
       WELL.mouthDiameter,
     )
     expect(out.bearingDeg).toBeCloseTo(BETWEEN.bearingDeg, 9)
-    expect(out.freedomDeg).toBeCloseTo(31.171, 3)
+    expect(out.freedomDeg).toBeCloseTo(35.123, 3)
   })
 
-  it('contains the bearing his first sentence gave, at the very edge of the band', () => {
+  it('contains the bearing his first sentence gives, at the very edge of the band', () => {
     /*
-     * 182 IS NOT OVERTURNED, IT IS CENTRED. «Колодец должен стоять рядом с
-     * проходом» (2026-08-16) put the mouth tangent to the departure doorway's
-     * jamb at 182.380 — which is this band's clockwise END, to four decimals.
+     * THE FIRST SENTENCE IS NOT OVERTURNED, IT IS CENTRED. «Колодец должен стоять
+     * рядом с проходом» (2026-08-16) puts the mouth tangent to the departure
+     * doorway's jamb — which is this band's clockwise END, to nine decimals.
      * «Между входами» (2026-08-17) names the other doorway as well and so picks
-     * out the middle. The move is 28.4° and the two sentences do not disagree;
-     * the second is the more constrained reading of the same wall.
+     * out the middle. The two sentences do not disagree; the second is the more
+     * constrained reading of the same wall.
+     *
+     * THAT TANGENT IS A DERIVATION AND NOT A NUMBER, which is why it reads 186.33
+     * here and 182.38 in the morning: the departure doorway moved to the middle
+     * of its landing that evening and the tangent to its jamb went with it. 182
+     * was never a measurement of anything — it was this construction run against
+     * the doorway of the day — so it follows the doorway rather than standing
+     * against it, exactly as 171 did before it.
      */
     const tangent = besideDoorwayBearing(
       DEPARTURE_DOORWAY.azimuthDeg,
@@ -355,12 +370,12 @@ describe('the wellhead stands between the two ways onto the stair', () => {
       WELL.mouthDiameter,
       -1,
     )
-    expect(tangent).toBeCloseTo(182.38, 3)
+    expect(tangent).toBeCloseTo(186.332, 3)
     expect(BETWEEN.toDeg).toBeCloseTo(tangent, 9)
-    expect(sep(WELL.azimuthDeg, 182)).toBeCloseTo(28, 6)
+    expect(sep(BETWEEN.bearingDeg, tangent)).toBeCloseTo(BETWEEN.freedomDeg, 9)
   })
 
-  it('stands 1.86 m and 1.90 m from the two jambs, where 182 stood 0.89 m from one', () => {
+  it('stands 2.02 m and 2.06 m from the two jambs, where the tangent stands 0.89 m from one', () => {
     /*
      * THE TANGENCY IN METRES, which is the only form of it anyone can picture,
      * measured to each jamb's INNER CORNER — the nearest stone, at the room face
@@ -368,17 +383,23 @@ describe('the wellhead stands between the two ways onto the stair', () => {
      *
      * AND IT IS WHAT THE MOVE COSTS. up/080 shows the wellhead's recess and the
      * stair's mouth as two openings in one wall with ONE pier between them, and
-     * at 182 that pier came out 0.887 m, near enough the frame to read as
-     * support. Centred it is 1.896 m, a wider pier than the frame looks. That is
-     * recorded and not argued away — it was never a measurement, a pier read off
-     * a handheld wide-angle frame with no scale is not one in this project, and a
-     * sentence naming BOTH doorways outranks a single frame naming one.
+     * on the tangent placement that pier comes out 0.878 m, near enough the frame
+     * to read as support. Centred it is 2.061 m, a wider pier than the frame
+     * looks. That is recorded and not argued away — it was never a measurement, a
+     * pier read off a handheld wide-angle frame with no scale is not one in this
+     * project, and a sentence naming BOTH doorways outranks a single frame naming
+     * one.
+     *
+     * The pier figure is stated against the TANGENT rather than against 182,
+     * because the tangent is the construction and 182 was only where it happened
+     * to fall before the doorway moved on the evening of 2026-08-17. 0.887 then
+     * and 0.878 now: the pier is measured off the jamb, so it went with it.
      */
     const jambA = ARRIVAL_DOORWAY.azimuthDeg + ARRIVAL_DOORWAY.halfWidthDeg
     const jambD = DEPARTURE_DOORWAY.azimuthDeg - DEPARTURE_DOORWAY.halfWidthDeg
-    expect(rimToJamb(WELL.azimuthDeg, jambA)).toBeCloseTo(1.855, 3)
-    expect(rimToJamb(WELL.azimuthDeg, jambD)).toBeCloseTo(1.896, 3)
-    expect(rimToJamb(182, jambD)).toBeCloseTo(0.887, 3)
+    expect(rimToJamb(WELL.azimuthDeg, jambA)).toBeCloseTo(2.019, 3)
+    expect(rimToJamb(WELL.azimuthDeg, jambD)).toBeCloseTo(2.061, 3)
+    expect(rimToJamb(BETWEEN.toDeg, jambD)).toBeCloseTo(0.878, 3)
     // very nearly equal, which is what "between" buys and what 182 did not have
     expect(Math.abs(rimToJamb(WELL.azimuthDeg, jambA) - rimToJamb(WELL.azimuthDeg, jambD))).toBeLessThan(
       0.05,
@@ -478,8 +499,8 @@ describe('the shaft stands opposite, and the chase costs nothing there', () => {
     }))
     expect(doorwayGaps.filter((g) => g.gap <= 0)).toEqual([])
     const nearestDoorway = doorwayGaps.reduce((a, b) => (b.gap < a.gap ? b : a))
-    expect(nearestDoorway.label).toContain('az 50.4')
-    expect(nearestDoorway.gap).toBeCloseTo(65.268, 2)
+    expect(nearestDoorway.label).toContain('az 46.8')
+    expect(nearestDoorway.gap).toBeCloseTo(61.674, 2)
 
     const revealGaps = SHIPPED_CUTS.map((w) => ({
       id: w.id,

@@ -2461,37 +2461,48 @@ export const WELL = {
    * ── THE WELLHEAD IS NOW DERIVED, NOT PLACED ───────────────────────────────
    *
    * «между входами на лестницу» — BETWEEN THE ENTRANCES TO THE STAIR. Storey 3
-   * has exactly two: the head of flight 2→3 at 106.365 and the foot of 3→4 at
-   * 202.628, both already computed by stairDoorways(). Their facing jambs stand
-   * at 113.610 and 195.383, so the gap is 81.772° of wall, and betweenDoorways()
+   * has exactly two: the head of flight 2→3 at 102.413 and the foot of 3→4 at
+   * 206.580, both already computed by stairDoorways(). Their facing jambs stand
+   * at 109.658 and 199.335, so the gap is 89.677° of wall, and betweenDoorways()
    * in lib/waterSystem.ts puts the mouth in the middle of it: 154.496 → 154.
+   *
+   * BOTH DOORWAYS MOVED ON THE EVENING OF 2026-08-17 AND THIS BEARING DID NOT,
+   * to the last digit. approachAzimuthDeg() stopped standing a doorway half a
+   * flight width from its end tread and stood it in the middle of its landing,
+   * where the slit is — [OWNER]'s «прямо», twice asked for — which sends the two
+   * ends of storey 3 3.952° further apart each, in opposite senses, about a
+   * midpoint that cannot move. The gap opened from 81.772° to 89.677° and the
+   * wellhead stayed at 154.496. A placement that survives its own inputs moving
+   * is worth more than one that happens to be right today.
    *
    * HOW MUCH FREEDOM IS LEFT, because the sentence does not give a degree. The
    * mouth is 1.08 m across on a 2.4 m radius and so takes 13.003° of arc; it may
-   * therefore stand anywhere from 126.613 to 182.380 before its rim touches a
-   * jamb. That is a band 55.767° wide — ±27.883°, or 1.168 m of travel along the
+   * therefore stand anywhere from 122.661 to 186.332 before its rim touches a
+   * jamb. That is a band 63.671° wide — ±31.835°, or 1.334 m of travel along the
    * floor. 154 is its middle, which is the only point in it that does not prefer
    * one doorway to the other, and the whole of the claim is "the middle of a band
-   * 1.17 m wide", not "154.0".
+   * 1.33 m wide", not "154.0".
    *
    * THE DERIVATION DOES NOT DEPEND ON offsetFromAxis, and that matters because
    * that radius is a [PLACEHOLDER] known to be too small (see below). The mouth's
    * width enters the BAND and cancels out of its MIDDLE. Push the wellhead out to
-   * the wall and the freedom shrinks — at 3.2 m the mouth takes 9.71° and the band
-   * opens to ±31.2° — but the bearing does not move at all. Contrast the old
+   * the wall and the freedom grows — at 3.2 m the mouth takes 9.71° and the band
+   * opens to ±35.1° — but the bearing does not move at all. Contrast the old
    * tangent placement, which moved 8° for the same correction.
    *
-   * AND 182 WAS INSIDE THIS BAND ALL ALONG, at its very clockwise end — 182.380
-   * to be exact, the tangent to the departure doorway's jamb. So this is not his
-   * first sentence being overturned by his second. «Рядом с проходом» put the
-   * mouth hard against one of the two doorways; «между входами» centres it
-   * between both. The move is 28.4°, and everything it costs is measured below.
+   * AND THE FIRST SENTENCE'S BEARING IS INSIDE THIS BAND, at its very clockwise
+   * end: the tangent to the departure doorway's jamb, 186.332 with the doorway
+   * where it stands tonight and 182.380 with it where it stood this morning. So
+   * this is not his first sentence being overturned by his second. «Рядом с
+   * проходом» puts the mouth hard against one of the two doorways; «между
+   * входами» centres it between both. The move is 31.8°, and everything it costs
+   * is measured below.
    *
    * WHAT IT COSTS: THE PIER IN up/080. That frame shows the wellhead's recess and
    * the stair's mouth as two openings in one wall with ONE pier between them, and
-   * at 182 that pier measured 0.887 m — near enough the frame to read as support.
-   * At 154 it is 1.896 m to the departure jamb and 1.855 m to the arrival one,
-   * which is a wider pier than the frame looks. That is recorded rather than
+   * on the tangent placement that pier measures 0.878 m — near enough the frame
+   * to read as support. At 154 it is 2.061 m to the departure jamb and 2.019 m to
+   * the arrival one, which is a wider pier than the frame looks. That is recorded rather than
    * argued away: it was never a measurement — a pier read off a handheld
    * wide-angle frame with no scale is not one in this project — and it was always
    * labelled a corroboration. A sentence naming both doorways outranks it.
@@ -2518,9 +2529,9 @@ export const WELL = {
    *
    * 182 IS THAT SENTENCE AS ARITHMETIC. besideDoorwayBearing() in
    * lib/waterSystem.ts puts the mouth's rim tangent to the radial plane of the
-   * doorway's near jamb: 202.628 − 7.245 of doorway − 13.003 of mouth = 182.38,
+   * doorway's near jamb: 206.580 − 7.245 of doorway − 13.003 of mouth = 186.33,
    * to the nearest whole degree, because nothing has measured the bearing itself
-   * and a decimal would imply something had. It leaves the mouth's rim 0.87 m
+   * and a decimal would imply something had. It leaves the mouth's rim 0.88 m
    * from the jamb's inner corner, which is about the width of the pier in
    * up/080 — a corroboration and NOT the derivation; a pier read off a handheld
    * wide-angle frame with no scale is not a measurement in this project.
@@ -2533,8 +2544,11 @@ export const WELL = {
    * doorway this bearing is tangent to stood at 190.772 because
    * approachAzimuthDeg() put every FOOT doorway on the wrong side of its end
    * tread — over the flight's own second, third and fourth treads instead of on
-   * the landing. Straightened, the storey-3 foot doorway stands at 202.628 and
-   * the same derivation gives 182.38.
+   * the landing. Straightened, the storey-3 foot doorway stood at 202.628 and the
+   * same derivation gave 182.38; centred on its landing the same evening it
+   * stands at 206.580 and gives 186.33. The tangent is a construction and not a
+   * number — it follows the doorway wherever the doorway goes, which is the whole
+   * reason this value has moved four times and never once been re-argued.
    *
    * THIS IS THE HAZARD THE OLD NOTE PROMISED WOULD COME, ARRIVING. It said "the
    * stair is still the thing that moves… this number must move with it", and
@@ -2715,19 +2729,24 @@ export const WELL_BEARING_CONFLICT = [
   '  WALL_SHAFT.azimuthDeg              154 + 180 = 334   щель в стене',
   '',
   'УСТЬЕ БОЛЬШЕ НЕ [PLACEHOLDER]. На ярусе 3 ровно два входа на лестницу — верх',
-  'марша 2→3 на 106.365 и низ 3→4 на 202.628. Между их косяками 81.772°, устье',
+  'марша 2→3 на 102.413 и низ 3→4 на 206.580. Между их косяками 89.677°, устье',
   'встаёт посередине: 154.496 → 154.',
   'СКОЛЬКО СВОБОДЫ ОСТАЛОСЬ: устье шириной 1.08 м на радиусе 2.4 занимает 13.003°,',
-  'поэтому оно может стоять где угодно от 126.613 до 182.380 — полоса 55.767°,',
-  'то есть ±27.883°, или 1.168 м хода по полу. 154 — её середина. Утверждение',
-  'звучит как «посередине полосы шириной 1.17 м», а не как «154.0».',
-  'И ЗАМЕТЬТЕ: 182 лежало в этой же полосе, у самого её края (182.380). Ваша',
-  'вторая фраза не отменяет первую, она её центрирует. Сдвиг — 28.4°.',
+  'поэтому оно может стоять где угодно от 122.661 до 186.332 — полоса 63.671°,',
+  'то есть ±31.835°, или 1.334 м хода по полу. 154 — её середина. Утверждение',
+  'звучит как «посередине полосы шириной 1.33 м», а не как «154.0».',
+  'И ЗАМЕТЬТЕ: 182 лежало в этой же полосе, у самого её края. Ваша вторая фраза',
+  'не отменяет первую, она её центрирует. Сдвиг — 31.8°.',
+  'ОБА ПРОЁМА СДВИНУЛИСЬ ВЕЧЕРОМ 17.08, каждый на 3.952° дальше от своей первой',
+  'ступени — на середину своей площадки, туда, где стоит окно («окна при входе на',
+  'лестницу опять направо смотрят»). Разошлись они в РАЗНЫЕ стороны, поэтому',
+  'середина между ними не сдвинулась ни на цифру: 154.496 было, 154.496 и есть.',
+  'Полоса свободы стала шире, устье осталось там же.',
   '',
   'ЧТО ЭТО ОПЛАТИЛО. На 182 штраба вскрывала лестничные проходы на четырёх ярусах',
   'из пяти (36.6–39.6° внутрь, 0.34 м в перемычку толщиной 0.25 м; на ярусе 3 щель',
   'выходила прямо на ступени марша 3→4 на уровне пола). На 334 не задет НИ ОДИН:',
-  '  ближайший дверной проём — верх 4→6, 65.27°',
+  '  ближайший дверной проём — верх 4→6, 61.67°',
   '  ближайшая оконная ниша — head-4-6, 59.75°',
   '  ближайший проход       — 4→6, 58.75° в плане',
   '  вход                   — 48.90°',
@@ -2750,7 +2769,7 @@ export const WELL_BEARING_CONFLICT = [
   '  2. РАДИУС УСТЬЯ. offsetFromAxis = 2.4 [PLACEHOLDER]; up/081 показывает устье',
   '     в полу НИШИ, то есть ближе к стене, около 3.1–3.2. На азимут это больше не',
   '     влияет вовсе (ширина устья сокращается в середине полосы) — сдвинется',
-  '     только свобода, с ±27.88° на ±31.17°.',
+  '     только свобода, с ±31.84° на ±35.12°.',
   '  3. ЛЕСТНИЦА. STAIR_FROM_BUTTRESS_DEG заведомо мал минимум на 8°; оба проёма',
   '     сдвинутся, а с ними — и устье, и штраба. Но устье теперь идёт за СРЕДНИМ',
   '     из двух проёмов, а не за одним, и потому вдвое менее чувствительно.',

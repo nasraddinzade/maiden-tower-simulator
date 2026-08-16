@@ -482,19 +482,33 @@ describe('the stair leaves no slot that looks through', () => {
       innerRadiusAt,
       (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
       WALL_LIFTS.map((l) => l.opensAtY),
+      // the landing is sized by the DOORWAY's width, not the flight's — see
+      // passageLeadSteps(). Omitting it here plans a shorter landing than the
+      // shell was cut for and every number below is then about another tower.
+      STAIR.doorwayWidth,
     )
 
-    it('gives both ends of every flight a way on, plus the storey 4→6 passes', () => {
+    it('gives both ends of every flight a way on and a landing, plus the 4→6 pass', () => {
       /*
-       * Two per flight, since the flights are separate runs off separate
-       * chambers, plus one more wherever a flight merely PASSES a storey and is
-       * left from partway along it. Anything less and some bottom tread stands
-       * proud of a chamber floor with nothing leading up to it — and this
-       * character controller will not climb a step of any height.
+       * FOUR per flight since 2026-08-17, where it used to be two.
+       *
+       * Two of them are the radial ways IN — one off each chamber, since the
+       * flights are separate runs off separate rooms — plus one more wherever a
+       * flight merely PASSES a storey and is left from partway along it. Anything
+       * less and some bottom tread stands proud of a chamber floor with nothing
+       * leading up to it, and this character controller will not climb a step of
+       * any height.
+       *
+       * The other two are the LANDINGS themselves, end tread to end cap. They are
+       * new because until then the landing's floor was whatever the radial ramp
+       * happened to cover — a flight width of arc on the doorway's bearing — and
+       * the far third of every landing, the part the slit is cut over, had
+       * nothing under it at all. See stairApproaches() and
+       * stairApproachSide.test.ts, which walks the whole arc.
        */
       const passes = WALL_LIFTS.reduce((n, l) => n + l.opensAtY.length, 0)
       expect(passes, 'the 4→6 flight should pass exactly one storey').toBe(1)
-      expect(approaches.length).toBe(flights.length * 2 + passes)
+      expect(approaches.length).toBe(flights.length * 4 + passes)
     })
 
     it('starts the room-side approaches inside the room, under the floor slab', () => {
