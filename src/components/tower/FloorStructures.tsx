@@ -6,6 +6,7 @@ import { azimuthToVector } from '../../lib/geometry'
 import { stairwellCutTools } from '../../lib/staircase'
 import { FLOORS, ROOF, TOWER, innerRadiusAt } from '../../config/tower'
 import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
+import { MIN_LATHE_SEGMENTS, WALL_EMBED } from '../../lib/bedding'
 import { isStoreyVisible, lodSegments } from '../../lib/visibility'
 
 /** Where a flight breaks through the structure above, in plan. */
@@ -46,12 +47,21 @@ const RADIAL_SEGMENTS = 64
 const PROFILE_SEGMENTS = 20
 const DEG = Math.PI / 180
 
-/**
- * How far floors and domes are bedded into the wall, metres. [ASSUMPTION] — no
- * source gives a bearing depth; this is only deep enough that the join cannot
- * show. See the note in cupolaProfile().
+/*
+ * WALL_EMBED — how far floors and domes are bedded into the wall — used to be
+ * DECLARED here, as 0.25, "only deep enough that the join cannot show". It is
+ * lib/bedding.ts's now and it is DERIVED, because the wall it is bedded into has
+ * a stair passage cut through it and 0.25 was 0.16 m more stone than the passage
+ * leaves. The whole argument is at the head of that file; MIN_LATHE_SEGMENTS
+ * comes from the same place and for the same reason.
+ *
+ * Re-exported because RoofTerrace has always taken it from here and the paving's
+ * junction with the parapet is a different junction from this one — eleven
+ * metres out, with no stair anywhere near it. It borrows the depth; it is not
+ * governed by the jamb. The day the terrace wants its own number, that is where
+ * it goes, and this line is what will have to be deleted to give it one.
  */
-export const WALL_EMBED = 0.25
+export { WALL_EMBED } from '../../lib/bedding'
 
 /**
  * Cut the stairwell out of a lathe surface.
@@ -68,14 +78,19 @@ export const WALL_EMBED = 0.25
  *
  * A CUTTER THAT CANNOT REACH THE STONE DOES NOTHING, and says so rather than
  * running. `maxRadius` is how far out the surface being cut actually goes, and
- * every storey's is EXACTLY the opening's inner radius: a slab is bedded
+ * every storey's fell EXACTLY on the opening's inner radius: a slab was bedded
  * WALL_EMBED into the wall, the stair stands STAIR.wallClearance off the same
- * face, and those two are both 0.25 m. So the tool has always been tangent to
- * the slab it was handed and has always removed precisely nothing — six
- * openings, six booleans resolving a tangency for no result, which is the CSG
- * case that has cost this model a floor twice. Passing the radius retires them.
- * It is not an optimisation dressed up: a cut that removes nothing is not a
- * cut, and now the six that never were are not claimed to be.
+ * face, and those two were both 0.25 m. So the tool was tangent to the slab it
+ * was handed and removed precisely nothing — six openings, six booleans
+ * resolving a tangency for no result, which is the CSG case that has cost this
+ * model a floor twice. Passing the radius retires them.
+ *
+ * THE EQUALITY THAT MADE IT A TANGENCY IS GONE (2026-08-16) and the early-out is
+ * the better for it. WALL_EMBED is now the middle of the jamb the stair leaves —
+ * 0.044 against the clearance's 0.250 — so the slab stops 0.206 m short of the
+ * flight instead of just touching it. The tool still removes nothing, but now
+ * because the opening is genuinely outside the slab rather than because two
+ * numbers happened to be typed the same. See lib/bedding.ts.
  */
 export function cutStairwell(
   geometry: THREE.BufferGeometry,
@@ -127,7 +142,8 @@ function useCupolaGeometry(
 ) {
   return useMemo(() => {
     const safeOculus = effectiveOpeningRadius(oculusRadius, spanRadius)
-    const pts = cupolaProfile(spanRadius, safeOculus, rise, profileSegments).map(
+    // the skirt is bedded to the SAME depth as the slabs — it is the same wall
+    const pts = cupolaProfile(spanRadius, safeOculus, rise, profileSegments, WALL_EMBED).map(
       (p) => new THREE.Vector2(p.r, p.y),
     )
     // built in world Y so a stairwell cut can be expressed in world coordinates
@@ -484,7 +500,14 @@ export function FloorStructures({
         // Phase 11: a closed storey three floors away is never visible, so it is
         // not drawn; the ones just above and below drop to a coarser lathe.
         if (!isStoreyVisible(f.index, viewerStorey, { showAll: showAllStoreys })) return null
-        const segments = lodSegments(f.index, viewerStorey, RADIAL_SEGMENTS)
+        /*
+         * The floor is MIN_LATHE_SEGMENTS, not lodSegments' own 12. A rim bedded
+         * into the wall has to stay inside a jamb 0.089 m thick, and a 12-gon at
+         * this radius dips 0.155 m inside its own circle — it would come out of
+         * the wall into the room. The LOD used to decide how deep the bedding
+         * had to be; the wall decides now, and the LOD follows it.
+         */
+        const segments = lodSegments(f.index, viewerStorey, RADIAL_SEGMENTS, MIN_LATHE_SEGMENTS)
         // the meridian profile is LODed too: a distant dome needs far fewer rings
         const profile = lodSegments(f.index, viewerStorey, PROFILE_SEGMENTS, 5)
         const springRadius = innerRadiusAt(f.ceilingY - cupolaRise)

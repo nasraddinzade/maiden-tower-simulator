@@ -6,6 +6,8 @@
  * с центральным круглым отверстием (окулюс) — ярусы связаны вертикально."
  */
 
+import { WALL_EMBED } from './bedding'
+
 /**
  * Radius of the sphere whose cap forms a shallow dome of the given span and rise.
  *
@@ -59,8 +61,15 @@ export function cupolaProfile(
    * merely touches leaves a sliver of daylight all the way round, which reads
    * in-game as a ring of triangular teeth at every ceiling. A skirt that runs
    * past the face cannot show one whatever the polygon counts are.
+   *
+   * "WHATEVER THE POLYGON COUNTS ARE" WAS THE HALF OF IT THAT WAS WRONG, and it
+   * is why this default is no longer a number typed here. A skirt that runs past
+   * the face also runs into whatever else is in the wall, and what is in the
+   * wall is the stair. See lib/bedding.ts: the depth is the middle of the jamb
+   * the passage leaves, and the polygon count follows from it rather than the
+   * other way about.
    */
-  embed = 0.25,
+  embed = WALL_EMBED,
 ): ProfilePoint[] {
   if (oculusRadius >= spanRadius) {
     throw new Error('oculus must be smaller than the cupola span')

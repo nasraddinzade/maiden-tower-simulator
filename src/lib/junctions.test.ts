@@ -17,6 +17,7 @@
 import { describe, expect, it } from 'vitest'
 import { ENTRANCE, FLOORS, STAIR, TOWER, WALL_LIFTS, innerRadiusAt } from '../config/tower'
 import { PLAYER } from '../config/player'
+import { MIN_LATHE_SEGMENTS, WALL_EMBED as BEDDING_EMBED } from './bedding'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from './cupola'
 import {
   PASSAGE_SIDE_CLEARANCE,
@@ -30,19 +31,27 @@ import {
 } from './staircase'
 
 /**
- * Must match WALL_EMBED in components/tower/FloorStructures.tsx.
- * Asserted below against the profile cupolaProfile() actually produces, so the
- * two cannot drift apart silently.
+ * THE REAL CONSTANT, not a copy of it. This file used to declare `const
+ * WALL_EMBED = 0.25` under a comment saying it "must match" the one in
+ * components/tower/FloorStructures.tsx, which is a promise a comment cannot
+ * keep. It is derived now — see lib/bedding.ts — and imported, so these guards
+ * are asserted against what the tower is actually built with.
  */
-const WALL_EMBED = 0.25
+const WALL_EMBED = BEDDING_EMBED
 
 /**
- * Lathe segment counts in play. lodSegments() emits 64, 32, 21, 16, 13, 12 as
- * the viewer moves away; 12 is genuinely reachable, because App.tsx renders all
- * eight storeys whenever storey culling is off. Testing only down to 16
- * understated the worst slab margin as +0.16 m when it is really +0.10 m.
+ * Lathe segment counts in play. lodSegments() used to emit 64, 32, 21, 16, 13,
+ * 12 as the viewer moved away, and 12 was genuinely reachable because App.tsx
+ * renders all eight storeys whenever storey culling is off.
+ *
+ * THAT LIST WAS THE TAIL WAGGING THE DOG. The bedding was sized to swallow the
+ * 12-gon's 0.155 m chord dip, which drove it 0.16 m deeper into the wall than
+ * the stair passage leaves stone for — the ledge on the climber's left. The
+ * dependency runs the other way now: the jamb sets the bedding, the bedding sets
+ * the floor under lodSegments(), and FloorStructures passes it. So the counts in
+ * play are MIN_LATHE_SEGMENTS and up, and this list follows rather than leads.
  */
-const LATHE_SEGMENTS = [64, 32, 21, 16, 13, 12] as const
+const LATHE_SEGMENTS = [64, 32, 21, 16, 13, 12].filter((n) => n >= MIN_LATHE_SEGMENTS)
 
 /**
  * How far a regular N-gon inscribed in radius R falls inside the true circle.
@@ -55,6 +64,21 @@ function chordDip(radius: number, segments: number): number {
 
 const worstDip = (radius: number) =>
   Math.max(...LATHE_SEGMENTS.map((n) => chordDip(radius, n)))
+
+/**
+ * How much clear stone a bedded rim must keep between its own worst facet and
+ * the room face.
+ *
+ * IT USED TO BE 0.05, AND 0.05 WAS AFFORDABLE ONLY BECAUSE THE BEDDING WAS TOO
+ * DEEP. The whole jamb is 0.089 m; half of it is where the rim goes and the
+ * other half is all there is to spend, so a flat five centimetres would now
+ * demand more margin than the wall has. The requirement was never five
+ * centimetres anyway — it is that the rim may not come out of a wall that is
+ * itself a 96-gon, and that is the shell's own chord dip, computed rather than
+ * chosen. Everything left over is genuine margin.
+ */
+const SHELL_SEGMENTS = 96
+const clearOf = (radius: number) => chordDip(radius, SHELL_SEGMENTS)
 
 describe('floor slabs bed into the wall', () => {
   it('never emerges into the room, at any storey or height', () => {
@@ -70,7 +94,7 @@ describe('floor slabs bed into the wall', () => {
         expect(
           margin,
           `storey ${f.floorNumber} slab at y ${y.toFixed(2)}: buried ${(outer - innerRadiusAt(y)).toFixed(3)} m, worst chord dip ${worstDip(outer).toFixed(3)} m`,
-        ).toBeGreaterThan(0.05)
+        ).toBeGreaterThan(clearOf(outer))
       }
     }
   })
@@ -88,7 +112,7 @@ describe('cupolas bed into the wall', () => {
       expect(
         margin,
         `storey ${f.floorNumber} skirt r ${skirt.r.toFixed(3)} at y ${skirtY.toFixed(2)}, wall ${innerRadiusAt(skirtY).toFixed(3)}`,
-      ).toBeGreaterThan(0.05)
+      ).toBeGreaterThan(clearOf(skirt.r))
     }
   })
 
