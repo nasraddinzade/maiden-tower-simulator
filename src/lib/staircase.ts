@@ -503,6 +503,80 @@ export interface PassageSection {
 }
 
 /**
+ * How many treads at the FOOT of a flight are the level platform you enter onto,
+ * rather than steps.
+ *
+ * THE LITTLE PLATFORM TO THE RIGHT OF THE WAY ONTO THE STAIR. [OWNER] 2026-08-16,
+ * arrow on a screenshot of the foot doorway: «не должно быть той маленькой
+ * площадки справа от входа на лестницу». Walked and measured before anything was
+ * touched, at the foot of 2→3 (the first stair doorway a visitor meets, since the
+ * lift below it is the modern spiral):
+ *
+ *   · the doorway spans azimuth 183.07–198.06, 1.10 m of arc at the walking line;
+ *   · the flight's first RISER stands at 186.5, so the left quarter of the opening
+ *     is stair and the right 0.85 m is level floor;
+ *   · that floor does not stop at the far jamb. The walking surface is level from
+ *     186.2 all the way to 219.2 — 33° of arc, 2.42 m — because the passage tube
+ *     runs 1.50 m of lead-in out past the first tread to carry the slit at the
+ *     passage's end;
+ *   · and the two halves of it were cut at DIFFERENT DEPTHS. Raycast down the
+ *     built shell: 3.781 (tread stone) out to azimuth 198.99, then 3.63 at 199.0,
+ *     3.71 at 200.0, 3.76 from 201 on (shell stone). A 0.13 m slot at 198.99,
+ *     0.155 m deep, standing 0.9° outside the doorway's far jamb, with a pale
+ *     shelf of a different material beyond it.
+ *
+ * The slot is what makes it read as a PLATFORM rather than as floor: two stones
+ * at two levels with a black line between them, seen through a doorway. It is
+ * drawn geometry — the shell's CSG bed and the flight's tread blocks — and not a
+ * collider; the ramp chain over it is one continuous inclined box and never had a
+ * lip. This function is the fix: the sections over those treads are landing
+ * sections, so the bed under the platform is the platform's own floor and the
+ * whole thing is one plane from the first riser to the passage's end.
+ *
+ * THE HEAD HAS THE SAME TRENCH AND IS LEFT ALONE. There the platform's sections
+ * are cut 1.5 risers under the storey and the lead-out at storey level, exactly as
+ * here, and at the head of 2→3 the slot lands at azimuth 110.1. Raising that bed
+ * is not the same edit at the top of the tower: the roof flight's platform IS the
+ * deck at 26.749, its deep bed sits at 26.4215 and stairPassageSections()'
+ * inStone() keeps a section only below masonryTopY 26.449 — so a landing bed at
+ * 26.729 drops those three sections out of the tube, takes tube[last] with them
+ * and moves head-8-9's cap and the slit centred on it. Six openings for a trench
+ * nobody has complained about is not a trade this file may make on its own.
+ *
+ * WHAT THIS DOES NOT DO, said plainly because the owner will look for it: the
+ * 1.50 m of level passage BEYOND the doorway is still there. It is the landing the
+ * slit at the foot is centred on — planPassageOpenings() places every opening at
+ * the middle of the arc between the end tread and the end cap — and shortening it
+ * to the 1.36° the doorway actually needs collapses that arc from 20.44° to 4.09°,
+ * which fitReveal() then clamps to a 0.17 m inner mouth against a 0.40 m outer
+ * one: six foot slits that no longer flare inward. Measured: with the lead-in cut
+ * to one step and the landing taken to the first riser instead, the six feet
+ * survive (inner mouths 0.796–0.845 m, all still clear of the pier) but every one
+ * of them moves 10–12° round the drum. That is the same bill approachAzimuthDeg()'s
+ * note prices from the other side, and it is the owner's to settle.
+ */
+export function entryLandingTreads(steps: StepPlacement[]): number {
+  /*
+   * TWO TREADS, NOT ONE, and the reason is that one cannot be told apart.
+   *
+   * planFlight() lays the platform at fromY and then climbs, so with a one-tread
+   * platform the list reads fromY, fromY+riser, fromY+2·riser — which is exactly
+   * what a flight with NO platform reads, one riser lower. The step list does not
+   * carry fromY, so nothing here can separate the two cases, and a rule that
+   * guessed would cut the first STEP of every plain flight as a landing and hollow
+   * the stair out under it. STAIR.endLandingLength is 0.9 m against a 0.3 m going,
+   * so the platform is three treads and the question is academic; drop that number
+   * below two treads' worth and this returns 0 and the trench comes back, visibly,
+   * rather than silently doing the wrong thing.
+   */
+  if (steps.length < 2 || steps[1].treadY !== steps[0].treadY) return 0
+  let n = 2
+  while (n < steps.length && steps[n].treadY === steps[0].treadY) n += 1
+  // a flight that never rises is not a flight with a platform on it
+  return n === steps.length ? 0 : n
+}
+
+/**
  * The void a stair in a wall actually requires.
  *
  * Modelling treads inside solid masonry is not enough: without a passage cut
@@ -622,16 +696,19 @@ export function stairPassageSections(
      * what cost this model its stair floor once already.
      *
      * AND A TREAD THAT DOES NOT RISE IS A LANDING TOO, which is the half of this
-     * the flag missed. The end platform is built as treads (see
+     * the flag missed. The platform at a flight's foot is built as TREADS (see
      * FlightParams.endLandingLength), so the sections over it were cut a riser and
      * a half down while the lead beyond them was cut at floor level — and the
      * sweep lofts between the two. Measured at the foot of 2→3, the bed fell to
-     * 3.626 at the edge of the last landing tread and came back to 3.761 one step
-     * later: a 0.13 m black slot standing exactly at the doorway's far jamb, with
-     * the lead's floor beyond it reading as a separate little shelf rather than as
-     * the same landing continuing. Raising it buries the landing's tread blocks in
-     * the bed, which costs nothing — a tread block is stone and so is the bed, and
-     * only the top face is ever seen.
+     * 3.626 at the outer edge of the last platform tread and came back to 3.761
+     * one step later: a 0.13 m black slot standing exactly at the doorway's far
+     * jamb, with the lead's floor beyond it reading as a SEPARATE little shelf
+     * rather than as the same landing continuing. That slot and that shelf are
+     * what the owner drew an arrow at on 2026-08-16; see entryLandingTreads().
+     *
+     * Raising the bed buries the platform's tread blocks in it, and that costs
+     * nothing: a tread block is stone, the bed is stone, and the only face of
+     * either that is ever seen is the tread's top.
      */
     landing = false,
   ): PassageSection => {
@@ -722,7 +799,15 @@ export function stairPassageSections(
     if (flight.length === 0) continue
     // each flight carries its own riser, since storeys round to different ones
     const riser = riserOf(flight)
-    const body = flight.map((step) => sectionAt(step, riser))
+    /*
+     * The platform you enter onto is cut as a landing, not as a stair.
+     *
+     * ONLY THE FOOT'S, and the head's identical trench is left alone on purpose —
+     * see the note on entryLandingTreads() for the measurement and for what
+     * raising the head's bed would drag with it at the top of the tower.
+     */
+    const entryTreads = entryLandingTreads(flight)
+    const body = flight.map((step, k) => sectionAt(step, riser, step.azimuthDeg, k < entryTreads))
     if (flight.length < 2) {
       tubes.push(body.filter(inStone))
       continue

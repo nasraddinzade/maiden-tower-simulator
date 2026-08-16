@@ -21,6 +21,7 @@ import { MIN_LATHE_SEGMENTS, WALL_EMBED as BEDDING_EMBED } from './bedding'
 import { cupolaProfile, domeHeightAt, effectiveOpeningRadius } from './cupola'
 import {
   PASSAGE_SIDE_CLEARANCE,
+  entryLandingTreads,
   flightRiser,
   planAllFlights,
   stairDoorways,
@@ -409,20 +410,32 @@ describe('the stair leaves no slot that looks through', () => {
      * with black gaps between them. Cut stone steps are monolithic with their
      * risers, so the block runs down to the floor of the cut — which also makes
      * consecutive treads overlap and the stair become one solid mass.
+     *
+     * DOWN TO THE FLOOR OR PAST IT, and the difference is the platform at a
+     * flight's foot. This asked for equality at every tread, which is right
+     * wherever the bed is cut for a STAIR — the cut tracks the treads a riser and
+     * a half down and the two meet. Over the entry platform the bed is cut for a
+     * LANDING instead (entryLandingTreads(): the level treads had a 0.155 m trench
+     * lofted between them and the lead beyond, and it showed through the doorway),
+     * so the block runs on 0.31 m into the stone. That is a fit, not a void, and
+     * the property this test is named for — nothing showing under a nosing — is
+     * satisfied by any block whose underside is at or below the floor. Equality is
+     * still asserted where the flight is climbing, so the plank-on-nothing fault
+     * cannot come back on the treads it was found on.
      */
     flights.forEach((flight, fi) => {
       if (flight.length < 2) return
       const byAzimuth = new Map(tubes[fi].map((s) => [s.azimuthDeg.toFixed(4), s]))
       const riser = flightRiser(flight)
-      for (const s of flight) {
+      const entry = entryLandingTreads(flight)
+      flight.forEach((s, k) => {
         const section = byAzimuth.get(s.azimuthDeg.toFixed(4))
-        if (!section) continue
+        if (!section) return
         const treadBottom = s.treadY - treadDepth(riser)
-        expect(
-          treadBottom,
-          `az ${s.azimuthDeg.toFixed(1)}: tread bottom ${treadBottom.toFixed(3)} vs passage floor ${section.bottomY.toFixed(3)}`,
-        ).toBeCloseTo(section.bottomY, 6)
-      }
+        const where = `az ${s.azimuthDeg.toFixed(1)}: tread bottom ${treadBottom.toFixed(3)} vs passage floor ${section.bottomY.toFixed(3)}`
+        if (k < entry) expect(treadBottom, where).toBeLessThanOrEqual(section.bottomY + 1e-6)
+        else expect(treadBottom, where).toBeCloseTo(section.bottomY, 6)
+      })
     })
   })
 
