@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   PASSAGE_FOOT_TOLERANCE,
+  TREAD_OVERLAP_FRACTION,
   entryLandingTreads,
+  flightRiser,
+  landingPaving,
   planAllFlights,
   planFlight,
+  stairDoorways,
   stairPassageSections,
+  treadDepth,
   type PassageSection,
   type StepPlacement,
 } from './staircase'
@@ -168,5 +173,220 @@ describe('the passage floor at the foot of a flight', () => {
     expect(deep.length).toBeGreaterThan(0)
     // a landing bed there would stand above the stone and be dropped
     expect(top - PASSAGE_FOOT_TOLERANCE).toBeGreaterThan(ROOF.masonryTopY)
+  })
+})
+
+/**
+ * THE FLOOR A WALKER SEES OVER A LANDING, WHICH IS NOT THE BED.
+ *
+ * The block above asserts the CUT, and it passes: since e96b76f the bed under a
+ * foot landing is one plane. The owner reported the little platform beside the
+ * way onto the stair twice anyway, and this is why. What is drawn over a landing
+ * is the flight's own tread stone, and it stopped at the end tread — so the floor
+ * was tread stone at storey level for the length of the platform and shell bed
+ * 0.020 m lower for the 1.33 m beyond it, with the join standing inside the
+ * doorway. Two stones at two levels seen through an opening; a little platform.
+ *
+ * These ask about the STONE THAT IS LAID, the way the block above asks about the
+ * pocket it is laid in. A slab covers the arc its own wedge covers — the same
+ * wedge stairTreadVertices() cuts, overlap included — and its top is its treadY.
+ */
+const paved = (flight: StepPlacement[], tube: PassageSection[]) => [
+  ...flight,
+  ...landingPaving(flight, tube),
+]
+
+/** The highest slab standing over an azimuth, or null where the stone runs out. */
+function drawnFloorAt(slabs: StepPlacement[], azimuthDeg: number): number | null {
+  let top: number | null = null
+  for (const s of slabs) {
+    const half = (s.angularWidthDeg / 2) * (1 + TREAD_OVERLAP_FRACTION)
+    if (Math.abs(azimuthDeg - s.azimuthDeg) > half) continue
+    if (top === null || s.treadY > top) top = s.treadY
+  }
+  return top
+}
+
+describe('the drawn floor of a landing', () => {
+  const flights = planAllFlights(stairSettings(), WALL_LIFTS, innerRadiusAt)
+  const tubes = tubesFor(flights)
+
+  /** Every flight end, with the stretch of tube that runs past its end tread. */
+  const ends = flights.flatMap((flight, i) => {
+    const climb = Math.sign(flight[1].azimuthDeg - flight[0].azimuthDeg)
+    return (['foot', 'head'] as const).map((end) => {
+      const tread = end === 'foot' ? flight[0] : flight[flight.length - 1]
+      const side = end === 'foot' ? -climb : climb
+      const past = (s: { azimuthDeg: number }) => (s.azimuthDeg - tread.azimuthDeg) * side > 1e-6
+      return {
+        id: `${end}-${i}`,
+        flight,
+        tube: tubes[i],
+        tread,
+        lead: tubes[i].filter(past),
+        paving: landingPaving(flight, tubes[i]).filter(past),
+      }
+    })
+  })
+
+  /**
+   * THE PROPERTY. From the passage's end cap to the end tread there is stone
+   * underfoot at every bearing, and all of it is one level: the level of the
+   * landing, which is the level of the storey the doorway opens onto.
+   *
+   * On HEAD it fails at ELEVEN of the twelve ends — every one that has a passage
+   * past its end tread. At the foot of 2→3 the drawn floor simply stops at
+   * azimuth 198.99 and the bed shows through 0.020 m lower for 18.15° of arc; at
+   * the head of the same flight it stops at 110.08 with the bed lofting 0.166 m
+   * below it. Cast down the built shell, r 4.20 and r 4.35, both are visible from
+   * the chamber through the doorway they stand in.
+   */
+  it('is one plane from the end cap to the end tread', () => {
+    let checked = 0
+    for (const e of ends) {
+      if (e.lead.length === 0) continue // the roof's head: no passage to floor
+      checked += 1
+      const slabs = paved(e.flight, e.tube)
+      const cap = e.lead.reduce((far, s) =>
+        Math.abs(s.azimuthDeg - e.tread.azimuthDeg) > Math.abs(far.azimuthDeg - e.tread.azimuthDeg)
+          ? s
+          : far,
+      ).azimuthDeg
+      const lo = Math.min(cap, e.tread.azimuthDeg)
+      const hi = Math.max(cap, e.tread.azimuthDeg)
+      for (let k = 0; k <= 200; k += 1) {
+        const az = lo + ((hi - lo) * k) / 200
+        const floor = drawnFloorAt(slabs, az)
+        const bed = bedAt(e.tube, az)
+        expect(
+          floor,
+          `${e.id} at azimuth ${az.toFixed(2)}: no stone laid; the bed shows at ${bed?.toFixed(4)}, ${(e.tread.treadY - (bed ?? 0)).toFixed(4)} m under the landing`,
+        ).not.toBeNull()
+        expect(
+          floor as number,
+          `${e.id} at azimuth ${az.toFixed(2)}: floor stands at ${floor?.toFixed(4)} against a landing at ${e.tread.treadY.toFixed(4)}`,
+        ).toBeCloseTo(e.tread.treadY, 9)
+      }
+    }
+    expect(checked, 'ends with a passage past the end tread').toBe(11)
+  })
+
+  /**
+   * AND IT IS BEDDED, NOT LAID ON. Every slab over a landing runs down past the
+   * floor of the cut beneath it, so what shows is its top and never its edge.
+   *
+   * This is the half of the repair that lets the head be fixed at all. e96b76f
+   * could not RAISE the head's bed — the roof flight's platform sections would
+   * have left the stone and taken the cap and its slit with them — so the head
+   * kept a 0.33 m trench under its platform and a 0.166 m slot at the near edge
+   * of it. Paving at a tread's depth buries that trench instead of filling it:
+   * nothing about the cut changes, and the slot has stone over it.
+   *
+   * A guard, not a diagnosis: it cannot fail on the code this fixes, because
+   * there was no paving there to float. It fails on the obvious cheaper repair —
+   * laying the slabs at the bed's own level, or thinner than a tread — which is
+   * what would put the edge back.
+   */
+  it('beds every slab of it below the floor of the cut', () => {
+    for (const e of ends) {
+      const depth = treadDepth(flightRiser(e.flight))
+      for (const s of e.paving) {
+        const half = (s.angularWidthDeg / 2) * (1 + TREAD_OVERLAP_FRACTION)
+        for (let k = 0; k <= 20; k += 1) {
+          const az = s.azimuthDeg - half + (2 * half * k) / 20
+          const bed = bedAt(e.tube, az)
+          if (bed === null) continue
+          expect(
+            s.treadY - depth,
+            `${e.id} slab at ${s.azimuthDeg.toFixed(2)}: underside ${(s.treadY - depth).toFixed(4)} against a bed at ${bed.toFixed(4)}`,
+          ).toBeLessThanOrEqual(bed + 1e-9)
+        }
+      }
+    }
+  })
+
+  /**
+   * IT MAY NOT REACH A DEGREE FURTHER THAN THE VOID IT LIES IN. Each slab stands
+   * on a section the cutter made, so the paving cannot outrun the passage however
+   * the lead's length is next re-argued — and at the roof, where inStone() drops
+   * the whole lead-out because the head landing IS the deck, nothing is laid at
+   * all. The alternative was a rule of its own for the terrace, and a strip of
+   * stair stone across the open roof the first time the two disagreed.
+   */
+  it('lays a slab only where the cutter left a section', () => {
+    let roofHead = 0
+    for (const e of ends) {
+      const bearings = e.tube.map((s) => s.azimuthDeg)
+      expect(e.paving.length, `${e.id} paving`).toBe(e.lead.length)
+      if (e.lead.length === 0) roofHead += 1
+      for (const s of e.paving) {
+        expect(
+          bearings.some((b) => Math.abs(b - s.azimuthDeg) < 1e-9),
+          `${e.id} slab at ${s.azimuthDeg.toFixed(3)} stands on a section`,
+        ).toBe(true)
+        expect(s.treadY, `${e.id} slab is level with its landing`).toBe(e.tread.treadY)
+      }
+    }
+    expect(roofHead, 'ends the cutter left no passage at').toBe(1)
+  })
+
+  /**
+   * WHAT THE OWNER IS LOOKING AT. Both his reports place the object beside the
+   * way onto the stair, so the property is stated there too: across the whole
+   * clear width of a doorway that opens onto a landing, the floor is one level
+   * and it is the doorway's own sill. A doorway whose arc runs off the paving —
+   * which is what moving one along its landing could do — fails this rather than
+   * quietly reopening the thing he reported.
+   *
+   * On HEAD every one of the twelve fails: the sill is at storey level and the
+   * floor beyond the platform is 0.020 m under it.
+   */
+  it('runs level under every doorway that opens onto one', () => {
+    const doorways = stairDoorways(
+      flights,
+      STAIR.width,
+      STAIR.doorwayHeight,
+      innerRadiusAt,
+      (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
+      ROOF.masonryTopY,
+      WALL_LIFTS.map((l) => l.opensAtY),
+      STAIR.doorwayWidth,
+    )
+    let onLandings = 0
+    for (const d of doorways) {
+      // the end whose landing this opening stands on, if any; the one opening
+      // partway up the 4→6 run stands on the flight itself and is not one
+      const e = ends.find(
+        (x) =>
+          x.lead.length > 0 &&
+          Math.abs(d.azimuthDeg - x.tread.azimuthDeg) <=
+            Math.abs(
+              x.lead.reduce((far, s) =>
+                Math.abs(s.azimuthDeg - x.tread.azimuthDeg) >
+                Math.abs(far.azimuthDeg - x.tread.azimuthDeg)
+                  ? s
+                  : far,
+              ).azimuthDeg - x.tread.azimuthDeg,
+            ) +
+              d.widthDeg / 2 &&
+          Math.abs(d.bottomY - x.tread.treadY) < 1e-9,
+      )
+      if (!e) continue
+      onLandings += 1
+      const slabs = paved(e.flight, e.tube)
+      for (let k = 0; k <= 40; k += 1) {
+        const az = d.azimuthDeg - d.widthDeg / 2 + (d.widthDeg * k) / 40
+        const floor = drawnFloorAt(slabs, az)
+        expect(
+          floor,
+          `${e.id} doorway at azimuth ${az.toFixed(2)}: nothing underfoot, bed at ${bedAt(e.tube, az)?.toFixed(4)}`,
+        ).not.toBeNull()
+        expect(
+          floor as number,
+          `${e.id} doorway at azimuth ${az.toFixed(2)}: floor ${floor?.toFixed(4)} against a sill at ${d.bottomY.toFixed(4)}`,
+        ).toBeCloseTo(d.bottomY, 9)
+      }
+    }
+    expect(onLandings, 'doorways standing on a landing').toBe(11)
   })
 })

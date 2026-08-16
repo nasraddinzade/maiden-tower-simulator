@@ -21,10 +21,11 @@
 
 import * as THREE from 'three'
 import { cupolaProfile, effectiveOpeningRadius } from './cupola'
-import { planAllFlights } from './staircase'
+import { landingPaving, planAllFlights, stairPassageSections } from './staircase'
 import { channelRings } from './waterSystem'
 import { isStoreyVisible, lodSegments } from './visibility'
-import { FLOORS, STAIR, TOWER, WALL_LIFTS, WATER, innerRadiusAt } from '../config/tower'
+import { FLOORS, ROOF, STAIR, TOWER, WALL_LIFTS, WATER, innerRadiusAt } from '../config/tower'
+import { PLAYER } from '../config/player'
 
 export interface BudgetOptions {
   /** Storey the viewer is on. */
@@ -116,7 +117,25 @@ export function interiorRenderBudget(options: BudgetOptions = {}): RenderBudget 
     WALL_LIFTS,
     innerRadiusAt,
   )
-  const stepCount = flights.reduce((n, f) => n + f.length, 0)
+  /*
+   * The paving counts too. Staircase.tsx draws the landings' floor slabs into
+   * the same buffer as the treads and out of the same wedge maker, so a slab
+   * costs exactly what a tread costs; leaving them out would understate the
+   * stair by a third and let the one part of it that grew this week grow
+   * unwatched. See landingPaving().
+   */
+  const tubes = stairPassageSections(
+    flights,
+    STAIR.width,
+    PLAYER.stairHeadroom,
+    innerRadiusAt,
+    ROOF.masonryTopY,
+    undefined,
+    STAIR.doorwayWidth,
+  )
+  const stepCount = flights
+    .filter((f) => f.length > 0)
+    .reduce((n, f, i) => n + f.length + landingPaving(f, tubes[i] ?? []).length, 0)
   byPart.stair.meshes = 1
   byPart.stair.triangles = stepCount * 12 // a box is 12 triangles
 

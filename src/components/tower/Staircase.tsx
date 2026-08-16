@@ -4,15 +4,18 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import {
   PASSAGE_SIDE_CLEARANCE,
   flightRiser,
+  landingPaving,
   planAllFlights,
   stairApproaches,
+  stairPassageSections,
   stairTreadVertices,
   treadDepth,
   type StepPlacement,
   type Winding,
 } from '../../lib/staircase'
 import { stairRampBoxes } from '../../lib/collision'
-import { WALL_LIFTS, innerRadiusAt, stairSettings } from '../../config/tower'
+import { ROOF, STAIR, WALL_LIFTS, innerRadiusAt, stairSettings } from '../../config/tower'
+import { PLAYER } from '../../config/player'
 
 export interface StaircaseProps {
   winding: Winding
@@ -56,9 +59,31 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
       innerRadiusAt,
     )
 
+    /*
+     * The passage those flights are cut in, planned HERE rather than taken from
+     * App, and for the same reason the flights are: this component draws the
+     * stair, so the stone it lays has to come off the same arithmetic as the
+     * steps it lays it beside. A tube handed in from elsewhere is a tube planned
+     * from someone else's copy of the leva settings, and the paving would then be
+     * one revision behind the treads it is flush with. See landingPaving().
+     */
+    const tubes = stairPassageSections(
+      flights,
+      p.width,
+      PLAYER.stairHeadroom,
+      innerRadiusAt,
+      ROOF.masonryTopY,
+      undefined,
+      STAIR.doorwayWidth,
+    )
+
     const out: PlacedStep[] = []
+    // stairPassageSections() emits one tube per NON-EMPTY flight, so the tubes
+    // are walked with their own counter rather than indexed by flight
+    let t = 0
     flights.forEach((steps) => {
       if (steps.length === 0) return
+      const tube = tubes[t++] ?? []
       /*
        * From the steps, not from rise / count: a flight with a landing has
        * treads that do not rise, and dividing by all of them gives a riser
@@ -66,7 +91,15 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
        * than the drop to the passage floor and hollow the flight out again.
        */
       const riser = flightRiser(steps)
-      for (const s of steps) {
+      /*
+       * The treads, AND the paving that carries each landing's floor on to the
+       * end of its passage. Without the second the floor beside every stair
+       * doorway is in two pieces at two levels — see landingPaving() for the
+       * raycast and for the owner's two reports of it. Same thickness, because a
+       * landing slab has the same stone under it as a tread and for the same
+       * reason: bedded, not laid on.
+       */
+      for (const s of [...steps, ...landingPaving(steps, tube)]) {
         out.push({
           ...s,
           radialWidth: p.width,

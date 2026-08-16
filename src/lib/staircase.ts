@@ -577,6 +577,136 @@ export function entryLandingTreads(steps: StepPlacement[]): number {
 }
 
 /**
+ * THE PAVING OF A LANDING: the level stone that carries its floor from the end
+ * tread out to the passage's end cap.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE LITTLE PLATFORM BESIDE THE WAY ONTO THE STAIR. [OWNER], twice: «не должно
+ * быть той маленькой площадки справа от входа на лестницу», then «справа с
+ * лестницы маленькая площадка появляется, которой не должно быть».
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * e96b76f measured the object and named its cause, and what it fixed was the
+ * BED — the sections over the entry platform are landing sections now, so the
+ * cut floor under a foot landing is one plane. That was right and it was not
+ * enough, because the floor a walker SEES over a landing is not the bed. It is
+ * the flight's own tread blocks, and they stop at the end tread. Cast down the
+ * built shell at the foot of 2→3, r 4.20, at one-degree steps:
+ *
+ *     az 187…198   3.7811   tread stone
+ *     az 199…217   3.7611   shell bed
+ *     az 218       nothing  (past the cap)
+ *
+ * A slab of tread stone 0.94 m long standing 0.020 m proud of 1.33 m of paler
+ * shell floor, with the join at azimuth 198.99 — INSIDE the doorway, which spans
+ * 195.34…210.33. Two stones at two levels with a black line between them, seen
+ * through a doorway: a little platform. Nothing about that changed when the
+ * bed was levelled; only the trench beside it got shallower, from 0.155 m to
+ * 0.020 m, which is why he saw it again.
+ *
+ * AND THE HEAD IS THE ONE HE MEANS BY «СПРАВА». e96b76f left the head's trench
+ * on the ground that nobody had complained about it. Cast down the same shell at
+ * the head of 2→3, r 4.35:
+ *
+ *     az  93…108   7.0423   shell bed (the lead-out)
+ *     az 109       6.9841   the loft diving
+ *     az 110       6.8959   ← 0.166 m of open slot, no stone over it
+ *     az 111…126   7.0623   tread stone
+ *
+ * The head doorway spans 99.12…113.61 and you enter it FACING OUTWARD to go
+ * down, so increasing azimuth is on your right: the platform, and the black slot
+ * at its foot, stand on the right of the way onto the stair, 3.6° inside the far
+ * jamb. It is the same object as the foot's and it is eight times deeper.
+ *
+ * WHAT THIS DOES. The landing is paved out to the cap at the end tread's own
+ * level, in the end tread's own stone, one slab per section of lead. From the
+ * first riser to the end of the passage the floor is then one plane and one
+ * material, flush with the storey it serves, and the joins that are left are at
+ * the two places a mason puts one: the riser, and the wall at the end of the
+ * passage.
+ *
+ * WHY NOT RAISE THE BED INSTEAD, which is the obvious repair and is the one
+ * thing that cannot be done. The bed has to stay strictly BELOW the doorway
+ * cutter's own floor or the two tools meet on a plane, and on a landing that
+ * floor is the storey level exactly (stairDoorways(), "ON A LANDING THE SILL IS
+ * THE FLOOR"). So the bed's level is forced to storey − footTolerance, the
+ * visible floor has to be storey level, and the only thing that can be both is
+ * stone laid ON the bed. Which is what a landing in a wall is: the cut is the
+ * pocket, the paving is the floor. Every slab is a tread-depth thick, so it is
+ * bedded 0.31 m into the stone under it and cannot read as a slab on a floor —
+ * at a head that same depth is what buries the 0.166 m trench instead of filling
+ * it, which is the edit e96b76f could not afford to make at the top of the tower.
+ *
+ * IT IS READ OFF THE CUT, NOT RE-DERIVED. The lead is `stairPassageSections()`'
+ * own business — how far past the end tread it runs is a rule about doorways that
+ * has already been rewritten twice this week — so this takes the TUBE and lays a
+ * slab on each section of it that stands past the end tread. There is no second
+ * expression for the length of a landing to drift from the first, and no way for
+ * the paving to reach a degree further than the void it lies in.
+ *
+ * That also settles where there must be NO paving, without a rule of its own.
+ * The cutter's inStone() has already dropped every lead section whose floor is
+ * above the top of the stone, which at the roof is all of them: the last flight's
+ * head landing IS the deck, and the stair leaves through the opening in the
+ * paving rather than along a tunnel. So eleven ends are paved and the twelfth
+ * gets nothing, because there is nothing there to pave — and a strip of stair
+ * stone across the open terrace is not something this can produce.
+ *
+ * IT MOVES NOTHING. No section, no cap, no doorway, no opening and no collider is
+ * derived from this; it is drawn stone, and nothing reads it back.
+ */
+export function landingPaving(
+  steps: StepPlacement[],
+  /** The flight's own passage, as stairPassageSections() cut it. */
+  tube: PassageSection[],
+): StepPlacement[] {
+  if (steps.length < 2 || tube.length === 0) return []
+
+  const foot = steps[0]
+  const head = steps[steps.length - 1]
+  const climb = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
+
+  const out: StepPlacement[] = []
+  const pave = (end: StepPlacement, lead: PassageSection[]) => {
+    /*
+     * Outward from the end tread, so each slab is exactly the step of lead it
+     * covers. Taking the width from the section spacing rather than from the
+     * flight's pitch is the same principle as taking the length from the tube:
+     * the paving is a rubbing of the cut, so a slab cannot be wider than its own
+     * bay however the cutter comes to lay them out.
+     */
+    const ordered = [...lead].sort(
+      (a, b) =>
+        Math.abs(a.azimuthDeg - end.azimuthDeg) - Math.abs(b.azimuthDeg - end.azimuthDeg),
+    )
+    let fromDeg = end.azimuthDeg
+    for (const s of ordered) {
+      out.push({
+        index: out.length,
+        azimuthDeg: s.azimuthDeg,
+        angularWidthDeg: Math.abs(s.azimuthDeg - fromDeg),
+        // the landing's own level and the flight's own walking line, so the
+        // paving is flush with the end tread's block and laps into it
+        treadY: end.treadY,
+        midRadius: end.midRadius,
+      })
+      fromDeg = s.azimuthDeg
+    }
+  }
+  // AWAY FROM THE FLIGHT AT BOTH ENDS, the sense stairPassageSections() carries
+  // its lead-in and lead-out in — against the climb below, along it above
+  pave(
+    foot,
+    tube.filter((s) => (s.azimuthDeg - foot.azimuthDeg) * climb < -1e-6),
+  )
+  pave(
+    head,
+    tube.filter((s) => (s.azimuthDeg - head.azimuthDeg) * climb > 1e-6),
+  )
+  return out
+}
+
+/**
  * The void a stair in a wall actually requires.
  *
  * Modelling treads inside solid masonry is not enough: without a passage cut
