@@ -2016,77 +2016,150 @@ export const WELL = {
   startsAtFloorIndex: 2,
   /**
    * Azimuth of the wellhead, and so of the chase the downpipe stands in.
-   * [PLACEHOLDER] — nothing has ever measured it.
    *
-   * IT WAS 230, AND 230 HAD OUTLIVED EVERY REASON IT WAS EVER GIVEN.
+   * NO LONGER A [PLACEHOLDER]. [OWNER] 2026-08-16: «колодец должен стоять рядом
+   * с проходом» — the well stands NEXT TO THE PASSAGE. That is testimony about
+   * where a thing is, and it overrides a derivation about where a thing may be.
    *
-   * It went there from 20 because at 20 the downpipe stood IN A DOORWAY — the
-   * chase is cut down the room-side face and the stair's head doorways came out
-   * at about az 15 while the flights started at 100, so a visitor leaving the
-   * stair on storey 3 walked into a 0.30 m pipe across the opening. The owner
-   * photographed it and called it, exactly, pipes in the entrances. That fault
-   * is real and the cure for it holds; what does not hold is the bearing.
+   * HIS FOOTAGE SAYS THE SAME AND SAYS WHICH PASSAGE. On the ascent the walker
+   * crosses storey 3 and the last thing before the climb is the wellhead:
+   * up/081 shows it glazed in the floor of an arched recess in the wall, a glass
+   * label fixed to the recess's jamb; up/080 shows that recess and the stair's
+   * mouth as two openings in the same wall with ONE pier between them, the
+   * steps rising immediately beyond it; up/082 and up/084 look down the shaft;
+   * up/085 is the first tread and up/086 the barred opening at the foot of the
+   * 3→4 passage. So the passage he means is the one storey 3 is LEFT by — the
+   * foot of flight 3→4, whose doorway this model puts at azimuth 190.77.
    *
-   * The flights have started at 196.7 since 2026-08-13, and the argument for 230
-   * was rebuilt twice on other grounds and void twice. First "the slit columns
-   * stand between 123 and 170" — after 2026-08-10 no slit stood anywhere, the
-   * openings having become the ends of the flights. Then "the nearest thing is
-   * the head of 4→6 at 310, 80° away" — after the stair turned a quarter of the
-   * drum the whole FOOT column swung to 205.4–218.5, straight at this. A value
-   * that must be re-justified every time the stair moves is not clear of the
-   * stair. It is being followed by it, and each rebuild left less room.
+   * 171 IS THAT SENTENCE AS ARITHMETIC. besideDoorwayBearing() in
+   * lib/waterSystem.ts puts the mouth's rim tangent to the radial plane of the
+   * doorway's near jamb: 190.772 − 7.245 of doorway − 13.003 of mouth = 170.52,
+   * to the nearest whole degree, because nothing has measured the bearing itself
+   * and a decimal would imply something had. It leaves the mouth's rim 0.87 m
+   * from the jamb's inner corner, which is about the width of the pier in
+   * up/080 — a corroboration and NOT the derivation; a pier read off a handheld
+   * wide-angle frame with no scale is not a measurement in this project.
    *
-   * WHAT WAS ACTUALLY WRONG AT 230, measured with the chase's own half-width of
-   * 5.13° (0.33 m at the storey-3 face) counted in, not eyeballed:
+   * THE SIDE IS ANTICLOCKWISE, and it rests on one frame. up/080 has the steps
+   * to the right of the recess with the camera facing the wall, and facing
+   * outward the right hand runs clockwise, so the well is the lower bearing. The
+   * arithmetic agrees for its own reasons: the clockwise tangent is 211, and 211
+   * puts the chase through SIX foot reveals in plan and through foot-3-4 in
+   * height as well — a pipe out of a window, which is the fault 4f3e197 was
+   * written to prevent. Anticlockwise costs no window at all.
    *
-   *   - the roof climb's passage reaches azimuth 227.0, and the chase at 230
-   *     stood 2.1° INSIDE it. No stone was cut, because that passage runs
-   *     23.14–27.50 and the topmost chase stops at 21.79;
-   *   - the nearest reveal, foot-8-9 at 218.5, OVERLAPPED IN PLAN by 0.3°:
-   *     11.5° of separation against 11.7° of summed half-widths. What kept the
-   *     two apart was 1.98 m of masonry and nothing else;
-   *   - the nearest passage on a storey the chase does run up was 8.4° clear,
-   *     down from 105° before the turn.
+   * WHAT IT DOES COST IS THE STAIR, AND THE BILL IS NOT SMALL. Every doorway is
+   * clear — the nearest is the very doorway it stands beside, 7.4° — and every
+   * reveal is clear by 21.6° or more. The passages are not: the chase breaks
+   * into a stair passage on all five storeys it runs up, eight lengths in all,
+   * biting 0.33–0.43 m past a jamb 0.25 m thick. Worst is storey 3, where the
+   * slot opens onto the treads of flight 3→4 standing 0.41–1.44 m above the room
+   * floor. chaseBreaches() computes it, wellClearance.test.ts asserts it and
+   * App.tsx prints it on every load; see WELL_BEARING_CONFLICT below for the
+   * whole report and for what would settle it.
    *
-   * Two of those three were not clearances at all, they were vertical accidents.
-   * Asking the guards about height was right and is not being undone — see
-   * downpipeChases() — but "clear" had quietly come to mean "does not touch
-   * anything at the heights both happen to occupy today", and a [PLACEHOLDER]
-   * whose whole defence is that its neighbour sits two metres higher is one
-   * lowered landing away from being a hole in a window.
+   * THE HISTORY, because this value has been round the houses and the reasons
+   * matter more than the numbers.
    *
-   * 312 IS DERIVED, NOT CHOSEN. Project every void in the drum — reveal,
-   * doorway and stair passage — onto plan, widen each by the chase's own
-   * half-angle, take the complement. The tower leaves exactly ONE arc free:
+   * It was 20, and at 20 the downpipe stood IN A DOORWAY: the chase is cut down
+   * the room-side face and the head doorways came out at about az 15 while the
+   * flights started at 100, so a visitor leaving the stair on storey 3 walked
+   * into a 0.30 m pipe across the opening. The owner photographed it and called
+   * it, exactly, pipes in the entrances. THAT FAULT IS NOT BEING REOPENED — 171
+   * is beside the door and not in it, and the doorway guard still holds.
    *
-   *     232.14° → 32.73° through north, 160.59° wide, middle 312.43°.
+   * It was then 230, to clear those doorways while the flights started at 100;
+   * the flights have started at 196.7 since 2026-08-13 and the argument was
+   * rebuilt twice on other grounds and void twice. Measured at last with the
+   * chase's own half-width counted in, 230 stood 2.1° inside the roof climb's
+   * passage and overlapped foot-8-9's reveal in plan, both held off by height
+   * alone and one of them by 1.98 m of it.
    *
-   * Its ends are passages rather than windows: the roof climb's lead-in at
-   * 227.0 closes it below and flight 4→6's lead-out at 37.9 closes it above.
-   * 312 is that middle to the nearest whole degree — a decimal here would claim
-   * a precision no measurement supports. It stands 79.9° clear in plan of the
-   * nearest void, 81.3° clear once height is counted as well, and 26.9° clear
-   * of the entrance, which is not in the derivation: 270 is sourced, it cannot
-   * move, and it lies 7 m below the lowest chase.
+   * It was then 312: the middle of the only arc the drum leaves free, 232.14° →
+   * 32.73° through north. That derivation is not withdrawn and is not wrong — it
+   * is still in clearArcsFor() and still tested — it simply answers a question
+   * that is no longer being asked. It asked where a bearing NOBODY HAS MEASURED
+   * may stand; there is now a witness. A rule that beats a placeholder loses to
+   * testimony, and it is worth saying plainly that the rule was working: 312 was
+   * clear of everything by 79.9° and 171 is not clear of the stair at all.
    *
-   * The half of the drum that is free is free because every flight, every
-   * doorway and every reveal in this model hangs off one stair bearing, and the
-   * stair occupies 37.9° to 227.0 and nothing else. That is a fact about the
-   * layout, not about the well.
-   *
-   * THE STAIR IS STILL THE THING THAT MOVES — STAIR_FROM_BUTTRESS_DEG is known
-   * to be too small by at least 8° and has deliberately not been changed — and
-   * this value is still hostage to it. The difference is that it is now hostage
-   * where a test can see it. clearArcsFor() in lib/waterSystem.ts is the
-   * derivation and wellClearance.test.ts runs it against the live flight plan,
-   * so the day the stair turns again the arc is recomputed, this number stops
-   * being its middle, and the suite says so instead of leaving the well where
-   * the previous stair bearing happened to put it.
+   * THE STAIR IS STILL THE THING THAT MOVES. STAIR_FROM_BUTTRESS_DEG is known to
+   * be too small by at least 8° and has deliberately not been changed, so the
+   * doorway this bearing hangs off will move, and this number must move with it.
+   * That is now a feature rather than a hazard: the derivation is run against the
+   * live flight plan in wellClearance.test.ts, so the day the stair turns, 171
+   * stops being the tangent and the suite says so — and the breach report is
+   * recomputed at the same time, which is the only honest way to find out whether
+   * turning the stair makes this better or worse.
    */
-  azimuthDeg: 312,
-  /** Distance of the wellhead from the tower axis. [PLACEHOLDER]. */
+  azimuthDeg: 171,
+  /**
+   * Distance of the wellhead from the tower axis. [PLACEHOLDER], and the
+   * footage now says it is too small — left alone anyway, because correcting it
+   * is a different change from the one that moved the bearing.
+   *
+   * 2.4 stands the mouth in open floor, 1.25 m clear of the room face. up/081
+   * shows it in the FLOOR OF A RECESS in the wall, its glass projecting a little
+   * into the room, and up/080 shows the recess as one of two openings in the
+   * same wall. A wellhead against the face would be somewhere near 3.1–3.2 with
+   * the room face at 3.649 — which is a reading, not a measurement, and the
+   * recess's depth is not in any source.
+   *
+   * IT MOVES THE BEARING WHEN IT IS CORRECTED, and by a knowable amount, which
+   * is why it is written down here rather than filed away: azimuthDeg is the
+   * tangent of the MOUTH on this radius, so a mouth at 3.2 subtends 9.71° from
+   * the axis instead of 13.00° and the tangent bearing becomes 173.8 → 174. The
+   * derivation carries the correction by itself; nobody has to re-argue it.
+   */
   offsetFromAxis: 2.4,
 }
+
+/**
+ * WHAT THE OWNER'S PLACEMENT OF THE WELL COSTS, printed on every load.
+ *
+ * Not a question — he answered it. A CONFLICT, in the sense App.tsx already uses
+ * for the openings: the record says one thing, the geometry says another, and
+ * the pair is the finding. His sentence puts the wellhead beside the storey-3
+ * doorway; the same number puts a 0.66 m chase up the wall through five storeys
+ * of stair passage. Both halves are in the model and neither has been softened.
+ *
+ * The numbers here are the shipped configuration's and are recomputed live by
+ * chaseBreaches() — this text says what they mean, App.tsx prints what they are.
+ */
+export const WELL_BEARING_CONFLICT = [
+  'КОЛОДЕЦ ПОСТАВЛЕН ТАМ, ГДЕ ВЫ СКАЗАЛИ, И ЭТО СТОИТ ПЯТИ ЯРУСОВ ЛЕСТНИЦЫ.',
+  '',
+  '«Колодец должен стоять рядом с проходом» — WELL.azimuthDeg 312 → 171. Устье',
+  'встало вплотную к дверному проёму лестницы 3→4 (az 190.77): край устья на',
+  '0.87 м от косяка, ни один проём и ни одна оконная ниша не задеты.',
+  '',
+  'НО ОДНО ЧИСЛО ДЕЛАЕТ ДВА ДЕЛА. Тем же азимутом задан ШТРАБА водосточной трубы',
+  'в стене — 0.66 м шириной, от пола до пяты свода на ярусах 3–7. На этом азимуте',
+  'она вскрывает лестничные проходы восемь раз:',
+  '  ярус 3 — проход 3→4 на 22.61°, проход 2→3 на 2.30°',
+  '  ярус 4 — проход 4→6 на 21.05°, проход 3→4 на 3.06°',
+  '  ярус 5 — проход 4→6 на 3.76°',
+  '  ярус 6 — проход 6→7 на 18.18°',
+  '  ярус 7 — проход 7→8 на 16.88°, проход 6→7 на 5.05°',
+  'Штраба уходит в кладку на 0.48 м, проход начинается в 0.25 м от лица стены:',
+  'перемычки между комнатой и лестницей снимается 0.33–0.43 м, то есть вся.',
+  'Хуже всего на ярусе 3: щель выходит прямо на ступени марша 3→4, которые там',
+  'стоят на 0.41–1.44 м выше пола комнаты.',
+  '',
+  'ЭТО НЕ СПРЯТАНО И НЕ ИСПРАВЛЕНО МОЛЧА. Штраба режется как есть — щели видно,',
+  'и их видно там, где они на самом деле получаются из ваших слов.',
+  '',
+  'ЧТО ЭТО ЗАКРОЕТ, по убыванию цены:',
+  '  1. С КАКОЙ СТОРОНЫ ОТ ДВЕРИ? Модель ставит колодец против часовой (171) по',
+  '     одному кадру up/080. По часовой — 211 — труба идёт через шесть оконных',
+  '     ниш, что заведомо хуже; если сторона другая, вопрос меняется целиком.',
+  '  2. ТРУБА ИДЁТ ТАМ ЖЕ, ГДЕ УСТЬЕ? Модель ведёт штрабу вертикально от устья',
+  '     вверх на пять ярусов. Если труба поднимается по другой части стены, а к',
+  '     колодцу приходит понизу, конфликта нет вообще — но второй азимут никто не',
+  '     мерил, и выдумывать его здесь нельзя.',
+  '  3. ЛЕСТНИЦА. STAIR_FROM_BUTTRESS_DEG заведомо мал минимум на 8°; проходы',
+  '     сдвинутся, и вместе с ними — и этот азимут, и весь список выше.',
+] as const
 
 // ———————————————————————— water collection ————————————————————————
 // [ref]: "Керамическая труба Ø 30 см идёт вниз из ниш в колодец. Между 2-м и 7-м

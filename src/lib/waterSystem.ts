@@ -205,6 +205,118 @@ export function clearArcsFor(blocks: readonly PlanBlock[], ownHalfDeg: number): 
 }
 
 /**
+ * WHERE A ROUND MOUTH STANDS BESIDE A DOORWAY AND NOT IN IT.
+ *
+ * The doorway's near jamb is a radial plane at `azimuth ± halfWidth`. A mouth of
+ * the given diameter, centred `mouthRadius` from the axis, stands clear of that
+ * plane iff its centre lies at least `asin(mouthDiameter / 2 / mouthRadius)`
+ * beyond it in bearing — the perpendicular distance from the centre to the plane
+ * being `mouthRadius · sin Δ`, which must reach the mouth's own radius. Equality
+ * is tangency, and tangency is what "beside" means: as near the opening as a
+ * round thing can stand without breaking the line of the jamb.
+ *
+ * `side` is +1 for the clockwise jamb (increasing azimuth) and −1 for the
+ * anticlockwise one. It is an argument and not a derivation because nothing in
+ * the arithmetic knows which side of a door a well was sunk on; only the footage
+ * does.
+ *
+ * IT IS EXACT, NOT SMALL-ANGLE. At the tower's own figures — a 1.08 m mouth 2.4 m
+ * out — arcsin gives 13.003° against the ratio's 12.891°, and 0.11° is 5 mm of
+ * arc there. That is nothing; the arcsin is used anyway because it stays right
+ * when the mouth is moved out to the wall, which the footage says it should be.
+ * If the mouth is wider than the circle it stands on it swallows the axis and no
+ * bearing clears the plane: the clamp then returns a quarter turn, which is the
+ * honest answer to an impossible question rather than a NaN.
+ */
+export function besideDoorwayBearing(
+  doorwayAzimuthDeg: number,
+  doorwayHalfWidthDeg: number,
+  mouthRadius: number,
+  mouthDiameter: number,
+  side: 1 | -1,
+): number {
+  const ratio = Math.min(1, Math.max(0, mouthDiameter / 2 / Math.max(1e-9, mouthRadius)))
+  const clearDeg = (Math.asin(ratio) * 180) / Math.PI
+  const a = doorwayAzimuthDeg + side * (Math.abs(doorwayHalfWidthDeg) + clearDeg)
+  return ((a % 360) + 360) % 360
+}
+
+/** One length of chase found standing inside one passage. */
+export interface ChaseBreach {
+  passage: string
+  /** 0-based storey whose length of chase does it. */
+  floorIndex: number
+  /** How far the chase's arc reaches into the passage's, degrees. */
+  overlapDeg: number
+  /** How far past the passage's inner face the chase's back reaches, metres. */
+  biteMetres: number
+  bottomY: number
+  topY: number
+}
+
+/** A passage as this module needs it: a tunnel described by its sections. */
+export interface PassageRun {
+  label: string
+  sections: ReadonlyArray<{
+    azimuthDeg: number
+    bottomY: number
+    topY: number
+    innerRadius: number
+  }>
+}
+
+/**
+ * WHERE THE CHASE STANDS IN A STAIR PASSAGE — the damage report, recomputed.
+ *
+ * Both dimensions, asked of the same pair: only the sections of a passage that
+ * share a length of chase's HEIGHT are considered, and their bearings are then
+ * compared with the chase's. That is the lesson of downpipeChases() and of
+ * clearArcsFor() applied together rather than one instead of the other — a
+ * height-blind guard cries wolf, a plan-blind one calls a two-metre miss a
+ * clearance, and what is wanted here is neither a guard nor a placement rule but
+ * an inventory of what a SOURCED position costs.
+ *
+ * The third dimension is the one that says whether it matters. A chase bites
+ * `depth` past the room face; a passage begins `wallClearance` past it. Where the
+ * two arcs cross, the bite is how much of the jamb between room and stair is
+ * removed, and anything over the jamb's own thickness is a hole between them.
+ *
+ * Returns worst first, and empty when the chase is clear — so the report is
+ * silent exactly when there is nothing to say.
+ */
+export function chaseBreaches(
+  chases: readonly DownpipeChase[],
+  passages: readonly PassageRun[],
+  faceRadiusAt: (y: number) => number,
+): ChaseBreach[] {
+  const DEG = 180 / Math.PI
+  const sep = (a: number, b: number) => Math.abs(((a - b + 540) % 360) - 180)
+  const out: ChaseBreach[] = []
+  for (const c of chases) {
+    const midY = (c.bottomY + c.topY) / 2
+    const face = faceRadiusAt(midY)
+    const chaseHalfDeg = (c.width / 2 / Math.max(1e-9, face)) * DEG
+    for (const p of passages) {
+      const shared = p.sections.filter((s) => !(s.topY < c.bottomY || s.bottomY > c.topY))
+      if (shared.length === 0) continue
+      const lo = Math.min(...shared.map((s) => s.azimuthDeg))
+      const hi = Math.max(...shared.map((s) => s.azimuthDeg))
+      const overlapDeg = chaseHalfDeg + (hi - lo) / 2 - sep(c.azimuthDeg, (lo + hi) / 2)
+      if (overlapDeg <= 0) continue
+      out.push({
+        passage: p.label,
+        floorIndex: c.floorIndex,
+        overlapDeg,
+        biteMetres: face + c.depth - Math.min(...shared.map((s) => s.innerRadius)),
+        bottomY: c.bottomY,
+        topY: c.topY,
+      })
+    }
+  }
+  return out.sort((a, b) => b.overlapDeg - a.overlapDeg)
+}
+
+/**
  * Profile of the well shaft: a funnel collar at the mouth narrowing to the bore.
  * Returned as (radius, y) pairs ready to be revolved.
  *

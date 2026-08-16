@@ -19,6 +19,7 @@ import {
   WALL_LIFTS,
   WATER,
   WELL,
+  WELL_BEARING_CONFLICT,
   innerRadiusAt,
 } from './config/tower'
 import { LAMP, PLAYER } from './config/player'
@@ -43,8 +44,8 @@ import { Staircase } from './components/tower/Staircase'
 import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
 import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
-import type { WallChase, WindowCut } from './lib/towerShell'
-import { downpipeChases } from './lib/waterSystem'
+import type { WindowCut } from './lib/towerShell'
+import { chaseBreaches, downpipeChases, type DownpipeChase } from './lib/waterSystem'
 import { WindowGrilles } from './components/tower/WindowGrilles'
 import { WindowSurrounds } from './components/tower/WindowSurrounds'
 import { CourseBands } from './components/tower/CourseBands'
@@ -364,8 +365,12 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
    * Photographed: an open rectangular recess through several courses, floor to
    * springing, with the pipe inside it. [ref] has the pipe coming out of the
    * niches, and this is the niche.
+   *
+   * Kept as DownpipeChase rather than narrowed to WallChase on the way out: the
+   * extra field is which storey each length belongs to, TowerShell has no use
+   * for it, and the breach report below cannot name a storey without it.
    */
-  const wallChases = useMemo<WallChase[]>(
+  const wallChases = useMemo<DownpipeChase[]>(
     () =>
       downpipeChases(
         FLOORS,
@@ -675,6 +680,50 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
     if (!import.meta.env.DEV) return
     console.warn(`[stair bearing]\n${STAIR_BEARING_QUESTION.join('\n')}`)
   }, [])
+
+  /*
+   * AND THE WELL, WHICH IS THE SAME KIND OF THING AS THE OPENINGS AND NOT THE
+   * SAME KIND AS THE ROOF: a conflict between a witness and the geometry, with
+   * both halves standing.
+   *
+   * [OWNER] 2026-08-16 put the wellhead beside the stair passage and the model
+   * obeyed him. The bearing that does it also drives the downpipe's chase up
+   * five storeys of wall the stair is already in, so the cutter opens the jamb
+   * between room and passage eight times. Nothing has been softened to hide
+   * that: the chase is cut, the slots are there to walk up to, and this prints
+   * what they are.
+   *
+   * THE LIST IS COMPUTED, NOT QUOTED. WELL_BEARING_CONFLICT carries the argument
+   * and the shipped figures; chaseBreaches() re-derives them here from the LIVE
+   * flight plan, so turning the stair in the leva panel changes the report on the
+   * spot. It falls silent when there is nothing to report, which is the only way
+   * anyone will notice the day something fixes it.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const breaches = chaseBreaches(
+      wallChases,
+      flightPlan.tubes.map((sections, i) => ({
+        label: `${WALL_LIFTS[i].fromFloorNumber}→${WALL_LIFTS[i].toFloorNumber}`,
+        sections,
+      })),
+      innerRadiusAt,
+    )
+    console.warn(
+      `[well]\n${[
+        ...WELL_BEARING_CONFLICT,
+        '',
+        breaches.length === 0
+          ? 'ЖИВОЙ ЗАМЕР: штраба сейчас не задевает ни один проход.'
+          : `ЖИВОЙ ЗАМЕР при az ${WELL.azimuthDeg}° и текущей лестнице — ${breaches.length}:`,
+        ...breaches.map(
+          (b) =>
+            `  ярус ${b.floorIndex + 1} × проход ${b.passage}: ${b.overlapDeg.toFixed(2)}° внутрь, ` +
+            `${b.biteMetres.toFixed(3)} м в перемычку, y ${b.bottomY.toFixed(2)}–${b.topY.toFixed(2)}`,
+        ),
+      ].join('\n')}`,
+    )
+  }, [wallChases, flightPlan])
 
   const apertures = useMemo(() => buildApertures(windows ?? []), [windows])
   useEffect(() => onApertures(apertures), [apertures, onApertures])
