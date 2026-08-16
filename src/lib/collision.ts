@@ -712,6 +712,75 @@ export function guardRingBoxes(p: GuardRingParams): BoxSpec[] {
   return out
 }
 
+export interface WalkBand {
+  /** Nearest the axis a walker may put their feet. */
+  innerRadius: number
+  /** Furthest from the axis a walker may put their feet. */
+  outerRadius: number
+  /** The walking line — the middle of the band. */
+  midRadius: number
+  /** outerRadius − innerRadius, which is what a ramp chain takes as its width. */
+  width: number
+}
+
+export interface ThroughOpeningBandParams {
+  /** Radius of what the flight winds round: a newel, or 0 for an open well. */
+  newelRadius: number
+  /** Radius of the hole the flight rises THROUGH — not the flight's own. */
+  openingRadius: number
+  /** Radius of the walker's capsule. */
+  walkerRadius: number
+  /** The gap the character controller keeps from every surface it meets. */
+  skin: number
+}
+
+/**
+ * The band of a flight a walker may stand on when the flight rises through a
+ * hole NARROWER than the flight itself.
+ *
+ * A walking surface is normally as wide as the thing it is drawn on, and every
+ * other flight in this model takes its width straight from the masonry. The
+ * modern spiral cannot: config/modern.ts's MODERN_SPIRAL_VS_OPENING records that
+ * the stair measures Ø 2.2 m ±0.4 and the well it comes up through measures
+ * Ø 1.8 m ±0.3, and the model refuses to adjust either figure to suit the other.
+ * The DRAWING can carry that contradiction — it draws both, and the treads
+ * simply pass through the slab. Physics cannot. Something has to say where a
+ * body may be, and a body is neither of those two diameters.
+ *
+ * So the band is the walker's own clearance, and nothing else:
+ *
+ *   inner   newelRadius + walkerRadius   — their shoulder against the tube
+ *   outer   openingRadius − walkerRadius − skin
+ *                                        — their shoulder against the rim of the
+ *                                          hole, less the gap the controller
+ *                                          keeps from every surface
+ *
+ * The skin is subtracted on the OUTER side only, and that asymmetry is the
+ * measurement this function was written from. The rim is a collider and the
+ * controller inflates the capsule by `skin` before testing it, so the outer
+ * limit really is openingRadius − walkerRadius − skin: measured on the walk, the
+ * capsule was pinned at r 0.581 against a rim at 0.900 with a 0.300 radius, three
+ * times out of three, at three different aiming lines. The newel is only DRAWN —
+ * it carries no collider — so nothing enforces the inner limit and nothing needs
+ * to keep clear of it; it is there so the walking line does not end up inside a
+ * tube the walker can see.
+ *
+ * Returns null when a walker does not fit through the hole at all. That is not a
+ * band to be clamped to zero: it is a building the survey says cannot be walked,
+ * and the caller must say so rather than emit a collider a hair wide.
+ */
+export function throughOpeningWalkBand(p: ThroughOpeningBandParams): WalkBand | null {
+  const innerRadius = p.newelRadius + p.walkerRadius
+  const outerRadius = p.openingRadius - p.walkerRadius - p.skin
+  if (!(outerRadius > innerRadius)) return null
+  return {
+    innerRadius,
+    outerRadius,
+    midRadius: (innerRadius + outerRadius) / 2,
+    width: outerRadius - innerRadius,
+  }
+}
+
 export interface RampStep {
   azimuthDeg: number
   treadY: number

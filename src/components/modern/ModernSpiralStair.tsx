@@ -7,16 +7,11 @@ import {
   MODERN_SPIRAL,
   MODERN_SPIRAL_LIFT,
   MODERN_SPIRAL_TREADS,
+  MODERN_SPIRAL_WALK_BAND,
 } from '../../config/modern'
 
 /** m — chequer plate is thin; this is a plate, not a stone block. */
 const TREAD_PLATE = 0.012
-
-/**
- * m — width of the walkable band the collider covers, about the walking line.
- * Narrower than the treads on purpose; see the note in useRampBoxes below.
- */
-const COLLIDER_BAND = 0.55
 
 /**
  * m — how far the walking-surface boxes hang below the treads.
@@ -86,6 +81,18 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
 
   const ramp = useMemo(() => {
     if (steps.length < 2) return []
+    /*
+     * THE WALKING LINE IS THE WELL'S, NOT THE TREAD'S.
+     *
+     * MODERN_SPIRAL_WALK_BAND is where a body fits between the newel and the rim
+     * of the hole this flight rises through, and the whole argument — with the
+     * walk that measured it — is written out there. Null means the survey says a
+     * walker does not fit through the well at all, and the honest collider for
+     * that is none: a band clamped to a hair wide would be a stair you can stand
+     * on and not walk, which is exactly the fault this replaced.
+     */
+    const band = MODERN_SPIRAL_WALK_BAND
+    if (!band) return []
     const width = MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius
     const first = steps[0]
     /*
@@ -124,7 +131,12 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
       {
         azimuthDeg: first.azimuthDeg + stepAngle * k,
         treadY: first.treadY,
-        midRadius: first.midRadius,
+        // onto the WALKING LINE, not onto the tread's middle: the approach
+        // exists to put the walker where the flight is collided, and delivering
+        // them to 0.579 put them on the outer edge of a band that now ends at
+        // 0.580 — one step off it and they are in the well's wall for the rest
+        // of the climb
+        midRadius: band.midRadius,
       },
     ])
     /*
@@ -135,17 +147,24 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
      * plane is yawed from it, so away from the walking line the two diverge, and
      * the step between them grows with distance from that line. On the masonry
      * flights the yaw is 4° a step at 4.3 m radius and the lip is ~15 mm — below
-     * notice. This newel spiral turns 27.7° a step at 0.58 m, and across the full
-     * 1.04 m tread the lip works out at ~0.11 m. This controller will not climb a
-     * lip of any height: measured, the walker took three treads and stopped dead.
+     * notice. This newel spiral turns 27.7° a step, and across the full 1.04 m
+     * tread the lip works out at ~0.11 m. This controller will not climb a lip of
+     * any height: measured, the walker took three treads and stopped dead.
      *
      * So the walking surface is a band about the walking line rather than the
-     * whole tread. The lip shrinks in proportion — ~0.06 m at this width — and
-     * the treads are still drawn full width, which is what anyone actually sees.
+     * whole tread. WHICH band is no longer a choice — it is the walker's own
+     * clearance through the well, MODERN_SPIRAL_WALK_BAND, and both terms of the
+     * lip fall with it: the half-width goes 0.275 → 0.111 and the walking line
+     * comes in to 0.469, which steepens the flight from 31.8° to 37.4° and still
+     * leaves the lip at 0.040 m against 0.079 m. The pitch stays well inside the
+     * controller's 60° climb limit. The treads are drawn full width throughout,
+     * which is what anyone actually sees.
+     *
      * Halving the span from two steps to one halves the chord error as well.
      */
+    const collided = steps.map((s) => ({ ...s, midRadius: band.midRadius }))
     return [
-      ...stairRampBoxes(steps, COLLIDER_BAND, 1, COLLIDER_THICKNESS),
+      ...stairRampBoxes(collided, band.width, 1, COLLIDER_THICKNESS),
       ...approaches.flatMap((a) => stairRampBoxes(a, width, 1, COLLIDER_THICKNESS)),
     ]
   }, [steps])

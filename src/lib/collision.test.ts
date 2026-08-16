@@ -6,6 +6,7 @@ import {
   guardRingBoxes,
   rotate,
   stairRampBoxes,
+  throughOpeningWalkBand,
   wallColliders,
   yawThenTilt,
   type BoxSpec,
@@ -901,5 +902,78 @@ describe('approachGuardBoxes', () => {
     expect(approachGuardBoxes({ ...PARAMS, line: [flat, flat, flat] })).toHaveLength(0)
     expect(approachGuardBoxes({ ...PARAMS, width: 0 })).toHaveLength(0)
     expect(approachGuardBoxes({ ...PARAMS, height: 0 })).toHaveLength(0)
+  })
+})
+
+/**
+ * The band a walker may stand on when the flight is wider than its own well.
+ *
+ * The maths is four terms and an inequality, which is exactly why it is worth
+ * stating: the fault it fixes was that nobody had written the inequality down.
+ * The modern spiral's collider offered a band 0.55 m wide about a line 1.25 mm
+ * inside the only corridor a body fits through, so a quarter of a metre of it
+ * was somewhere to stand that a body does not fit in — and the walker who was
+ * nudged out there by the ramp chain's own joints jammed against the rim of the
+ * hole and could not climb, could not retreat and could not be freed except by
+ * being aimed a metre inward.
+ */
+describe('throughOpeningWalkBand', () => {
+  const PARAMS = { newelRadius: 0.0575, openingRadius: 0.9, walkerRadius: 0.3, skin: 0.02 }
+
+  it('puts the outer edge where the walker plus the controller skin meets the rim', () => {
+    const band = throughOpeningWalkBand(PARAMS)!
+    // the identity, and it is an identity rather than a target: the controller
+    // inflates the capsule by `skin` before it tests anything, so a walker
+    // standing on the outer edge is exactly touching the rim and no further
+    expect(band.outerRadius + PARAMS.walkerRadius + PARAMS.skin).toBeCloseTo(
+      PARAMS.openingRadius,
+      12,
+    )
+  })
+
+  it('holds for EVERY point of the band, which is the whole of its purpose', () => {
+    const band = throughOpeningWalkBand(PARAMS)!
+    for (let t = 0; t <= 1; t += 0.05) {
+      const r = band.innerRadius + (band.outerRadius - band.innerRadius) * t
+      expect(r + PARAMS.walkerRadius + PARAMS.skin).toBeLessThanOrEqual(
+        PARAMS.openingRadius + 1e-12,
+      )
+    }
+  })
+
+  it('keeps the walking line off the newel by a whole body', () => {
+    const band = throughOpeningWalkBand(PARAMS)!
+    expect(band.innerRadius - PARAMS.walkerRadius).toBeCloseTo(PARAMS.newelRadius, 12)
+    // and the skin is NOT taken off this end: the newel is drawn and carries no
+    // collider, so there is nothing here for the controller to keep clear of
+    expect(band.innerRadius).toBeGreaterThan(PARAMS.newelRadius)
+  })
+
+  it('reports the mid and the width the ramp chain is built from', () => {
+    const band = throughOpeningWalkBand(PARAMS)!
+    expect(band.midRadius).toBeCloseTo((band.innerRadius + band.outerRadius) / 2, 12)
+    expect(band.width).toBeCloseTo(band.outerRadius - band.innerRadius, 12)
+    expect(band.midRadius - band.width / 2).toBeCloseTo(band.innerRadius, 12)
+  })
+
+  it('returns null rather than a hair-wide band when nobody fits', () => {
+    /*
+     * A degenerate band is not a small band, it is a building the survey says
+     * cannot be walked, and the caller has to be able to tell the two apart. The
+     * alternative — clamping to some minimum — would put a collider back exactly
+     * where this function has just proved a body does not go.
+     */
+    expect(throughOpeningWalkBand({ ...PARAMS, openingRadius: 0.6 })).toBeNull()
+    // and the exact tangency is null too: a band of zero width is no band
+    expect(
+      throughOpeningWalkBand({ ...PARAMS, openingRadius: 0.0575 + 0.3 + 0.3 + 0.02 }),
+    ).toBeNull()
+  })
+
+  it('widens with the opening, metre for metre', () => {
+    const a = throughOpeningWalkBand(PARAMS)!
+    const b = throughOpeningWalkBand({ ...PARAMS, openingRadius: PARAMS.openingRadius + 0.25 })!
+    expect(b.width - a.width).toBeCloseTo(0.25, 12)
+    expect(b.innerRadius).toBeCloseTo(a.innerRadius, 12)
   })
 })

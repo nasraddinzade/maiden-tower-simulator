@@ -13,6 +13,8 @@
  */
 
 import { FLOORS, LIFTS } from './tower'
+import { PLAYER } from './player'
+import { throughOpeningWalkBand } from '../lib/collision'
 
 /**
  * The free-standing steel spiral that carries visitors from the entry chamber to
@@ -139,6 +141,63 @@ export const MODERN_SPIRAL_VS_OPENING = {
     return this.spiralDiameter - 0.4 <= this.openingDiameter + 0.3
   },
 }
+
+/**
+ * Radius of the well this flight rises through: the vault of the storey it
+ * STARTS in is the thing pierced, and its opening is the hole in the floor it
+ * arrives on. Read off the lift rather than written as an index, so the day the
+ * spiral serves different storeys the well follows it.
+ */
+export const MODERN_SPIRAL_WELL_RADIUS = MODERN_SPIRAL_LIFT
+  ? (FLOORS[MODERN_SPIRAL_LIFT.fromFloorNumber - 1]?.oculusRadius ?? 0)
+  : 0
+
+/**
+ * WHERE A BODY MAY BE ON THIS STAIR — and it is not the middle of the treads.
+ *
+ * THE OWNER COULD NOT WALK THE TOP OF HIS OWN SPIRAL, and the thing standing in
+ * the way was the rim of the hole it comes up through. Walked and measured
+ * before anything was touched: climbing the flight on its drawn walking line the
+ * capsule stopped dead at feet 2.089–2.276 m, r 0.581, three runs out of three,
+ * and aiming it one metre further in freed it instantly and it climbed the same
+ * treads to the top. The obstruction is radial and it is at r 0.900 — the
+ * surveyed opening — meeting a 0.300 m capsule that the character controller
+ * inflates by its 0.020 m skin.
+ *
+ * IT WAS A MILLIMETRE, NOT A NEAR MISS, and that is why nothing about the flight
+ * being "roughly right" would have helped. The drawn walking line is
+ * columnRadius + (outerRadius − columnRadius)/2 = 0.57875. The widest a body
+ * fits inside the well is 0.900 − 0.300 − 0.020 = 0.58000. The stair was
+ * built 1.25 mm inside the only corridor there is, and the collider then offered
+ * a band 0.55 m wide about that line — 0.274 m of it outside the wall of the
+ * well, which is to say a quarter of a metre of somewhere to stand that a body
+ * does not fit in. A walker nudged out there by the ramp chain's own joints
+ * jams, and jams for good: the rim will not let them out and the flight will not
+ * let them up.
+ *
+ * WHY THE STAIR IS NOT MOVED INSTEAD. The two diameters are BOTH surveyed and
+ * they contradict each other — MODERN_SPIRAL_VS_OPENING, a few lines up, records
+ * that and refuses to reconcile them. It still refuses. What changes here is
+ * only where a BODY is allowed to be, which is neither of those two figures and
+ * never was: it is the walker's own width taken off the hole. The drawn stair,
+ * the drawn treads and the drawn well are all exactly what they were, and the
+ * conflict is still recorded rather than resolved.
+ *
+ * WHAT IT COSTS, stated because it is real: the band comes out 0.2225 m wide on
+ * a tread drawn 1.0425 m wide, so most of the visible tread carries no collider
+ * and a walker who gets out there falls through drawn steel. That trade is not
+ * new — the collider was already narrower than the tread, for the lip argument
+ * in ModernSpiralStair — but it is now much narrower, and the same argument says
+ * why it is bearable: a chain of yawed boxes cannot follow a tight helix without
+ * leaving lips at the joints, the lip scales with the band's half-width and with
+ * the pitch, and both fall here. 0.079 m before, 0.040 m now.
+ */
+export const MODERN_SPIRAL_WALK_BAND = throughOpeningWalkBand({
+  newelRadius: MODERN_SPIRAL.columnRadius,
+  openingRadius: MODERN_SPIRAL_WELL_RADIUS,
+  walkerRadius: PLAYER.radius,
+  skin: PLAYER.characterOffset,
+})
 
 // ————————————————— the glass guards round the openings —————————————————
 
