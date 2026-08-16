@@ -27,6 +27,26 @@
  * the turn. It is 4 at +0, 6 at +11.09, 5 at +45 and 6 again at +90. There is no
  * brightest bearing to tune toward, only a bearing the owner knows.
  *
+ * [2026-08-16] THREE OF THE FOUR ARE A MODEL RULE AND NOT THE TOWER, and this
+ * file could not have known it, because it reads the doorways as given. The
+ * second block below explains storey 2 by "what a foot is" — the doorway on the
+ * far side of the first tread from the slit that serves the same landing — and
+ * that arrangement is one sign in approachAzimuthDeg(), which sends the doorway
+ * ALONG THE CLIMB at both ends while the passage carries its landing AWAY from
+ * the flight at both. Send it the other way at a foot and this census reads
+ * SEVEN of eight: storeys 2, 3 and 4 come lit through foot-2-3, foot-3-4 and
+ * foot-4-6, and the only room left dark is storey 5, whose doorway stands at no
+ * passage end at all. The third block's arithmetic goes with them — the quarter
+ * turn is worth "exactly two rooms" only while head-2-3 and head-3-4 are the
+ * only openings that serve storeys 3 and 4, and on that sign they are not.
+ *
+ * NOTHING WAS CHANGED. It was measured out of the owner's complaint that the
+ * slit at a stair entrance looks skew, it is written up in full on
+ * approachAzimuthDeg() with its bill — which also moves WELL.azimuthDeg, placed
+ * by his own words the day before — and a count of lit rooms and the place a
+ * well stands are not a screenshot's to move. Read every number below as
+ * conditional on that sign, exactly as they are already conditional on the turn.
+ *
  * CLAUDE.md rule 6: every assertion below is arithmetic on azimuths and heights.
  */
 import { describe, expect, it } from 'vitest'
