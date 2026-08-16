@@ -55,6 +55,13 @@ import {
 } from './staircase'
 import { floorColliders, guardRingBoxes } from './collision'
 import { SHIPPED_CUTS } from './openings.fixture'
+import {
+  paneCorners,
+  pavingProfile,
+  pavingSurfaceY,
+  roofBalustrade,
+  yawForBearing,
+} from './roofTerrace'
 import { buildShellGeometry, type ShellParams } from './towerShell'
 
 const DEG = Math.PI / 180
@@ -444,5 +451,322 @@ describe('the balustrade stands where the frames put it', () => {
     const actual = circumference / BALUSTRADE.postCount
     expect(Math.abs(actual - BALUSTRADE.postSpacing)).toBeLessThan(0.1)
     expect(BALUSTRADE.postCount).toBeGreaterThan(30)
+  })
+})
+
+/**
+ * THE BALUSTRADE AS IT IS ACTUALLY BUILT, which is a different question from the
+ * one above and the reason fault (a) survived a whole suite.
+ *
+ * Everything in the block before this reads the CONFIG: radii, heights, counts.
+ * All of it was right, and all of it passed, while every pane on the terrace
+ * stood at ninety degrees to the fence — because the config never said which way
+ * a pane faces. That decision lived in a useMemo in RoofTerrace.tsx, which rule 6
+ * puts beyond any test, and the owner's screenshot is what finally read it: a row
+ * of loose sheets standing edge-on, staggered off the line of the posts.
+ *
+ * So these assert the LAYOUT. They are still arithmetic — roofBalustrade() and
+ * yawForBearing() return numbers and nothing here renders.
+ */
+describe('the balustrade is a fence and not a row of fins', () => {
+  const laid = roofBalustrade(BALUSTRADE)
+  const stepDeg = 360 / BALUSTRADE.postCount
+
+  const bearing = (azimuthDeg: number) => {
+    const a = azimuthDeg * DEG
+    return { x: Math.sin(a), z: -Math.cos(a) }
+  }
+  /** Where the local +X of a box yawed for this bearing actually points. */
+  const yawedX = (azimuthDeg: number) => {
+    const t = yawForBearing(azimuthDeg)
+    return { x: Math.cos(t), z: -Math.sin(t) }
+  }
+  /** And its local +Z, which is the direction a pane's width runs. */
+  const yawedZ = (azimuthDeg: number) => {
+    const t = yawForBearing(azimuthDeg)
+    return { x: Math.sin(t), z: Math.cos(t) }
+  }
+
+  it('yaws a box so that its X is the radius and its Z is the tangent', () => {
+    /*
+     * The quarter turn, stated on its own. With yaw = −a the two dot products
+     * below come out 0 and 1 instead of 1 and 0 — X on the tangent, Z on the
+     * radius — which is exactly a pane turned broadside.
+     */
+    for (let a = 0; a < 360; a += 7) {
+      const out = bearing(a)
+      const tangent = { x: Math.cos(a * DEG), z: Math.sin(a * DEG) }
+      const x = yawedX(a)
+      const z = yawedZ(a)
+      expect(x.x * out.x + x.z * out.z, `X on the radius at az ${a}`).toBeCloseTo(1, 12)
+      expect(z.x * tangent.x + z.z * tangent.z, `Z on the tangent at az ${a}`).toBeCloseTo(1, 12)
+    }
+  })
+
+  it('gives every bay exactly one pane, halfway between its two posts', () => {
+    expect(laid.posts).toHaveLength(BALUSTRADE.postCount)
+    expect(laid.panes).toHaveLength(BALUSTRADE.postCount)
+    expect(laid.clamps).toHaveLength(BALUSTRADE.postCount * 4)
+    for (const pane of laid.panes) {
+      const [from, to] = pane.betweenAzimuthDeg
+      const span = ((to - from + 540) % 360) - 180
+      expect(Math.abs(span)).toBeCloseTo(stepDeg, 9)
+      expect(((pane.azimuthDeg - from + 540) % 360) - 180).toBeCloseTo(stepDeg / 2, 9)
+    }
+  })
+
+  it('stands each pane IN the plane of the two posts it is clamped to', () => {
+    /*
+     * THE PROPERTY THE OWNER DESCRIBED, in metres. A point clamp holds the sheet
+     * at the post, so the sheet's mid-plane must contain both clamp points — the
+     * radius `glassRadius` on each of the two post bearings. Signed distance to
+     * that plane, both ends, both directions: zero.
+     *
+     * On the arrangement shipped until 2026-08-16 the pane's centre sat on the
+     * ARC rather than the chord, so this reads −0.0137 m at both joints even
+     * before the quarter turn is counted — the sheet floating one sagitta
+     * outboard of the posts holding it.
+     */
+    for (const pane of laid.panes) {
+      const n = bearing(pane.azimuthDeg)
+      for (const jointAz of pane.betweenAzimuthDeg) {
+        const j = bearing(jointAz)
+        const dx = j.x * BALUSTRADE.glassRadius - pane.x
+        const dz = j.z * BALUSTRADE.glassRadius - pane.z
+        expect(dx * n.x + dz * n.z, `joint ${jointAz.toFixed(2)}`).toBeCloseTo(0, 12)
+      }
+    }
+  })
+
+  it('keeps every square millimetre of glass between the posts and the parapet', () => {
+    /*
+     * THE QUARTER TURN, read in metres off the corners of the box that is
+     * actually drawn. A sheet turned broadside is 0.885 m deep in the RADIAL
+     * direction: its far corners stand at r 7.935 — 0.435 m inside stone that is
+     * 0.75 m thick — and its near corners at 7.050, hanging 0.377 m in over the
+     * terrace past the posts holding them. Laid in the fence's plane the same
+     * sheet spans 7.483…7.498, between the post circle at 7.4275 and the
+     * parapet's face at 7.500, and touches neither.
+     */
+    const outside: string[] = []
+    for (const pane of laid.panes) {
+      for (const c of paneCorners(pane)) {
+        const r = Math.hypot(c.x, c.z)
+        if (r > ROOF.deckOuterRadius + 1e-9 || r < BALUSTRADE.postRadius) {
+          outside.push(`az ${pane.azimuthDeg.toFixed(2)}: r ${r.toFixed(4)}`)
+        }
+        expect(c.y).toBeGreaterThanOrEqual(BALUSTRADE.glassBottom - 1e-12)
+        expect(c.y).toBeLessThanOrEqual(BALUSTRADE.glassTop + 1e-12)
+      }
+    }
+    expect(outside).toEqual([])
+  })
+
+  it('closes the circuit: every joint is a clamp’s width and no more', () => {
+    /*
+     * A fence is continuous. The gap left between two panes at a post is the
+     * clamp disc — the only thing at the joint whose size was read — and the
+     * glass has to account for the rest of the circuit. Measured as the chord
+     * polygon the panes actually form, not as the circle they do not.
+     */
+    const chord = 2 * BALUSTRADE.glassRadius * Math.sin((stepDeg / 2) * DEG)
+    for (const pane of laid.panes) {
+      expect(chord - pane.width).toBeCloseTo(BALUSTRADE.clampDiameter, 9)
+    }
+    const glassRun = laid.panes.reduce((s, p) => s + p.width, 0)
+    const polygon = BALUSTRADE.postCount * chord
+    expect(polygon - glassRun).toBeCloseTo(BALUSTRADE.postCount * BALUSTRADE.clampDiameter, 9)
+    // and the polygon is inside the circle it is inscribed in, as a polygon is
+    expect(glassRun).toBeLessThan(2 * Math.PI * BALUSTRADE.glassRadius)
+  })
+
+  it('stands its feet on whatever the terrace has at their radius', () => {
+    /*
+     * WHERE THE TWO MEASUREMENTS DISAGREE, AND WHAT IS DRAWN THERE.
+     *
+     * The channel is 0.16 m wide, measured; the posts stand 0.0725 m in from the
+     * parapet, derived from a clamp reach that is also measured and from the
+     * reading that the glass touches the parapet's inner face. Both cannot be
+     * right — the frames that show the channel (roof/003, roof/013, roof/018,
+     * roof/020) show the flanges bolted to plain paving well clear of it, and the
+     * same frames put the posts about 0.20 m in. That is an open question for
+     * [OWNER] and it is not settled here.
+     *
+     * What IS settled is that the model may not float. Every foot lands on the
+     * surface the terrace actually has under it, and while the disagreement
+     * stands that surface is the channel's floor. The cap does not move: it is
+     * measured above the paving.
+     */
+    const deck = {
+      deckY: ROOF.deckY,
+      masonryTopY: ROOF.masonryTopY,
+      deckOuterRadius: ROOF.deckOuterRadius,
+      wallEmbed: 0.25,
+      channelWidth: ROOF.channelWidth,
+      channelDepth: ROOF.channelDepth,
+    }
+    const standing = roofBalustrade(BALUSTRADE, deck)
+    const surface = pavingSurfaceY(deck, BALUSTRADE.postRadius) - ROOF.deckY
+    for (const p of [...standing.posts, ...standing.flanges]) {
+      expect(p.baseY).toBeCloseTo(surface, 12)
+    }
+    for (const p of standing.posts) {
+      expect(p.baseY + p.height, 'the cap stays where it was measured').toBeCloseTo(
+        BALUSTRADE.postHeight,
+        12,
+      )
+    }
+    // with no terrace given at all, everything sits on the deck plane
+    for (const p of laid.posts) expect(p.baseY).toBe(0)
+    // and the surface function knows exactly one radius where the answer differs
+    expect(pavingSurfaceY(deck, ROOF.channelInnerRadius - 0.001)).toBeCloseTo(ROOF.deckY, 12)
+    expect(pavingSurfaceY(deck, ROOF.channelInnerRadius + 0.001)).toBeCloseTo(
+      ROOF.channelInvertY,
+      12,
+    )
+    expect(pavingSurfaceY(deck, ROOF.deckOuterRadius + 0.001)).toBeCloseTo(ROOF.deckY, 12)
+  })
+
+  it('reaches each pane with a clamp from the post’s face to the glass', () => {
+    /*
+     * The clamp is the thing that makes the offset legitimate: the panes stand
+     * outboard of the posts BECAUSE something holds them there. Its cylinder
+     * lies along the radius, so its far end must land on the pane's mid-plane
+     * radius and its near end on the post's own face.
+     */
+    for (const c of laid.clamps) {
+      const r = Math.hypot(c.x, c.z)
+      const splay = BALUSTRADE.clampDiameter * 0.75
+      const onAxis = Math.sqrt(Math.max(0, r * r - splay * splay))
+      expect(onAxis).toBeCloseTo(BALUSTRADE.postRadius + c.reach / 2, 9)
+      expect(onAxis + c.reach / 2).toBeCloseTo(BALUSTRADE.glassRadius, 9)
+    }
+  })
+})
+
+/**
+ * THE DRAINAGE CHANNEL, which the model had none of until 2026-08-16.
+ *
+ * [OWNER] asked for it and the footage carries it: roof/018 and roof/020 rake it
+ * with the sun, roof/003, roof/012, roof/013 and roof/022 run it away round the
+ * drum, and roof/001 and roof/016 show the scupper it drains to, punched clean
+ * through the base of the parapet at deck level. Width measured, depth
+ * bracketed by argument — see ROOF_CHANNEL_WIDTH in config/tower.ts.
+ */
+describe('the paving drains at its edge', () => {
+  const spec = {
+    deckY: ROOF.deckY,
+    masonryTopY: ROOF.masonryTopY,
+    deckOuterRadius: ROOF.deckOuterRadius,
+    wallEmbed: 0.25,
+    channelWidth: ROOF.channelWidth,
+    channelDepth: ROOF.channelDepth,
+  }
+  const profile = pavingProfile(spec)
+
+  /** The Y of the paving's top surface at this radius, walking the meridian. */
+  const surfaceAt = (r: number) => {
+    let best = Number.NaN
+    for (let i = 0; i + 1 < profile.length; i += 1) {
+      const a = profile[i]
+      const b = profile[i + 1]
+      if (a.y !== b.y) continue // a vertical face has no top
+      const lo = Math.min(a.r, b.r)
+      const hi = Math.max(a.r, b.r)
+      if (r >= lo - 1e-12 && r <= hi + 1e-12 && (Number.isNaN(best) || a.y > best)) best = a.y
+    }
+    return best
+  }
+
+  it('sinks the last hand’s breadth of paving before the parapet', () => {
+    /*
+     * Stated as a walk out from the middle of the terrace: deck, deck, deck,
+     * then a step down of exactly channelDepth at channelInnerRadius, then the
+     * floor all the way to the parapet's face. On the arrangement shipped until
+     * 2026-08-16 the surface reads deckY at every one of these radii, because
+     * the profile was four points and a rectangle.
+     */
+    expect(surfaceAt(ROOF.deckInnerRadius + 0.5)).toBeCloseTo(ROOF.deckY, 12)
+    expect(surfaceAt(ROOF.channelInnerRadius - 0.01)).toBeCloseTo(ROOF.deckY, 12)
+    expect(surfaceAt(ROOF.channelInnerRadius + 0.01)).toBeCloseTo(ROOF.channelInvertY, 12)
+    expect(surfaceAt(ROOF.deckOuterRadius - 0.01)).toBeCloseTo(ROOF.channelInvertY, 12)
+    expect(ROOF.deckY - ROOF.channelInvertY).toBeCloseTo(ROOF.channelDepth, 12)
+    expect(ROOF.deckOuterRadius - ROOF.channelInnerRadius).toBeCloseTo(ROOF.channelWidth, 12)
+  })
+
+  it('is cut in the paving course and does not reach the bed under it', () => {
+    /*
+     * A channel that went through the course would open on the drum's own stone
+     * — and on the stair passage's vault, which is roofed by this course and
+     * nothing else for its last roofed metre. The invert has to stay in the
+     * slab.
+     */
+    expect(ROOF.channelInvertY).toBeGreaterThan(ROOF.masonryTopY)
+    expect(ROOF.channelDepth).toBeLessThan(ROOF.pavingDepth)
+    for (const p of profile) expect(p.y).toBeGreaterThanOrEqual(ROOF.masonryTopY - 1e-12)
+  })
+
+  it('stays inboard of the parapet and leaves the bedded lip alone', () => {
+    /*
+     * The course reaches WALL_EMBED past the parapet's inner face so that the
+     * lathe and the shell's 96-gon cannot leave a ring of daylight between them.
+     * The channel is cut INBOARD of that face, so the embedded lip is still full
+     * depth and still buried.
+     */
+    expect(surfaceAt(ROOF.deckOuterRadius + 0.1)).toBeCloseTo(ROOF.deckY, 12)
+    const maxR = Math.max(...profile.map((p) => p.r))
+    expect(maxR).toBeCloseTo(ROOF.deckOuterRadius + spec.wallEmbed, 12)
+    for (const p of profile) {
+      if (p.y < ROOF.deckY - 1e-12 && p.y > ROOF.masonryTopY + 1e-12) {
+        expect(p.r).toBeLessThanOrEqual(ROOF.deckOuterRadius + 1e-12)
+      }
+    }
+  })
+
+  it('is a groove and not a cliff: the meridian is closed and single-valued', () => {
+    /*
+     * The profile is revolved, so a point out of order is a self-intersecting
+     * solid rather than an error message. Walk it: the outward leg rises to the
+     * rim, the return leg comes back inward with only the notch's two vertical
+     * faces in it, and the ends meet.
+     */
+    expect(profile[0]).toEqual(profile[profile.length - 1])
+    const top = profile.filter((p) => p.y === ROOF.deckY).map((p) => p.r)
+    expect(top.length).toBeGreaterThanOrEqual(4)
+    // the return leg is monotonically inward once past the rim
+    const rim = profile.findIndex((p, i) => i > 0 && p.r === Math.max(...profile.map((q) => q.r)) && p.y === ROOF.deckY)
+    for (let i = rim; i + 1 < profile.length - 1; i += 1) {
+      expect(profile[i + 1].r).toBeLessThanOrEqual(profile[i].r + 1e-12)
+    }
+  })
+
+  it('says nothing at all when there is no channel to say it about', () => {
+    /*
+     * The escape hatch, asserted rather than assumed: set either number to zero
+     * — which is what the owner does if this reading is ever overturned — and
+     * the paving goes back to the plain course it was, five points and a
+     * rectangle, with no zero-width face left behind to z-fight with itself.
+     */
+    for (const off of [{ channelWidth: 0 }, { channelDepth: 0 }]) {
+      const plain = pavingProfile({ ...spec, ...off })
+      expect(plain).toHaveLength(5)
+      expect(plain.every((p) => p.y === ROOF.deckY || p.y === ROOF.masonryTopY)).toBe(true)
+    }
+  })
+
+  it('keeps its depth inside the bracket the frames allow', () => {
+    /*
+     * The depth is the one number here that was NOT read off a frame, and this
+     * is the guard on the argument that bounds it: deeper than 0.05 and the fall
+     * would read as a facet under the raking light of roof/020, shallower than
+     * 0.015 and nothing casts the line at the wall's foot in roof/013.
+     */
+    const [lo, hi] = ROOF.channelDepthBracket
+    expect(ROOF.channelDepth).toBeGreaterThanOrEqual(lo)
+    expect(ROOF.channelDepth).toBeLessThanOrEqual(hi)
+    // and the width is a hand's breadth, not a joint and not a gutter you fall in
+    expect(ROOF.channelWidth).toBeGreaterThan(0.13)
+    expect(ROOF.channelWidth).toBeLessThan(0.2)
+    expect(ROOF.channelWidth).toBeLessThan(ROOF.pavedWidth / 10)
   })
 })

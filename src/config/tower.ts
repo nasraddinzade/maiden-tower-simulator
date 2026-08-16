@@ -465,6 +465,117 @@ const DECK_OUTER_RADIUS = OUTER_RADIUS - PARAPET_THICKNESS
 const DECK_INNER_RADIUS = innerRadiusAt(TOP_OF_FLOORS)
 const PAVING_DEPTH = FLOOR_SLAB
 
+/**
+ * THE DRAINAGE CHANNEL round the edge of the paving. [OWNER], and then measured.
+ *
+ * WHAT IT IS. The paving does not run flat into the parapet. It stops a hand's
+ * breadth short of it and the last strip is sunk, so that the terrace drains to
+ * the wall rather than standing in water — a shallow trough running the whole
+ * circuit, dressed smooth, with a crisp arris where it comes back up to the
+ * paving. Every roof frame that shows the parapet's foot at all shows it:
+ * roof/018 and roof/020 have it raking with the sun, one lit and one in the
+ * parapet's own shadow; roof/003, roof/013, roof/012 and roof/022 show it as a
+ * band running away round the drum; roof/001 and roof/016 show what it drains
+ * TO — a scupper punched clean through the base of the parapet at deck level,
+ * with a stone chute in it, which is an outlet and an outlet needs a channel.
+ *
+ * WHY THE SCUPPERS ARE NOT BUILT WITH IT. Nothing in the corpus says how many
+ * there are or where they stand: two frames show one hole each, on bearings that
+ * cannot be recovered because neither frame shows the drum. Rule 1 — a scupper
+ * placed at a plausible azimuth would be a fabrication with a bearing on it. The
+ * channel is a ring and needs no bearing; the holes do, and wait.
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * THE WIDTH IS MEASURED. 0.16 m, bracket 0.13…0.20. [ESTIMATE]
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * By the same horizon method PARAPET_THICKNESS was got by, in the two roof
+ * frames that carry both the sea horizon and the parapet's foot in one view.
+ * Rows below the horizon go as f·(h − y)/d, so a point on the deck at distance d
+ * sits at f·h/d and the ratio of two such rows IS the ratio of two distances —
+ * no focal length in it at all. What the focal length buys is the conversion to
+ * metres, and it is this file's own 1550 ± 150 px on the 1820 px axis.
+ *
+ *   · roof/013, columns near x 400: horizon 62, the parapet's foot 1252, the
+ *     channel's outer arris 1376. The foot is at d = f·h/1190 = 1.76 m with
+ *     h = ROOF_CAMERA_HEIGHT, the arris at f·h/1314 = 1.59 m, and the difference
+ *     is 0.168 m.
+ *   · roof/012, near x 700: horizon 70, foot 1247, arris 1355 → 1.78 and 1.63 m,
+ *     difference 0.145 m.
+ *
+ * The two frames are 0.023 m apart, which is a fifth of what the focal length's
+ * own ±10% does to either of them, so the spread is not the error — f is, with
+ * the camera height (±7%) and the arris rows (±8 px) behind it.
+ *
+ * TWO CHECKS THAT COST NOTHING AND BOTH PASS. The same rows, read the other way
+ * round, hand back numbers this file already holds: the parapet's height taken
+ * as a ratio of the camera's own height gives 0.54 in roof/013 against the 0.556
+ * PARAPET is built from; and the camera solved from the parapet instead of
+ * stated comes out at 1.33–1.39 m against ROOF_CAMERA_HEIGHT's 1.35. Neither is
+ * an independent confirmation of anything — same frames, same reader — but a
+ * reading that could not reproduce them would have been a reading of the wrong
+ * two lines, and that is the failure mode here.
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * THE DEPTH IS NOT MEASURED AND CANNOT BE, FROM THIS CORPUS. 0.03 m [ESTIMATE]
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * It is not shyness: the reading is degenerate. The channel's floor at the wall
+ * is the one point whose row would carry the depth, and its row is also the only
+ * thing fixing the camera's distance to the parapet — one equation, two
+ * unknowns, and every frame in the corpus is looked at from inside the terrace
+ * where those two cannot be separated. A frame taken along the wall, or one
+ * showing the scupper's chute against the paving, would separate them. There
+ * isn't one.
+ *
+ * So the number is bracketed by argument rather than read, 0.015…0.05:
+ *   · it is cut in the paving course and the frames show a dressed stone floor,
+ *     not the bed underneath, so it is a small fraction of `pavingDepth` (0.30);
+ *   · deeper than 0.05 and the fall across 0.16 m is steeper than 1 in 3, which
+ *     would read as a distinct facet under the raking light of roof/020 and
+ *     roof/003; both show a nearly flat band with the fall only at the wall;
+ *   · shallower than 0.015 and there is nothing to cast the shadowed line that
+ *     runs the length of the wall's foot in roof/013 — about 10 px there, which
+ *     is 0.011 m at that frame's scale, and a shadow is never narrower than what
+ *     throws it.
+ * 0.03 is the middle of that and nothing more. Change it and the model changes.
+ *
+ * IT GETS NO COLLIDER, and that is a decision rather than an omission. 0.03 m is
+ * below the step the capsule resolves and far below PLAYER's autostep; a ring of
+ * boxes round the whole circuit to describe it would cost physics for a lip
+ * nobody can feel. The deck's collider stays flat at `deckY`.
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * AND IT LANDS ON THE BALUSTRADE. [OWNER] — this one needs a decision.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * A channel 0.16 m wide reaches r 7.34, and BALUSTRADE.postRadius is 7.4275. The
+ * posts stand IN it, flanges and all, with 0.07 m to spare either side. Nothing
+ * about that is a modelling slip — it is two measurements that cannot both be
+ * right, and the second one is not this note's to overturn:
+ *
+ *   · the posts are at 7.4275 because `glassRadius` is DECK_OUTER_RADIUS less
+ *     half a pane, i.e. because the glass was read as standing hard against the
+ *     parapet's inner face. That is a reading of the frames, not a measurement
+ *     off one, and it is what BALUSTRADE's own test asserts;
+ *   · every frame that shows the channel shows the flanges bolted to plain
+ *     paving, clear of it — roof/003 and roof/018 most plainly, roof/013 and
+ *     roof/020 as well;
+ *   · read the same way this width was, roof/011 and roof/013 both put the post
+ *     axis about 0.20 m in from the parapet's face (the post's distance from its
+ *     apparent 0.06 m diameter, the parapet's from the deck row), against the
+ *     0.0725 m the config derives. The bracket on that is wide — ±0.04 m, mostly
+ *     the focal length again — but it does not reach 0.07.
+ *
+ * So on the evidence the glass stands about 0.13 m clear of the parapet and the
+ * balustrade should move inboard. That would change a number nobody asked to
+ * have changed and would retire a test that currently passes, so it is left for
+ * the owner. Meanwhile roofBalustrade() stands the feet on the channel's floor
+ * rather than hovering them over it: the disagreement is drawn, not hidden.
+ */
+const ROOF_CHANNEL_WIDTH = 0.16
+const ROOF_CHANNEL_DEPTH = 0.03
+
 export const ROOF = {
   /** World Y of the paving's TOP — what you stand on, and where the stair lands. */
   deckY: TOP_OF_FLOORS,
@@ -491,6 +602,22 @@ export const ROOF = {
   deckInnerRadius: DECK_INNER_RADIUS,
   /** m — width of paved deck the visitor can actually walk, room face → parapet. */
   pavedWidth: DECK_OUTER_RADIUS - DECK_INNER_RADIUS,
+  /**
+   * m — width of the drainage channel at the parapet's foot. [ESTIMATE] 0.16,
+   * bracket 0.13…0.20, measured off roof/012 and roof/013; see the note above.
+   */
+  channelWidth: ROOF_CHANNEL_WIDTH,
+  /**
+   * m — how far the channel's floor lies below the paving. [ESTIMATE] 0.03,
+   * bracket 0.015…0.05, and bracketed by argument rather than read; see above.
+   */
+  channelDepth: ROOF_CHANNEL_DEPTH,
+  /** m — the bracket the depth sits in, carried so a test can guard it. */
+  channelDepthBracket: [0.015, 0.05] as const,
+  /** m — radius of the channel's inner lip, where the walkable paving begins. */
+  channelInnerRadius: DECK_OUTER_RADIUS - ROOF_CHANNEL_WIDTH,
+  /** World Y of the channel's floor. */
+  channelInvertY: TOP_OF_FLOORS - ROOF_CHANNEL_DEPTH,
 } as const
 
 /*
@@ -608,7 +735,18 @@ export const BALUSTRADE = {
     const r = this.glassRadius - this.clampReach
     return Math.max(8, Math.round((2 * Math.PI * r) / this.postSpacing))
   },
-  /** m — radius of the pane's mid-plane: its outer face on the parapet. */
+  /**
+   * m — radius of the pane's mid-plane WHERE IT MEETS A POST, which is the only
+   * radius a flat sheet in a round parapet has.
+   *
+   * The panes are flat and the parapet is not, so a pane spans the CHORD between
+   * the two posts it is clamped to: its outer face touches the parapet's inner
+   * face at both joints and stands one sagitta clear at mid-bay — 0.0137 m at
+   * 52 bays, which is very nearly the thickness of the glass and is the reason
+   * the balustrade reads as a fifty-two-sided figure rather than a circle. That
+   * is what the fitting is. Reading this as the radius of a ring of glass was
+   * fault (a) of 2026-08-16; see lib/roofTerrace.ts.
+   */
   get glassRadius(): number {
     return DECK_OUTER_RADIUS - this.glassThickness / 2
   },

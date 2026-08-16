@@ -2,6 +2,12 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { BALUSTRADE, FLOORS, ROOF } from '../../config/tower'
+import {
+  pavingProfile,
+  roofBalustrade,
+  yawForBearing,
+  type PavingSpec,
+} from '../../lib/roofTerrace'
 import { WALL_EMBED, cutStairwell, type StairwellCut } from './FloorStructures'
 
 /**
@@ -15,15 +21,29 @@ import { WALL_EMBED, cutStairwell, type StairwellCut } from './FloorStructures'
  * use alone: without the cut the paving is buried in solid wall, without the
  * paving the terrace is a hole where the top of the tower used to be.
  *
- * See ROOF and BALUSTRADE in config/tower.ts for where every number came from.
- * Nothing in this file may carry a dimension of its own (rule 2).
+ * WHERE THE DECISIONS ARE. Not here. lib/roofTerrace.ts says which way a pane
+ * faces and where the drainage channel is cut; this file only revolves one and
+ * lays out matrices for the other. See ROOF and BALUSTRADE in config/tower.ts
+ * for where every number came from. Nothing in this file may carry a dimension
+ * of its own (rule 2).
  */
 
 const RADIAL_SEGMENTS = 96
-const DEG = Math.PI / 180
+
+/** The terrace's own surface, shared by the course that is drawn and the fence
+ * that stands on it — one description, so the two cannot part company. */
+const PAVING: PavingSpec = {
+  deckY: ROOF.deckY,
+  masonryTopY: ROOF.masonryTopY,
+  deckOuterRadius: ROOF.deckOuterRadius,
+  wallEmbed: WALL_EMBED,
+  channelWidth: ROOF.channelWidth,
+  channelDepth: ROOF.channelDepth,
+}
 
 /**
- * The paving: one course of stone from the axis out past the parapet's foot.
+ * The paving: one course of stone from the axis out past the parapet's foot,
+ * with the drainage channel sunk in it at the edge.
  *
  * A DISC, not an annulus, and that is a fact about the building rather than a
  * shortcut. Storey 8's vault is closed — FLOORS' last entry has oculusRadius 0 —
@@ -31,31 +51,15 @@ const DEG = Math.PI / 180
  * for. The one hole it does get is the stair's, and that comes from the same
  * StairwellCut every storey slab takes.
  *
- * It reaches WALL_EMBED PAST the parapet's inner face, for the reason the floor
- * slabs are bedded into the wall: an edge that merely touches the face leaves a
- * ring of the mismatch between this lathe and the shell's 96-gon open, and here
- * that ring would look down eleven metres of wall.
+ * The meridian, channel included, comes from lib/roofTerrace.pavingProfile();
+ * all this does is revolve it and take the stair's bite out of the result.
  */
 function usePavingGeometry(cut: StairwellCut | undefined, segments = RADIAL_SEGMENTS) {
   return useMemo(() => {
     const outer = ROOF.deckOuterRadius + WALL_EMBED
     const top = ROOF.deckY
     const bottom = ROOF.masonryTopY
-    /*
-     * BOTTOM FIRST, then out, then up. LatheGeometry winds its triangles from
-     * the order the profile is given in, so a profile traversed the other way
-     * round comes out with every normal reversed — and a paving slab whose top
-     * face points at the floor below it is invisible from the terrace under any
-     * single-sided material. Drawn that way the deck read as a hole: you looked
-     * down into storey 8 through stone that was there.
-     */
-    const pts = [
-      new THREE.Vector2(0, bottom),
-      new THREE.Vector2(outer, bottom),
-      new THREE.Vector2(outer, top),
-      new THREE.Vector2(0, top),
-      new THREE.Vector2(0, bottom),
-    ]
+    const pts = pavingProfile(PAVING).map((p) => new THREE.Vector2(p.r, p.y))
     const geom = new THREE.LatheGeometry(pts, segments)
     if (!cut) return geom
     /*
@@ -87,103 +91,38 @@ function usePavingGeometry(cut: StairwellCut | undefined, segments = RADIAL_SEGM
  */
 function useBalustradeGeometry() {
   return useMemo(() => {
-    const n = BALUSTRADE.postCount
-    const stepDeg = 360 / n
-    const posts: THREE.BufferGeometry[] = []
-    const clamps: THREE.BufferGeometry[] = []
-    const panes: THREE.BufferGeometry[] = []
+    const laid = roofBalustrade(BALUSTRADE, PAVING)
+    const steel: THREE.BufferGeometry[] = []
+    const glass: THREE.BufferGeometry[] = []
 
-    const postR = BALUSTRADE.postRadius
-    const glassR = BALUSTRADE.glassRadius
-    const paneH = BALUSTRADE.glassTop - BALUSTRADE.glassBottom
-    /*
-     * The pane spans the chord between its two posts and stops a clamp's radius
-     * short at each end, because the clamps stand in the joint — the panes are
-     * edge to edge with a gap you can see daylight through in roof/011, not
-     * butted. Nothing measures that gap; it is taken as the clamp disc, which is
-     * the only thing at the joint whose size was read.
-     */
-    const chord = 2 * glassR * Math.sin((stepDeg / 2) * DEG)
-    const paneW = Math.max(0.2, chord - BALUSTRADE.clampDiameter)
-
-    for (let i = 0; i < n; i++) {
-      const az = i * stepDeg
-      const rad = az * DEG
-      const dirX = Math.sin(rad)
-      const dirZ = -Math.cos(rad)
-
-      // the post, base flange to cap
-      const tube = new THREE.CylinderGeometry(
-        BALUSTRADE.postDiameter / 2,
-        BALUSTRADE.postDiameter / 2,
-        BALUSTRADE.postHeight,
-        10,
-      )
-      tube.translate(
-        dirX * postR,
-        ROOF.deckY + BALUSTRADE.postHeight / 2,
-        dirZ * postR,
-      )
-      posts.push(tube)
-
-      // the flange bolted to the paving. Its diameter is the post's, doubled:
-      // read off the [PHOTO] bay, where the flange is about twice the tube.
-      const flange = new THREE.CylinderGeometry(
-        BALUSTRADE.postDiameter,
-        BALUSTRADE.postDiameter,
-        0.02,
-        12,
-      )
-      flange.translate(dirX * postR, ROOF.deckY + 0.01, dirZ * postR)
-      posts.push(flange)
-
-      /*
-       * Two clamps at the cap and two low down, one for each of the panes that
-       * meet at this post — which is why they are offset tangentially rather
-       * than sitting on the post's own line. roof/021 and roof/032 show the pair
-       * splayed on a forked arm; the fork itself is below the resolution this
-       * model draws at.
-       */
-      const tangentX = Math.cos(rad)
-      const tangentZ = Math.sin(rad)
-      for (const y of [BALUSTRADE.postHeight, BALUSTRADE.glassBottom]) {
-        for (const side of [-1, 1]) {
-          const disc = new THREE.CylinderGeometry(
-            BALUSTRADE.clampDiameter / 2,
-            BALUSTRADE.clampDiameter / 2,
-            BALUSTRADE.clampReach,
-            10,
-          )
-          // lying along the radius, from the post out to the glass
-          disc.rotateZ(Math.PI / 2)
-          disc.rotateY(-az * DEG)
-          const off = BALUSTRADE.clampDiameter * 0.75 * side
-          const r = postR + BALUSTRADE.clampReach / 2
-          disc.translate(
-            dirX * r + tangentX * off,
-            ROOF.deckY + y,
-            dirZ * r + tangentZ * off,
-          )
-          clamps.push(disc)
-        }
-      }
-
-      // the pane, centred on the bay between this post and the next
-      const midAz = az + stepDeg / 2
-      const midRad = midAz * DEG
-      const pane = new THREE.BoxGeometry(BALUSTRADE.glassThickness, paneH, paneW)
-      pane.rotateY(-midRad)
-      pane.translate(
-        Math.sin(midRad) * glassR,
-        ROOF.deckY + BALUSTRADE.glassBottom + paneH / 2,
-        -Math.cos(midRad) * glassR,
-      )
-      panes.push(pane)
+    for (const p of [...laid.posts, ...laid.flanges]) {
+      const tube = new THREE.CylinderGeometry(p.diameter / 2, p.diameter / 2, p.height, 12)
+      // baseY is the FOOT, and it is not always the deck: see roofBalustrade
+      tube.translate(p.x, ROOF.deckY + p.baseY + p.height / 2, p.z)
+      steel.push(tube)
+    }
+    for (const c of laid.clamps) {
+      const disc = new THREE.CylinderGeometry(c.diameter / 2, c.diameter / 2, c.reach, 10)
+      // a cylinder's axis is its local +Y; laid on its side it becomes local +X,
+      // and the yaw below puts that on the clamp's own bearing — outward along
+      // the radius, from the post's face to the glass
+      disc.rotateZ(Math.PI / 2)
+      disc.rotateY(yawForBearing(c.azimuthDeg))
+      disc.translate(c.x, ROOF.deckY + c.y, c.z)
+      steel.push(disc)
+    }
+    for (const pane of laid.panes) {
+      // thickness on X, height on Y, width on Z — so the yaw that puts X on the
+      // pane's bearing puts its width along the tangent, in the fence's plane
+      const sheet = new THREE.BoxGeometry(pane.thickness, pane.height, pane.width)
+      sheet.rotateY(yawForBearing(pane.azimuthDeg))
+      sheet.translate(pane.x, ROOF.deckY + pane.y, pane.z)
+      glass.push(sheet)
     }
 
     return {
-      steel: mergeGeometries([...posts, ...clamps], false),
-      glass: mergeGeometries(panes, false),
+      steel: mergeGeometries(steel, false),
+      glass: mergeGeometries(glass, false),
     }
   }, [])
 }
