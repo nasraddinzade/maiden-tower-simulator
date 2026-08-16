@@ -341,39 +341,48 @@ describe('the stair leaves no slot that looks through', () => {
      * doorway were cut into masonry the passage never reached. That is a blind
      * rectangular pocket 1.36 m deep and 2.4 m tall standing in the wall beside
      * every stair exit, and it is what the owner kept calling unhewn.
+     *
+     * A DOORWAY IS ASKED WHICH FLIGHT IT BELONGS TO RATHER THAN GUESSED AT FROM
+     * ITS HEIGHT, and that changed on 2026-08-17. The old attribution took the
+     * first tube spanning the doorway's sill, and a head and the foot above it
+     * share a floor level, so the foot of 8→9 was always being measured against
+     * 7→8's tube. It passed only because the two used to overlap: with the way in
+     * straightened the foot doorways moved a flight width along the drum and
+     * foot-8-9 came out 7.2° off the end of the wrong passage. The geometry was
+     * right — 8→9's own tube reaches 227.0 — and the heuristic was not.
      */
-    const doors = stairDoorways(
-      flights,
-      STAIR.width,
-      ENTRANCE.height,
-      innerRadiusAt,
-      (i: number, end: 'foot' | 'head') =>
-        end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY,
-      TOWER.topY,
-      WALL_LIFTS.map((l) => l.opensAtY),
-      STAIR.doorwayWidth,
-    )
-    // a doorway belongs to the flight whose tube spans its height
-    for (const d of doors) {
-      const fi = tubes.findIndex((t) => {
-        const lo = Math.min(...t.map((x) => x.bottomY))
-        const hi = Math.max(...t.map((x) => x.topY))
-        return d.bottomY >= lo - 0.5 && d.bottomY <= hi
-      })
-      expect(fi, `no passage spans the doorway at az ${d.azimuthDeg.toFixed(1)}`).toBeGreaterThan(-1)
-      const az = tubes[fi].map((x) => x.azimuthDeg)
+    const doorsOf = (i: number) =>
+      stairDoorways(
+        [flights[i]],
+        STAIR.width,
+        ENTRANCE.height,
+        innerRadiusAt,
+        (_: number, end: 'foot' | 'head') =>
+          end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY,
+        TOWER.topY,
+        [WALL_LIFTS[i].opensAtY],
+        STAIR.doorwayWidth,
+      )
+    let counted = 0
+    flights.forEach((_, i) => {
+      const az = tubes[i].map((x) => x.azimuthDeg)
       const lo = Math.min(...az)
       const hi = Math.max(...az)
-      const half = d.widthDeg / 2
-      expect(
-        d.azimuthDeg - half,
-        `doorway at az ${d.azimuthDeg.toFixed(1)} runs off the near end of its passage (${lo.toFixed(1)}–${hi.toFixed(1)})`,
-      ).toBeGreaterThanOrEqual(lo - 1e-6)
-      expect(
-        d.azimuthDeg + half,
-        `doorway at az ${d.azimuthDeg.toFixed(1)} runs off the far end of its passage (${lo.toFixed(1)}–${hi.toFixed(1)})`,
-      ).toBeLessThanOrEqual(hi + 1e-6)
-    }
+      for (const d of doorsOf(i)) {
+        counted++
+        const half = d.widthDeg / 2
+        expect(
+          d.azimuthDeg - half,
+          `doorway at az ${d.azimuthDeg.toFixed(1)} runs off the near end of its passage (${lo.toFixed(1)}–${hi.toFixed(1)})`,
+        ).toBeGreaterThanOrEqual(lo - 1e-6)
+        expect(
+          d.azimuthDeg + half,
+          `doorway at az ${d.azimuthDeg.toFixed(1)} runs off the far end of its passage (${lo.toFixed(1)}–${hi.toFixed(1)})`,
+        ).toBeLessThanOrEqual(hi + 1e-6)
+      }
+    })
+    // six flights, a foot and a head apiece, and storey 5's opening partway up 4→6
+    expect(counted).toBe(13)
   })
 
   it('keeps every tread inside the passage it runs in', () => {

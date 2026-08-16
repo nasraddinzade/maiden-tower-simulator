@@ -1,20 +1,26 @@
 /**
- * WHY THE SLIT AT THE WAY ONTO THE STAIR COMES OUT SKEW, as arithmetic.
+ * THE WAY ONTO THE STAIR, AND THE SIGN THAT HAD IT BACKWARDS AT SIX ENDS.
  *
  * [OWNER] 2026-08-16, of the model on screen: «окно при входе на лестницу должно
- * не на кривую направо выходить, а прямо». This file measures the thing that
- * makes it do that and asserts nothing about what should be done — see the note
- * on approachAzimuthDeg() in lib/staircase.ts for the one-line change, for what
- * it costs and for why the cost is the owner's to accept rather than this
- * repository's to spend.
+ * не на кривую направо выходить, а прямо». This file measured why, in the sure
+ * knowledge that nothing would be done about it; on 2026-08-17 he walked the
+ * tower again, found it still there, and it was done. The file now pins the
+ * repair AND keeps the fault, because a measurement that only exists while it is
+ * broken cannot tell you afterwards whether it came back.
  *
- * THE SHAPE OF THE FINDING. A passage's lead runs AWAY from its flight at both
- * ends, so a landing is always on the far side of its end tread from the treads.
- * approachAzimuthDeg() walks ALONG THE CLIMB at both ends instead, which is the
+ * THE SHAPE OF IT. A passage's lead runs AWAY from its flight at both ends, so a
+ * landing is always on the far side of its end tread from the treads.
+ * approachAzimuthDeg() used to walk ALONG THE CLIMB at both ends, which is the
  * same direction at a head and the opposite one at a foot. So every head doorway
- * opens onto its landing and every foot doorway opens onto the flight, while
- * planPassageOpenings() centres the slit on the landing either way — and a slit
- * the walker never stands in front of is a slit that runs off to one side.
+ * opened onto its landing and every foot doorway opened onto the flight's own
+ * second, third and fourth treads, while planPassageOpenings() centred the slit
+ * on the landing either way — and a slit the walker never stands in front of is a
+ * slit that runs off to one side. One sign, six doorways, twelve degrees each.
+ *
+ * WHAT IT COST TO SPEND, all of it carried and none of it hidden: the daylight
+ * census went from four chambers of eight to seven, WELL.azimuthDeg followed its
+ * doorway from 171 to 182, and junctions.test.ts's doorway-to-passage heuristic
+ * needed the flight named rather than guessed. Those are argued where they land.
  *
  * Every number below is a difference of azimuths or a ratio of arcs (CLAUDE.md
  * rule 6). Nothing here reads the built mesh: the reveal itself was cleared by a
@@ -133,31 +139,32 @@ describe('the way in stands on the landing at a head and on the treads at a foot
     }
   })
 
-  it('signs that offset toward the landing at all six heads and away at all six feet', () => {
+  it('signs that offset TOWARD the landing at all twelve, feet included', () => {
+    /*
+     * THE ASSERTION THE REPAIR IS. It read "toward at all six heads and AWAY at
+     * all six feet", and both halves passed: +4.94…+5.93° at the heads,
+     * −5.08…−6.13° at the feet, the same magnitude either way because the
+     * magnitude is half a flight width and only the sign was ever in question.
+     *
+     * The feet are positive now and the two bands have merged into one, so a
+     * return of the fault shows up as a negative number rather than as a picture
+     * somebody has to notice.
+     */
     expect(HEADS).toHaveLength(6)
     expect(FEET).toHaveLength(6)
-    for (const o of HEADS) {
+    for (const o of SHIPPED_ENDS) {
       const off = approachOffsetTowardLandingDeg(
         SHIPPED_FLIGHTS[o.flightIndex],
-        endTreadOf(o.flightIndex, 'head'),
+        endTreadOf(o.flightIndex, o.end),
         STAIR.width,
       )
       expect(off, `${o.id}`).toBeGreaterThan(4.9)
-      expect(off, `${o.id}`).toBeLessThan(6.0)
-    }
-    for (const o of FEET) {
-      const off = approachOffsetTowardLandingDeg(
-        SHIPPED_FLIGHTS[o.flightIndex],
-        endTreadOf(o.flightIndex, 'foot'),
-        STAIR.width,
-      )
-      expect(off, `${o.id}`).toBeLessThan(-5.0)
-      expect(off, `${o.id}`).toBeGreaterThan(-6.2)
+      expect(off, `${o.id}`).toBeLessThan(6.2)
     }
   })
 })
 
-describe('what that costs the slit, which is the owner’s complaint measured', () => {
+describe('what the slit reads like now, and what it read like before', () => {
   it('stands every head’s doorway inside the mouth of its own recess', () => {
     for (const o of HEADS) {
       const d = doorwayFor(o)
@@ -168,32 +175,37 @@ describe('what that costs the slit, which is the owner’s complaint measured', 
     }
   })
 
-  it('stands every foot’s doorway outside it, 13.5–16.4° round the drum', () => {
+  it('stands every foot’s doorway inside it too, which is the repair', () => {
     /*
-     * THE PICTURE HE SENT. The walker steps onto the stair 13.5–16.4° of drum
-     * from the slit that serves the end he is standing at — past its far jamb,
-     * not merely off its centre — so the recess is beside him and its 3.5 m of
-     * reveal runs away to his right. At r 4.2 in the foot-2-3 doorway the slit's
-     * outer mouth bears 222.5° against a facing of 190.6°.
+     * AND NOW A FOOT READS EXACTLY LIKE A HEAD, which is what «прямо» means when
+     * it is turned into arithmetic: 3.3–4.1° from the slit that serves the end
+     * you are standing at, with 10.2–12.6° of the mouth in front of you. Same
+     * bounds as the heads above, deliberately, because foot-N and head-(N−1)
+     * share a landing and there was never a reason for the two to differ.
      */
     for (const o of FEET) {
       const d = doorwayFor(o)
       const half = slitHalfDeg(o)
       const apart = Math.abs(delta(d.azimuthDeg, o.azimuthDeg))
-      expect(apart, `${o.id} apart`).toBeGreaterThan(13.5)
-      expect(apart, `${o.id} apart`).toBeLessThan(16.4)
-      expect(apart, `${o.id} outside mouth`).toBeGreaterThan(half)
-      expect(overlapDeg(d.azimuthDeg, d.halfDeg, o.azimuthDeg, half), `${o.id} overlap`).toBeLessThan(0.3)
+      expect(apart, `${o.id} apart`).toBeGreaterThan(3.3)
+      expect(apart, `${o.id} apart`).toBeLessThan(4.1)
+      expect(apart, `${o.id} inside mouth`).toBeLessThan(half)
+      expect(overlapDeg(d.azimuthDeg, d.halfDeg, o.azimuthDeg, half), `${o.id} overlap`).toBeGreaterThan(10.2)
     }
   })
 
-  it('would read exactly like a head if the shift were sent toward the landing', () => {
+  it('reproduces the fault exactly when the shift is sent back along the climb', () => {
     /*
-     * AND BY HOW MUCH, so that the change is a quantity rather than an opinion.
-     * Reflecting a foot doorway through its own end tread — the whole of the
-     * one-line change — puts it 3.4–4.1° from its slit with 10.2–12.6° of
-     * overlap, which is the band the six heads already occupy. Nothing here
-     * applies it; see the note on approachAzimuthDeg() for the bill.
+     * THE PICTURE HE SENT, KEPT AS A REFLECTION SO IT CANNOT BE ARGUED WITH
+     * LATER. Send a foot doorway back to the far side of its own end tread — the
+     * whole of the fault, one sign — and the walker steps onto the stair
+     * 13.5–16.4° of drum from the slit that serves him, past its far jamb rather
+     * than merely off its centre, with 0.3° of the mouth in view. That was the
+     * shipped model until 2026-08-17: at r 4.2 in the foot-2-3 doorway the slit's
+     * outer mouth bore 222.5° against a facing of 190.6°.
+     *
+     * Which also fixes the magnitude of the repair at one flight width of arc,
+     * since the two readings are reflections of each other about the end tread.
      */
     for (const o of FEET) {
       const d = doorwayFor(o)
@@ -201,9 +213,15 @@ describe('what that costs the slit, which is the owner’s complaint measured', 
       const reflected = tread.azimuthDeg - delta(d.azimuthDeg, tread.azimuthDeg)
       const half = slitHalfDeg(o)
       const apart = Math.abs(delta(reflected, o.azimuthDeg))
-      expect(apart, `${o.id} apart`).toBeGreaterThan(3.3)
-      expect(apart, `${o.id} apart`).toBeLessThan(4.1)
-      expect(overlapDeg(reflected, d.halfDeg, o.azimuthDeg, half), `${o.id} overlap`).toBeGreaterThan(10.2)
+      expect(apart, `${o.id} apart`).toBeGreaterThan(13.5)
+      expect(apart, `${o.id} apart`).toBeLessThan(16.4)
+      expect(apart, `${o.id} outside mouth`).toBeGreaterThan(half)
+      expect(overlapDeg(reflected, d.halfDeg, o.azimuthDeg, half), `${o.id} overlap`).toBeLessThan(0.3)
+      // the move itself: one flight width of arc at the end tread's radius
+      expect(
+        Math.abs(delta(d.azimuthDeg, reflected)),
+        `${o.id} moved`,
+      ).toBeCloseTo((STAIR.width / tread.midRadius) * (180 / Math.PI), 9)
     }
   })
 })

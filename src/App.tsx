@@ -341,13 +341,20 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
    * The arched openings between each room and the stair passage. With the
    * passage sealed inside the masonry these are the only way onto the stair —
    * which is what the walkthrough footage of the tower shows.
+   *
+   * THE HEIGHT IS THE BUILDING'S NOW, not the walker's. It was
+   * `PLAYER.height + 0.35` here and at four other call sites, which cut a 2.100 m
+   * opening in a wall whose vault sprang at 1.600 — see STAIR.doorwayHeight and
+   * CUPOLA_RISE for the measurement that closed it. The leva sliders below still
+   * move the stair; nothing on this panel may move the doorway's head, because
+   * it is not a modelling choice any more.
    */
   const doorways = useMemo(() => {
     if (!stair.cutStairwells) return undefined
     return stairDoorways(
       flightPlan.flights,
       stair.stairWidth,
-      PLAYER.height + 0.35,
+      STAIR.doorwayHeight,
       innerRadiusAt,
       LANDING_Y_OF,
       // the same level the passage is clamped to, and for the same reason. It
@@ -488,9 +495,11 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
    * It belongs beside testimonyConflicts() and it is the same KIND of thing: a
    * large claim about the building that the model was making in silence. With
    * every opening at the end of a stair passage, a chamber sees out only where
-   * its doorway and a slit overlap in bearing — and at four storeys of eight
-   * they do not overlap at all. Two of those four are the quarter turn's doing
-   * and would change if the owner ruled on it; two are structural and would not.
+   * its doorway and a slit overlap in bearing — and at one storey of eight they
+   * do not overlap at all. It was four of eight until 2026-08-17, and three of
+   * those four were a sign in approachAzimuthDeg() rather than the building; the
+   * one that remains is storey 5, reached from the middle of a flight, and no
+   * turn of the stair reaches it.
    *
    * Live, off the leva sliders, not off the config: turn Staircase → start az°
    * and watch the census move. That is the point of printing it here rather than

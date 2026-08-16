@@ -103,28 +103,43 @@ const TOP_Y = GROUND_Y + HEIGHT
 // the ±1.5 m spread is ±0.19 m on CEILING_STRUCTURE — hence 0.79 ± 0.24, which is
 // why the assumed 0.8 needs no revision.
 /*
- * INDEPENDENTLY CONFIRMED, once, and it is the only confirmation the vertical
- * model has.
+ * WITHDRAWN, 2026-08-16. This block used to be headed "INDEPENDENTLY CONFIRMED,
+ * once, and it is the only confirmation the vertical model has", and the
+ * confirmation is not one. It is kept, struck through in prose, because the
+ * springing it certified is the number this whole section turns on.
  *
- * Storey 3's springing — where the vault leaves the vertical wall — was measured
- * at 1.65 ± 0.09 m by fitting two circles in one frame (the floor junction and
- * the vault soffit), solving camera pitch and roll as free parameters, and
- * taking the scale from the tower's OWN sourced taper rather than from anything
- * in the room. The model implies clear − cupolaRise = 2.5 − 0.9 = 1.60. They
- * agree to 0.05 m, half a sigma.
+ * WHAT IT CLAIMED. Storey 3's springing — where the vault leaves the vertical
+ * wall — measured at 1.65 ± 0.09 m by fitting two circles in one frame (the
+ * floor junction and the vault soffit), solving camera pitch and roll as free
+ * parameters, and taking the scale from the tower's OWN sourced taper. The model
+ * implies clear − cupolaRise = 2.5 − 0.9 = 1.60, and the two agreed to 0.05 m.
  *
- * That confirms the PAIR, not either number: nothing measured separates a clear
- * height from its vault rise. Storeys 2, 4, 6 and 7 remain entirely unmeasured,
- * and the uniform 2.5 m is still an assumption laid over a sourced AVERAGE.
+ * WHY IT CANNOT BE WORTH THAT. The scale in that fit is the difference between
+ * the two circles' radii, and the taper makes it 0.0441 m per metre of height —
+ * 0.071 m out of 3.6 across a wall that is weathered into pockets a hand deep
+ * (up/159, up/160). Reproduced here on storey 6 with both curves traced
+ * sub-pixel across the whole frame, the residual is flat: profiling the camera
+ * height from 0.80 m to 2.00 m moves the rms from 32.8 to 38.7 mm, with the
+ * springing sliding from 1.39 to 3.02 m to follow it. There is no minimum to
+ * find. Unbounded, the same fit walks to the trivial solution — camera on the
+ * wall, h → 0 — at an rms of half a millimetre. A pitch of ±10° buys the whole
+ * range on its own, and no interior frame carries a horizon to fix pitch with.
  *
- * Two other candidate measurements were rejected rather than adopted. Storey 5's
- * springing was scaled off this file's own ROOF_CAMERA_HEIGHT, so it is a
- * measured ratio times an assumption and shares that assumption with PARAPET —
- * not independent. Storey 8's was scaled off a fire extinguisher taken as
- * 0.55 m tall, a dimension imported from outside the building to size the
- * building, and it is contradicted by an integer: 16–17 risers from the storey-8
- * floor to the roof deck would force a 0.284 m riser, 40% above every other
- * estimate.
+ * SO THE ONE THING THE CHAMBERS CANNOT GIVE UP IS AN ABSOLUTE HEIGHT. What they
+ * do give up is RATIOS between things at the same distance, which need neither
+ * the pitch nor the camera's height nor the focal length — see
+ * DOORWAY_HEAD_FRACTION below, which is measured that way and which refutes
+ * 1.65 without needing a better fit than the one it replaces: a springing at
+ * 1.65 puts the head of every chamber doorway at 1.24 m.
+ *
+ * Two other candidate measurements were rejected rather than adopted, and both
+ * rejections still stand. Storey 5's springing was scaled off this file's own
+ * ROOF_CAMERA_HEIGHT, so it is a measured ratio times an assumption and shares
+ * that assumption with PARAPET — not independent. Storey 8's was scaled off a
+ * fire extinguisher taken as 0.55 m tall, a dimension imported from outside the
+ * building to size the building, and it is contradicted by an integer: 16–17
+ * risers from the storey-8 floor to the roof deck would force a 0.284 m riser,
+ * 40% above every other estimate.
  */
 const GROUND_CLEAR = 3.0 // m — [İçərişəhər] 1st storey clear height
 const UPPER_CLEAR = 2.5 // m — [İçərişəhər] upper storeys, average → [ASSUMPTION] applied to each
@@ -230,11 +245,188 @@ const PARAPET_THICKNESS_BRACKET = [0.55, 0.95] as const
 const CEILING_STRUCTURE =
   (HEIGHT - SILL_ABOVE_GROUND - GROUND_CLEAR - (FLOOR_COUNT - 1) * UPPER_CLEAR - PARAPET) /
   FLOOR_COUNT
-// Rise (стрела подъёма) of the shallow cupola, measured down from the crown to where
-// it springs off the inner wall. [ASSUMPTION] — no source gives it. Kept deliberately
-// small: [ref] calls the vaults "пологие" (shallow), and photographs of the one
-// documented cupola show a very flat dome with concentric ring courses.
-const CUPOLA_RISE = 0.9 // m — [ASSUMPTION]
+/**
+ * m — rise (стрела подъёма) of the shallow cupola, from the crown down to where
+ * it springs off the inner wall. [ESTIMATE] 0.25, bracket 0.10…0.45.
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * IT WAS 0.9, AND 0.9 IS REFUTED. 2026-08-16.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * The old value was tagged [ASSUMPTION] and defended as "kept deliberately
+ * small" — [ref] calls the vaults "пологие" and the one documented cupola is
+ * very flat. Both halves of that are still true and the number was still wrong,
+ * because nobody had asked what it does to the rest of the section.
+ *
+ * WHAT IT DOES. UPPER_CLEAR is sourced and is the height at the CROWN, so the
+ * springing is 2.5 − rise, and at rise 0.9 that is 1.600 m. A room whose ceiling
+ * is 1.600 m at its own wall is a strong claim about the building, and it was
+ * being made in silence. It was also self-contradicting: the model cut the
+ * doorway onto the stair 2.100 m tall (PLAYER.height + 0.35) in that same
+ * 1.600 m wall — a hole half a metre taller than the wall it is cut in. That
+ * impossibility is the reason the collision went unnoticed for so long. You
+ * never met the 1.600 m ceiling, because at every place you walked to the wall
+ * you were walking into a 2.100 m hole in it.
+ *
+ * WHAT THE FOOTAGE SAYS, and it is a ratio rather than a length — see the note
+ * withdrawing the storey-3 springing above for why it can only be a ratio.
+ * Measured at storey 6 in up/165, the head of the chamber doorway stands at
+ * 0.75 of the springing (DOORWAY_HEAD_FRACTION). So
+ *
+ *     doorway head = 0.75 × (2.5 − rise)
+ *
+ * and at rise 0.9 the tower's stair doorways come out 1.20 m tall. They are
+ * doorways the owner walked through twelve times.
+ *
+ * THE BRACKET. 0.10…0.45, and the two ends are argued rather than read, because
+ * no frame in the corpus resolves a rise:
+ *
+ *   · LOWER 0.10. Below rise/span ≈ 0.025 this is not a cupola but a slab with a
+ *     curved soffit, and [ref] says cupola: "пологим каменным куполом" with a
+ *     central oculus. up/070–073 photograph storey 3's, laid in concentric ring
+ *     courses of large slabs — flat enough that a 0.9 m rise over a 3.65 m
+ *     half-span would read as a dome in those frames and does not.
+ *   · UPPER 0.45. There the doorway head is 1.54 m and the opening 0.81 m wide by
+ *     DOORWAY_SPRINGING_RATIO — narrower than the 0.9 m flight it serves, which
+ *     is the point at which the stair stops fitting through its own door.
+ *   · 0.25 is the middle of that and nothing more. It gives rise/span 0.061, a
+ *     sphere of 33.4 m radius, a springing 2.25 m above the floor, a doorway head
+ *     at 1.688 m and a doorway 0.889 m wide. Change it and the model changes —
+ *     including how tall the visitor is allowed to be, which is now bound to it
+ *     by test.
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * THE UPPER BOUND USED TO BE THE OWNER'S HEAD, AND THAT ARGUMENT IS DEAD.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * It read: at rise 0.45 the owner — 1.85 m [OWNER] — must crouch 0.31 m at every
+ * doorway, and the frames either side of all twelve crossings show a steady
+ * walking grip and no dip. The observation is fine and the inference is void,
+ * because the same arithmetic applied to the whole admissible range says he
+ * crouches at EVERY value of the rise:
+ *
+ *     head ≥ 1.90 m  ⇒  0.75 × (2.5 − rise) ≥ 1.90  ⇒  rise ≤ −0.03
+ *
+ * A 1.85 m man cannot walk upright through a doorway three quarters of the way
+ * up a 2.5 m room, whatever the vault does. So "no dip in the frames" cannot
+ * bound the rise — it bounds nothing, and if it is evidence of anything it is
+ * evidence against the sourced 2.5 m or against the 0.75, not against 0.45. It
+ * is replaced by DOORWAY_SPRINGING_RATIO below, which is a second measurement of
+ * the same class as the first and which brackets the rise from the doorway's
+ * WIDTH instead of from a visitor's stature.
+ *
+ * WHAT IS STILL MISSING, precisely: one tape measurement, of any single vertical
+ * length inside any chamber — the springing above the floor, or the head of any
+ * stair doorway. One number closes this, because everything else in the section
+ * is either sourced (2.5 m) or measured as a ratio (0.75, 2.53). Failing that,
+ * one photograph taken along a chamber wall with a metre rule against the stone.
+ */
+const CUPOLA_RISE = 0.25 // m — [ESTIMATE], bracket 0.10…0.45; see the note above
+/** m — the bracket CUPOLA_RISE sits in, carried so a test can guard it. */
+const CUPOLA_RISE_BRACKET = [0.1, 0.45] as const
+
+/**
+ * The head of a chamber's doorway onto the stair, as a fraction of the height at
+ * which that chamber's vault springs. [VIDEO] 0.75, bracket 0.65…0.85.
+ *
+ * THIS IS THE MEASUREMENT THE SECTION HANGS ON, so how it was got matters.
+ *
+ * Three points in one image column are at the same horizontal distance from the
+ * camera: the floor at the foot of a doorway's jamb, the head of that doorway,
+ * and the springing arris directly above it — all in the same wall, all at
+ * (near enough) the same radius from the axis. For any three such points the
+ * quantity
+ *
+ *     D / S = (tan e_D − tan e_floor) / (tan e_S − tan e_floor)
+ *
+ * contains neither the distance nor the camera's height: both cancel. That is
+ * the whole reason it can be measured here when a length cannot. At zero pitch
+ * and roll it degenerates further, to the ratio of two row differences, and the
+ * focal length cancels too.
+ *
+ * up/165, STOREY 6, the doorway out of the chamber onto the 6→7 climb, seen
+ * near square-on with its whole height and the springing above it in one frame.
+ * At column x = 250 of 1024: the floor–wall junction at row 1490, the doorway's
+ * flat head at 560, the arris where the dark vault leaves the lit stone at 240.
+ * (930)/(1250) = 0.744.
+ *
+ * The pitch is unknown and it is what the bracket is mostly made of, but it is
+ * not free: at more than about +11° the floor junction in that column rises to
+ * within 0.17 of the horizon, which puts the wall further away than the tower is
+ * wide. Over the admissible span −20°…+10° the ratio moves 0.71…0.79.
+ *
+ * TWO MORE, less square-on and so carried as spread rather than as separate
+ * measurements: down/135, the arched doorway out of storey 4, taken at the
+ * arch's crown, 0.67; up/111, the same chamber climbing, 0.82. Centre 0.75.
+ *
+ * WHAT THE ARRIS IS, since the whole thing depends on reading it right. Between
+ * the coursed ashlar and the smooth dark vault there is a band two or three
+ * courses deep of stone eaten hollow by salt weathering, with the museum's cove
+ * LED tucked at its head. Read at high magnification (up/159 right side) the
+ * band is weathered WALL, not an oversailing cornice: the erosion goes inward
+ * into pockets, the face stays in the plane of the ashlar below, and the bright
+ * line at the top is the cove, not a shadow under a projection. So the springing
+ * is the top of that band, which is what this ratio is measured against and what
+ * cupolaSpringY means.
+ *
+ * WHAT IT IS NOT. It is not a doorway height. Multiplied by a springing that is
+ * itself an estimate it gives one, and that is how STAIR.doorwayHeight is built
+ * — but the fraction is the measured thing and the metre value is not.
+ */
+const DOORWAY_HEAD_FRACTION = 0.75
+/** The bracket the fraction sits in. [VIDEO] — see the note above. */
+const DOORWAY_HEAD_FRACTION_BRACKET = [0.65, 0.85] as const
+
+/**
+ * The springing height above the floor, in units of the stair doorway's own
+ * CLEAR WIDTH. [VIDEO] 2.53, bracket 2.28…2.78.
+ *
+ * THE SECOND RATIO, and the reason it exists: DOORWAY_HEAD_FRACTION ties the
+ * doorway's head to the springing and nothing ties either of them to a LENGTH.
+ * This one does, because a doorway has a width as well as a height and the width
+ * is the one dimension of a chamber that a plan-level figure already exists for.
+ * It is the same class of measurement as the fraction — a ratio of two image
+ * lengths at the same distance — and it is even cheaper: for two lengths in one
+ * near-frontal wall the ratio of pixel spans IS the ratio of metres, with the
+ * focal length and the principal point cancelling exactly.
+ *
+ * HOW IT WAS READ. Brightness profiles across the frame, nine-pixel boxcar, the
+ * edge taken where the profile turns rather than by eye:
+ *
+ *   up/165, STOREY 6, the doorway onto the 6→7 climb. At column 280 of 1024 the
+ *   springing arris (the cove LED at the top of the weathered band) is at row
+ *   213, the doorway's head at 565, the floor–wall junction at 1487. The
+ *   opening's jambs, read across rows 950…1350, stand at columns 245 and 730.
+ *   springing/width = 1274/485 = 2.627, head/springing = 922/1274 = 0.724.
+ *
+ *   up/111, the arched doorway of the storey below, taken at the arch's crown.
+ *   Arris 342, crown 510, floor 1330 at column 330; jambs at 310 and 718.
+ *   springing/width = 988/407 = 2.427, head/springing = 0.830.
+ *
+ * The two frames straddle 2.53, 0.20 apart; the bracket is that spread widened
+ * by what ±8 px on each of the four edges is worth, which is ±0.05 either way.
+ * Note which way the one systematic runs: any obliquity in the view foreshortens
+ * the WIDTH and not the height, so both readings are upper bounds on this ratio
+ * — a wall turned 20° off square inflates it by 6%, one turned 35° by 22%.
+ *
+ * WHAT IT SETTLES, and it settles two things the head fraction could not.
+ *
+ * IT REFUTES rise 0.9 WITHOUT GOING NEAR A VISITOR'S HEAD. At 0.9 the springing
+ * is 1.60 m and this ratio makes the doorway 0.63 m wide — narrower than the
+ * 0.9 m flight behind it, and narrower than the shoulders of the man who filmed
+ * it. The old refutation of 0.9 was that its doorways come out 1.20 m tall and
+ * the owner walked through them; that argument turned out to prove too much (see
+ * CUPOLA_RISE). This one does not depend on anybody's stature at all.
+ *
+ * AND IT CONTRADICTS STAIR.doorwayWidth, WHICH IS 1.1. Run the other way, a
+ * 1.1 m opening puts the springing at 2.78 m and the crown above it — against a
+ * SOURCED 2.5 m — so the two cannot both stand. That conflict is not resolved
+ * here and the width has not been moved: see the note on STAIR.doorwayWidth for
+ * the whole of it, including the one systematic that could account for it.
+ */
+const DOORWAY_SPRINGING_RATIO = 2.53
+/** The bracket the ratio sits in — the two frames. [VIDEO], see the note above. */
+const DOORWAY_SPRINGING_RATIO_BRACKET = [2.28, 2.78] as const
 /**
  * Oculus radius. [PHOTO] — measured, not assumed, but with a stated tolerance.
  *
@@ -422,8 +614,42 @@ export const TOWER = {
    * stops doing so the datum or a sourced clear height has moved.
    */
   parapetHeight: TOP_Y - TOP_OF_FLOORS,
-  /** Rise of each shallow cupola, crown down to its springing [ASSUMPTION]. */
+  /** Rise of each shallow cupola, crown down to its springing [ESTIMATE]. */
   cupolaRise: CUPOLA_RISE,
+  /** m — the bracket the rise sits in, carried so a test can guard it. */
+  cupolaRiseBracket: CUPOLA_RISE_BRACKET,
+  /**
+   * m — how far above its own floor an UPPER storey's vault springs off the
+   * wall. [DERIVED] from a sourced clear height and an estimated rise, and the
+   * one number in the chamber's section that the walker actually meets: below it
+   * the room is a plain drum, above it the ceiling is coming down.
+   */
+  upperSpringingAboveFloor: UPPER_CLEAR - CUPOLA_RISE,
+  /**
+   * The doorway head as a fraction of the springing. [VIDEO] 0.75 — see
+   * DOORWAY_HEAD_FRACTION for the frames and the method.
+   */
+  doorwayHeadFraction: DOORWAY_HEAD_FRACTION,
+  /** The bracket that fraction sits in, carried so a test can guard it. */
+  doorwayHeadFractionBracket: DOORWAY_HEAD_FRACTION_BRACKET,
+  /**
+   * The springing height in units of the stair doorway's clear width. [VIDEO]
+   * 2.53 — the second ratio the chambers give up, and the only one that ties the
+   * section to a length. See DOORWAY_SPRINGING_RATIO for the frames and the
+   * method, and for what it says about STAIR.doorwayWidth.
+   */
+  doorwaySpringingRatio: DOORWAY_SPRINGING_RATIO,
+  /** The bracket that ratio sits in, carried so a test can guard it. */
+  doorwaySpringingRatioBracket: DOORWAY_SPRINGING_RATIO_BRACKET,
+  /**
+   * m — the stair doorway's clear width as the measured proportion gives it,
+   * from a SOURCED crown and an estimated rise. [DERIVED] 0.889.
+   *
+   * NOT what the model cuts. STAIR.doorwayWidth is 1.1 and the difference is a
+   * conflict, not a rounding — it is carried here so a test can state it in one
+   * line instead of re-deriving it.
+   */
+  doorwayWidthByProportion: (UPPER_CLEAR - CUPOLA_RISE) / DOORWAY_SPRINGING_RATIO,
   /** Visible thickness of an annular floor slab [ASSUMPTION]. */
   floorSlab: FLOOR_SLAB,
   /** m — masonry and fill above each cupola crown [DERIVED]; see the note above. */
@@ -1153,29 +1379,38 @@ export const ENTRANCE = {
  *     −34. The photograph puts it at beak +13.9. The counterclockwise branch —
  *     the layout this value replaced — is dead, and that is worth having.
  *
- * WHAT IT COSTS IN DAYLIGHT, measured 2026-08-15, and until then stated nowhere:
- * TWO WHOLE ROOMS.
+ * WHAT IT COSTS IN DAYLIGHT: NOTHING, AND IT USED TO COST TWO WHOLE ROOMS.
  *
- * head-2-3 and head-3-4 are the two ends this value buries in the pier, and they
- * are the only openings that serve storeys 3 and 4. A chamber has no window of
- * its own; it sees out through its doorway onto the stair and then out of the
- * passage, and those two holes line up only at a flight's HEAD — at a foot the
- * doorway stands half a flight-width up the climb from the first tread while the
- * slit stands on the landing behind it, 13.5–16.4° away against a doorway
- * half-arc of 6.2–7.5. So at this value four of the eight chambers can see
- * daylight and at 90 + 11.09 six can. Storeys 2 and 5, which are served by a
- * foot and by a doorway the stair merely runs past, are dark at every bearing
- * there is.
+ * ═════════════════════════════════════════════════════════════════════════
+ * WITHDRAWN 2026-08-17. The two rooms were a sign error, not a pier.
+ * ═════════════════════════════════════════════════════════════════════════
  *
- * THAT IS NOT AN ARGUMENT FOR TURNING IT, and the arithmetic refuses to become
- * one. The count does not climb with the turn: 4 at +0, 6 at +11.09, 5 at +45
- * where the head of 4→6 swings into the pier in its turn, 6 again at +90. There
- * is no brightest bearing to tune toward, and had there been one, choosing it
- * would be rule 7 wearing a friendlier face than a solstice. It is written down
- * because it was not written down: the model has been shipping a tower whose
- * middle four storeys have no view out and nothing in it said so.
- * lib/chamberDaylight.ts measures it, chamberDaylight.test.ts asserts the count,
- * and the day this number moves that count moves audibly with it.
+ * The claim was: head-2-3 and head-3-4 are the two ends this value buries in the
+ * pier, and they are THE ONLY openings that serve storeys 3 and 4, because a
+ * doorway and a slit line up only at a flight's HEAD — at a foot the doorway
+ * stood half a flight-width up the climb from the first tread while the slit
+ * stood on the landing behind it, 13.5–16.4° away. The first clause is still
+ * true. The second was an artefact of approachAzimuthDeg() sending the shift
+ * along the climb at a foot, which it stopped doing on 2026-08-17. The feet
+ * below those two heads serve the same two rooms and stand nowhere near the
+ * beak.
+ *
+ * So the census is seven of eight at this value AND at 90 + 11.09, and seven at
+ * twenty-two of the twenty-four bearings a whole revolution passes through. What
+ * the turn buys is a second band in two rooms that already have one.
+ *
+ * THAT WAS NEVER AN ARGUMENT FOR TURNING IT and is now not even a temptation.
+ * The count used to be 4 at +0, 6 at +11.09, 5 at +45 where the head of 4→6
+ * swings into the pier in its turn, 6 again at +90 — not monotonic, no brightest
+ * bearing to tune toward. It is 7 at all four. Had there been a maximum,
+ * choosing it would be rule 7 wearing a friendlier face than a solstice.
+ *
+ * IT IS ALL STILL MEASURED, and that is what caught the sign. The census exists
+ * because for a long time the model shipped a tower whose middle four storeys had
+ * no view out and nothing in it said so. lib/chamberDaylight.ts measures it,
+ * chamberDaylight.test.ts asserts the count, and when the doorways moved the
+ * count moved audibly with them — which is how a retired finding gets retired
+ * rather than quietly rotting.
  *
  * WHY IT IS STILL 90. Because the evidence settles the DIRECTION and a FLOOR and
  * does not settle the VALUE, and this number turns every azimuth in the project.
@@ -1225,16 +1460,14 @@ export const STAIR_BEARING_QUESTION = [
   '  · the sense of your "to the right of the beak" is CONFIRMED by the same',
   '    photograph. The anticlockwise reading is dead.',
   '',
-  'AND WHAT IT COSTS, which nothing said until 2026-08-15: TWO ROOMS. A chamber',
-  'has no window of its own — it sees out through its doorway onto the stair and',
-  'then out of the passage — and the two blind ends above are the only openings',
-  'that serve storeys 3 and 4. Swept ray by ray at eye height, four of the eight',
-  'chambers can see daylight at 90 and six can at +11.09. This is NOT a reason to',
-  'turn it: a dark room is not evidence about a building, and the count does not',
-  'even climb with the turn — 5 at +45, 6 again at +90 — so there is no brightest',
-  'bearing to aim at. It is measured in lib/chamberDaylight.ts so that nobody',
-  'finds it out later. Storeys 2 and 5 are dark at every bearing there is, for a',
-  'reason no turn can reach.',
+  'AND WHAT IT COSTS IN DAYLIGHT: NOTHING, AND THIS LINE USED TO SAY TWO ROOMS.',
+  'The claim was that the two blind ends above are the only openings serving',
+  'storeys 3 and 4. On 2026-08-17 that turned out to be a sign in',
+  'approachAzimuthDeg() rather than the pier: the FEET of the same flights light',
+  'the same two rooms and stand nowhere near the beak. Swept ray by ray at eye',
+  'height, seven chambers of eight see the sky at 90 and seven at +11.09; only',
+  'storey 5 is dark, and no turn reaches it. The turn buys two rooms a SECOND',
+  'band of light, not their first.',
   '',
   'NOTHING HAS BEEN TURNED. STAIR_FROM_BUTTRESS_DEG is still the 90 of your',
   '"about a quarter", because +15.1 is one photograph and this number moves every',
@@ -1257,6 +1490,7 @@ export const STAIR: {
   wallClearance: number
   startAzimuthDeg: number
   doorwayWidth: number
+  doorwayHeight: number
   landingLength: number
   endLandingLength: number
 } = {
@@ -1461,8 +1695,61 @@ export const STAIR: {
    * wallColliders(), not in how wide the hole is, and this widening is a
    * reasonable change that fixes a different problem than the one it was aimed
    * at. See the chip filed for the jamb clipping.
+   *
+   * ═════════════════════════════════════════════════════════════════════════
+   * AND THE FOOTAGE SAYS 0.889, WHICH IS A CONFLICT AND NOT A ROUNDING.
+   * 2026-08-17.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * DOORWAY_SPRINGING_RATIO measures the springing at 2.53 doorway-widths above
+   * the floor. The springing is 2.25 m — sourced crown less an estimated rise —
+   * so the opening the footage shows is 0.889 m wide, which is the flight's own
+   * width to a centimetre. Run the other way, 1.1 m demands a springing at
+   * 2.783 m and therefore a crown above it, against [İçərişəhər]'s SOURCED
+   * 2.5 m. The two cannot both stand.
+   *
+   * IT IS NOT MOVED, AND THE REASON IS NOT COST. It is that the measurement has
+   * exactly one systematic and it runs the right way to explain the whole gap:
+   * obliquity foreshortens a width and never a height, so a wall seen 33–37° off
+   * square reads 1.1 m as 0.89. up/165 shows the left cheek's reveal in shadow
+   * across a third of the opening, which is what an oblique view of a tunnel
+   * through a 3.7 m wall looks like. I cannot recover that angle from the frame
+   * and I will not assume it in either direction.
+   *
+   * WHAT WOULD SETTLE IT, exactly: one tape across any stair doorway, jamb to
+   * jamb. It is the same single measurement CUPOLA_RISE is waiting on — either a
+   * width or a height closes the whole section, because everything else in it is
+   * sourced or is a ratio. Until then the model cuts 1.1 m, which is the SOURCED
+   * main entrance and the least invented figure available, and chamberSection
+   * .test.ts states the disagreement in metres so it cannot go quiet.
    */
   doorwayWidth: 1.1,
+  /**
+   * m — clear height of the opening, floor to head. [DERIVED] 1.688.
+   *
+   * IT USED TO BE `PLAYER.height + 0.35`, AND THAT IS THE FAULT THIS FILE HAS
+   * JUST BEEN CORRECTED FOR. Not a dimension of the building at all: the
+   * avatar's capsule plus a third of a metre, written at five call sites, sizing
+   * a hole in a 12th-century wall from the thing that walks through it. It came
+   * out 2.100 m in a wall whose vault sprang at 1.600, so the model was cutting
+   * an opening half a metre taller than the masonry it was cut in — twelve
+   * times — and that hole is exactly why nobody ever met the 1.600 m ceiling.
+   *
+   * It is now the building's own: the springing, which is sourced clear height
+   * less an estimated rise, times a fraction MEASURED off the footage. See
+   * DOORWAY_HEAD_FRACTION for the frames and the method, and CUPOLA_RISE for the
+   * argument that the rise is 0.25 and not 0.9.
+   *
+   * Taken at the UPPER storeys' springing, which is every storey the historic
+   * stair serves. Storey 1 has no stair doorway — it is reached through ENTRANCE
+   * and left by the modern spiral — and its own vault springs 0.5 m higher.
+   *
+   * A doorway can no longer be taller than the wall it is cut in, whatever
+   * anyone does to the rise afterwards, because the fraction is below one by
+   * measurement. chamberSection.test.ts asserts that and asserts the walker
+   * still fits under it.
+   */
+  doorwayHeight: DOORWAY_HEAD_FRACTION * (UPPER_CLEAR - CUPOLA_RISE),
 
   /**
    * How far a landing runs along the walking line, metres. [ESTIMATE]
@@ -2169,22 +2456,46 @@ export const WELL = {
    * 3→4 passage. So the passage he means is the one storey 3 is LEFT by — the
    * foot of flight 3→4, whose doorway this model puts at azimuth 190.77.
    *
-   * 171 IS THAT SENTENCE AS ARITHMETIC. besideDoorwayBearing() in
+   * 182 IS THAT SENTENCE AS ARITHMETIC. besideDoorwayBearing() in
    * lib/waterSystem.ts puts the mouth's rim tangent to the radial plane of the
-   * doorway's near jamb: 190.772 − 7.245 of doorway − 13.003 of mouth = 170.52,
+   * doorway's near jamb: 202.628 − 7.245 of doorway − 13.003 of mouth = 182.38,
    * to the nearest whole degree, because nothing has measured the bearing itself
    * and a decimal would imply something had. It leaves the mouth's rim 0.87 m
    * from the jamb's inner corner, which is about the width of the pier in
    * up/080 — a corroboration and NOT the derivation; a pier read off a handheld
    * wide-angle frame with no scale is not a measurement in this project.
    *
+   * ═════════════════════════════════════════════════════════════════════════
+   * IT WAS 171 UNTIL 2026-08-17, AND THE WELL DID NOT MOVE — THE DOOR DID.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * Nothing here was re-argued and nothing about the wellhead was re-read. The
+   * doorway this bearing is tangent to stood at 190.772 because
+   * approachAzimuthDeg() put every FOOT doorway on the wrong side of its end
+   * tread — over the flight's own second, third and fourth treads instead of on
+   * the landing. Straightened, the storey-3 foot doorway stands at 202.628 and
+   * the same derivation gives 182.38.
+   *
+   * THIS IS THE HAZARD THE OLD NOTE PROMISED WOULD COME, ARRIVING. It said "the
+   * stair is still the thing that moves… this number must move with it", and
+   * that is exactly what has happened, only through the doorway's side rather
+   * than through STAIR_FROM_BUTTRESS_DEG. The owner's sentence is RELATIONAL —
+   * beside the passage — so honouring it means the well follows the passage. A
+   * well left at 171 while its doorway moved 12° would be the letter of his
+   * placement against the whole of its meaning.
+   *
    * THE SIDE IS ANTICLOCKWISE, and it rests on one frame. up/080 has the steps
    * to the right of the recess with the camera facing the wall, and facing
-   * outward the right hand runs clockwise, so the well is the lower bearing. The
-   * arithmetic agrees for its own reasons: the clockwise tangent is 211, and 211
-   * puts the chase through SIX foot reveals in plan and through foot-3-4 in
-   * height as well — a pipe out of a window, which is the fault 4f3e197 was
-   * written to prevent. Anticlockwise costs no window at all.
+   * outward the right hand runs clockwise, so the well is the lower bearing.
+   *
+   * THE ARITHMETIC USED TO AGREE FOR ITS OWN REASONS AND NOW BARELY DOES, which
+   * is worth saying plainly rather than quietly dropping. While the doorway was
+   * at 190.77 the clockwise tangent was 211 and 211 put the chase through SIX
+   * foot reveals in plan; anticlockwise cost no window at all, and that read as
+   * independent support. With the doorway straightened the mirror tangent is 223
+   * and it costs ONE reveal, foot-8-9. So the second reason has mostly gone and
+   * the side now rests on up/080 alone, which is where the note always said the
+   * decision came from.
    *
    * WHAT IT DOES COST IS THE STAIR, AND THE BILL IS NOT SMALL. Every doorway is
    * clear — the nearest is the very doorway it stands beside, 7.4° — and every
@@ -2203,7 +2514,7 @@ export const WELL = {
    * the room-side face and the head doorways came out at about az 15 while the
    * flights started at 100, so a visitor leaving the stair on storey 3 walked
    * into a 0.30 m pipe across the opening. The owner photographed it and called
-   * it, exactly, pipes in the entrances. THAT FAULT IS NOT BEING REOPENED — 171
+   * it, exactly, pipes in the entrances. THAT FAULT IS NOT BEING REOPENED — 182
    * is beside the door and not in it, and the doorway guard still holds.
    *
    * It was then 230, to clear those doorways while the flights started at 100;
@@ -2219,18 +2530,18 @@ export const WELL = {
    * that is no longer being asked. It asked where a bearing NOBODY HAS MEASURED
    * may stand; there is now a witness. A rule that beats a placeholder loses to
    * testimony, and it is worth saying plainly that the rule was working: 312 was
-   * clear of everything by 79.9° and 171 is not clear of the stair at all.
+   * clear of everything by 79.9° and 182 is not clear of the stair at all.
    *
    * THE STAIR IS STILL THE THING THAT MOVES. STAIR_FROM_BUTTRESS_DEG is known to
    * be too small by at least 8° and has deliberately not been changed, so the
-   * doorway this bearing hangs off will move, and this number must move with it.
-   * That is now a feature rather than a hazard: the derivation is run against the
-   * live flight plan in wellClearance.test.ts, so the day the stair turns, 171
-   * stops being the tangent and the suite says so — and the breach report is
-   * recomputed at the same time, which is the only honest way to find out whether
-   * turning the stair makes this better or worse.
+   * doorway this bearing hangs off will move again, and this number must move
+   * with it. That is a feature rather than a hazard, and it has now been
+   * exercised once: the derivation is run against the live flight plan in
+   * wellClearance.test.ts, the doorway moved 11.856° on 2026-08-17, the suite
+   * said so rather than leaving the well where the old sign had put it, and the
+   * breach report was recomputed at the same time.
    */
-  azimuthDeg: 171,
+  azimuthDeg: 182,
   /**
    * Distance of the wellhead from the tower axis. [PLACEHOLDER], and the
    * footage now says it is too small — left alone anyway, because correcting it
@@ -2258,39 +2569,49 @@ export const WELL = {
  * Not a question — he answered it. A CONFLICT, in the sense App.tsx already uses
  * for the openings: the record says one thing, the geometry says another, and
  * the pair is the finding. His sentence puts the wellhead beside the storey-3
- * doorway; the same number puts a 0.66 m chase up the wall through five storeys
- * of stair passage. Both halves are in the model and neither has been softened.
+ * doorway; the same number puts a 0.66 m chase up the wall through four stair
+ * passages. Both halves are in the model and neither has been softened.
  *
  * The numbers here are the shipped configuration's and are recomputed live by
  * chaseBreaches() — this text says what they mean, App.tsx prints what they are.
  */
 export const WELL_BEARING_CONFLICT = [
-  'КОЛОДЕЦ ПОСТАВЛЕН ТАМ, ГДЕ ВЫ СКАЗАЛИ, И ЭТО СТОИТ ПЯТИ ЯРУСОВ ЛЕСТНИЦЫ.',
+  'КОЛОДЕЦ ПОСТАВЛЕН ТАМ, ГДЕ ВЫ СКАЗАЛИ, И ЭТО СТОИТ ЧЕТЫРЁХ ПРОХОДОВ ЛЕСТНИЦЫ.',
   '',
-  '«Колодец должен стоять рядом с проходом» — WELL.azimuthDeg 312 → 171. Устье',
-  'встало вплотную к дверному проёму лестницы 3→4 (az 190.77): край устья на',
-  '0.87 м от косяка, ни один проём и ни одна оконная ниша не задеты.',
+  '«Колодец должен стоять рядом с проходом» — WELL.azimuthDeg 312 → 171 → 182.',
+  'Устье стоит вплотную к дверному проёму лестницы 3→4: край устья на 0.89 м от',
+  'косяка, ни один проём и ни одна оконная ниша не задеты.',
   '',
-  'НО ОДНО ЧИСЛО ДЕЛАЕТ ДВА ДЕЛА. Тем же азимутом задан ШТРАБА водосточной трубы',
+  'ПОЧЕМУ 171 СТАЛО 182, ХОТЯ КОЛОДЕЦ НЕ ДВИГАЛИ. 17.08.2026 выпрямлен вход на',
+  'лестницу: проём у НИЗА марша стоял по ту сторону первой ступени от площадки,',
+  'и проём 3→4 переехал со 190.77 на 202.63. Ваша фраза — про соседство, поэтому',
+  'колодец идёт за своим проходом. Оставить 171 значило бы сохранить букву вашей',
+  'расстановки и потерять весь её смысл.',
+  '',
+  'НО ОДНО ЧИСЛО ДЕЛАЕТ ДВА ДЕЛА. Тем же азимутом задана ШТРАБА водосточной трубы',
   'в стене — 0.66 м шириной, от пола до пяты свода на ярусах 3–7. На этом азимуте',
-  'она вскрывает лестничные проходы восемь раз:',
-  '  ярус 3 — проход 3→4 на 22.61°, проход 2→3 на 2.30°',
-  '  ярус 4 — проход 4→6 на 21.05°, проход 3→4 на 3.06°',
-  '  ярус 5 — проход 4→6 на 3.76°',
-  '  ярус 6 — проход 6→7 на 18.18°',
-  '  ярус 7 — проход 7→8 на 16.88°, проход 6→7 на 5.05°',
+  'она вскрывает лестничные проходы четыре раза:',
+  '  ярус 3 — проход 3→4 на 39.57°',
+  '  ярус 4 — проход 4→6 на 38.74°',
+  '  ярус 6 — проход 6→7 на 37.24°',
+  '  ярус 7 — проход 7→8 на 36.56°',
+  'Ран стало меньше, а каждая — глубже: на 171 штраба задевала УГЛЫ восьми',
+  'проходов, на 182 она стоит прямо под маршами.',
   'Штраба уходит в кладку на 0.48 м, проход начинается в 0.25 м от лица стены:',
-  'перемычки между комнатой и лестницей снимается 0.33–0.43 м, то есть вся.',
-  'Хуже всего на ярусе 3: щель выходит прямо на ступени марша 3→4, которые там',
-  'стоят на 0.41–1.44 м выше пола комнаты.',
+  'перемычки между комнатой и лестницей снимается 0.34 м, то есть вся.',
+  'Хуже всего на ярусе 3: щель выходит прямо на ступени марша 3→4 и начинается',
+  'НА УРОВНЕ ПОЛА комнаты, поднимаясь вместе с ними на 0.82 м. Порога между',
+  'комнатой и лестницей на этом азимуте нет вовсе.',
   '',
   'ЭТО НЕ СПРЯТАНО И НЕ ИСПРАВЛЕНО МОЛЧА. Штраба режется как есть — щели видно,',
   'и их видно там, где они на самом деле получаются из ваших слов.',
   '',
   'ЧТО ЭТО ЗАКРОЕТ, по убыванию цены:',
-  '  1. С КАКОЙ СТОРОНЫ ОТ ДВЕРИ? Модель ставит колодец против часовой (171) по',
-  '     одному кадру up/080. По часовой — 211 — труба идёт через шесть оконных',
-  '     ниш, что заведомо хуже; если сторона другая, вопрос меняется целиком.',
+  '  1. С КАКОЙ СТОРОНЫ ОТ ДВЕРИ? Модель ставит колодец против часовой (182) по',
+  '     одному кадру up/080. По часовой — 223 — труба идёт через оконную нишу',
+  '     foot-8-9. Этот довод ослаб: до выпрямления входа зеркальный вариант стоил',
+  '     ШЕСТИ ниш, теперь одной, и сторона держится на одном кадре, а не на двух',
+  '     независимых основаниях.',
   '  2. ТРУБА ИДЁТ ТАМ ЖЕ, ГДЕ УСТЬЕ? Модель ведёт штрабу вертикально от устья',
   '     вверх на пять ярусов. Если труба поднимается по другой части стены, а к',
   '     колодцу приходит понизу, конфликта нет вообще — но второй азимут никто не',

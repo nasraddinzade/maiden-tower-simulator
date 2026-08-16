@@ -93,7 +93,7 @@ const built = buildShellGeometry({
   stairDoorways: stairDoorways(
     flights,
     STAIR.width,
-    PLAYER.height + 0.35,
+    STAIR.doorwayHeight,
     innerRadiusAt,
     (i, end) => (end === 'foot' ? WALL_LIFTS[i].fromY : WALL_LIFTS[i].toY),
     ROOF.masonryTopY,

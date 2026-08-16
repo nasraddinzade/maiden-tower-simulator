@@ -1,5 +1,5 @@
 /**
- * HOW MUCH DAYLIGHT EACH CHAMBER GETS, and for four of the eight the answer is
+ * HOW MUCH DAYLIGHT EACH CHAMBER GETS, and for one of the eight the answer is
  * none at all.
  *
  * WHY THIS FILE EXISTS. Since 2026-08-10 the tower has no openings on the
@@ -37,30 +37,31 @@
  *                     SLIT's own width and not the doorway's: 0.4 m of hole at
  *                     8.25 m of radius. The doorway is five times wider and
  *                     never the thing in the way.
- *   storey 1          the entrance, 7.12° of it, and no stair involved.
- *   storeys 2 and 5   NOTHING, and structurally so. Their only doorway is at a
- *                     FOOT (storey 5's is halfway along the 4→6 run, which is
- *                     not a passage end at all and has no slit anywhere near
- *                     it). At a foot the doorway sits half a flight-width ALONG
- *                     THE CLIMB from the first tread while the slit sits on the
- *                     landing BEHIND it — 16.4° apart at storey 2 against a
- *                     doorway half-width of 7.5° and a slit half-width of 1.4°.
- *                     A foot slit lights the passage, never the room.
- *   storeys 3 and 4   NOTHING, and for the other reason. Both are served by a
- *                     head, both heads' doorways DO cover their slit's bearing —
- *                     and both slits are head-2-3 and head-3-4, the two ends
- *                     standing inside the buttress. They are not cut, so there
- *                     is nothing for the doorway to line up with.
+ *   storey 1          the entrance, 7.61° of it, and no stair involved.
+ *   storeys 2, 3, 4   a band 2.57–2.64° wide out of the FOOT of the climb that
+ *                     leaves there — foot-2-3, foot-3-4, foot-4-6 — and nothing
+ *                     else, because no head above them is cut.
+ *   storey 5          NOTHING, and structurally so. It is reached from halfway
+ *                     along the 4→6 run, which is not a passage end at all, so
+ *                     its doorway has no slit within a storey of it in height.
+ *                     No turn of the stair reaches that.
  *
- * THE SECOND CAUSE IS THE QUARTER TURN'S, and that is the whole reason this is
- * worth measuring rather than merely noting. STAIR.startAzimuthDeg is
- * BUTTRESS.azimuthDeg + STAIR_FROM_BUTTRESS_DEG, the quarter turn is [OWNER]
- * 2026-08-13 said by eye and worth ±15°, and his own footage has since shown a
- * glazed window standing open at head-3-4 (up/098, down/137–139). Turn the stair
- * the 11.09° that brings both those ends out of the pier and storeys 3 and 4
- * light up; leave it and they are black. So the count below is a number that a
- * single unresolved decision moves, which is exactly the kind of number that
- * should be asserted in a test rather than discovered later.
+ * FOUR OF THESE ROOMS WERE DARK UNTIL 2026-08-17 AND IT WAS A SIGN, NOT A WALL.
+ * This block used to explain storeys 2, 3 and 4 by "what a foot is": the doorway
+ * sitting half a flight-width ALONG THE CLIMB from the first tread while the slit
+ * sat on the landing BEHIND it, 16.4° away against a doorway half-width of 7.5°.
+ * That was approachAzimuthDeg() taking the shift along the climb at both ends
+ * when a passage carries its landing AWAY from the flight at both. A foot reads
+ * like a head now and a foot slit lights its room like a head's.
+ *
+ * WHAT THE QUARTER TURN STILL COSTS, and it is much less than it was.
+ * STAIR.startAzimuthDeg is BUTTRESS.azimuthDeg + STAIR_FROM_BUTTRESS_DEG, the
+ * quarter turn is [OWNER] 2026-08-13 said by eye and worth ±15°, and his own
+ * footage has since shown a glazed window standing open at head-3-4 (up/098,
+ * down/137–139). Turning the stair 11.09° brings head-2-3 and head-3-4 out of the
+ * pier and gives storeys 3 and 4 a SECOND band each. It no longer decides whether
+ * they see daylight at all — that claim was true only while the feet were
+ * misplaced, and it is retired in chamberDaylight.test.ts with its own note.
  *
  * REPORTS, DOES NOT REPAIR. Nothing here may be used to choose a bearing.
  * Turning the stair until more rooms are lit is fitting the building to a

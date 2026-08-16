@@ -2,50 +2,43 @@
  * HOW MANY ROOMS IN THIS TOWER CAN SEE THE SKY, asserted as a number so that the
  * day it changes, it changes loudly.
  *
- * THE COUNT IS FOUR OF EIGHT. Storeys 2, 3, 4 and 5 — the whole middle of the
- * building — have no sight line to daylight at all from their own axis at eye
- * height. That has been true of this model since the openings moved to the ends
- * of the stair passages on 2026-08-10 and nothing in it said so: `built` reports
- * that a SLIT reaches daylight, which is a fact about the passage, and the
- * chambers were never asked. lib/chamberDaylight.ts asks them; this file pins
- * the answer.
+ * THE COUNT IS SEVEN OF EIGHT. Only storey 5 has no sight line to daylight at
+ * all from its own axis at eye height, and its darkness is structural: it is
+ * reached from the MIDDLE of the single 4→6 run, so its doorway stands at no
+ * passage end and there is no slit within a storey of it in height.
  *
- * WHY A NUMBER AND NOT A DESCRIPTION. Two of those four are dark because of
- * STAIR_FROM_BUTTRESS_DEG, which is [OWNER]'s "about a quarter" said by eye and
- * worth ±15°, and which he has not ruled on. head-2-3 and head-3-4 are the only
- * openings that serve storeys 3 and 4, both stand inside the pier at 90, and
- * both come out of it at 90 + 11.09. So the count is a quantity that one
- * unresolved decision moves from four to six. Written as prose it would be
- * re-argued every time the stair turns, exactly as WELL.azimuthDeg's clearance
- * was; written as a test it fails out loud on the day the turn is made, and the
- * reader of that failure is told what it cost and what it bought.
+ * ═════════════════════════════════════════════════════════════════════════
+ * IT WAS FOUR OF EIGHT UNTIL 2026-08-17, AND THAT COUNT WAS A SIGN ERROR.
+ * ═════════════════════════════════════════════════════════════════════════
  *
- * NOTHING HERE MAY BE USED TO CHOOSE A BEARING (rule 7). A test that says "six
- * is better than four" would be fitting the building to a preference about the
- * building. It says what each bearing yields and stops, and the last test in the
- * third block is there to take the temptation away: the count does not climb with
- * the turn. It is 4 at +0, 6 at +11.09, 5 at +45 and 6 again at +90. There is no
- * brightest bearing to tune toward, only a bearing the owner knows.
+ * The three rooms that were dark and are not — storeys 2, 3 and 4 — were dark
+ * because approachAzimuthDeg() put every FOOT doorway on the far side of its
+ * first tread from the landing, while planPassageOpenings() centred the slit on
+ * the landing. Doorway and slit ended up 13.5–16.4° apart round the drum with
+ * solid stone between them, so a foot's light fell on the steps and never
+ * reached the room it opened off. Straightened, a foot reads like a head — 3.3
+ * to 4.1° apart, 10.2 to 12.6° of overlap — and each of those three rooms gets
+ * about 2.6° of sky through its own way onto the stair.
  *
- * [2026-08-16] THREE OF THE FOUR ARE A MODEL RULE AND NOT THE TOWER, and this
- * file could not have known it, because it reads the doorways as given. The
- * second block below explains storey 2 by "what a foot is" — the doorway on the
- * far side of the first tread from the slit that serves the same landing — and
- * that arrangement is one sign in approachAzimuthDeg(), which sends the doorway
- * ALONG THE CLIMB at both ends while the passage carries its landing AWAY from
- * the flight at both. Send it the other way at a foot and this census reads
- * SEVEN of eight: storeys 2, 3 and 4 come lit through foot-2-3, foot-3-4 and
- * foot-4-6, and the only room left dark is storey 5, whose doorway stands at no
- * passage end at all. The third block's arithmetic goes with them — the quarter
- * turn is worth "exactly two rooms" only while head-2-3 and head-3-4 are the
- * only openings that serve storeys 3 and 4, and on that sign they are not.
+ * This file said so on 2026-08-16, in a paragraph headed "THREE OF THE FOUR ARE
+ * A MODEL RULE AND NOT THE TOWER", and then left the four standing because the
+ * bill looked too big to pay on the strength of a screenshot. The owner walked
+ * the tower again and it was still there. It has been paid.
  *
- * NOTHING WAS CHANGED. It was measured out of the owner's complaint that the
- * slit at a stair entrance looks skew, it is written up in full on
- * approachAzimuthDeg() with its bill — which also moves WELL.azimuthDeg, placed
- * by his own words the day before — and a count of lit rooms and the place a
- * well stands are not a screenshot's to move. Read every number below as
- * conditional on that sign, exactly as they are already conditional on the turn.
+ * AND THE QUARTER TURN IS NO LONGER WORTH TWO ROOMS — IT IS WORTH NONE. That was
+ * this file's central finding and it does not survive: head-2-3 and head-3-4 are
+ * NOT the only openings that serve storeys 3 and 4, because the feet below them
+ * do it too, and the feet are nowhere near the pier. Swept every 15° through a
+ * whole revolution the count is seven at twenty-two bearings of twenty-four and
+ * six at the other two, where storey 2's own foot swings into the beak. So
+ * STAIR_FROM_BUTTRESS_DEG has lost its most expensive consequence: turning it
+ * still moves eleven openings, but it no longer decides whether the middle of
+ * the building can see out. That is a smaller reason to press him for an answer,
+ * and it is recorded here rather than quietly deleted because the old claim was
+ * asserted loudly and in this file.
+ *
+ * NOTHING HERE MAY BE USED TO CHOOSE A BEARING (rule 7), and the temptation is
+ * now smaller than the argument against it was.
  *
  * CLAUDE.md rule 6: every assertion below is arithmetic on azimuths and heights.
  */
@@ -141,7 +134,7 @@ function sweptAtQuarterTurn(fromButtressDeg: number): ChamberDaylight[] {
   const doorways = stairDoorways(
     flights,
     settings.width,
-    PLAYER.height + 0.35,
+    STAIR.doorwayHeight,
     innerRadiusAt,
     landingY,
     ROOF.masonryTopY,
@@ -175,34 +168,53 @@ const BUILT = SHIPPED_ENDS.filter((o) => o.built)
  */
 const SLIT_HALF_DEG = halfArcDeg(BUILT[0].outerWidth, TOWER.outerRadius)
 
-describe('the number, and it is four chambers out of eight', () => {
-  it('lights storeys 1, 6, 7 and 8 and leaves 2, 3, 4 and 5 with no sight line at all', () => {
+describe('the number, and it is seven chambers out of eight', () => {
+  it('leaves only storey 5 with no sight line at all', () => {
     /*
      * THE ASSERTION THIS WHOLE FILE EXISTS FOR. If it fails, the tower's
      * daylight has changed, and whoever changed it owes the commit message an
      * account of which room gained or lost a view and why.
      */
-    expect(litChamberCount(CHAMBERS)).toBe(4)
-    expect(darkChambers(CHAMBERS)).toEqual([2, 3, 4, 5])
-    expect(CHAMBERS.filter((c) => c.lit).map((c) => c.floorNumber)).toEqual([1, 6, 7, 8])
+    expect(litChamberCount(CHAMBERS)).toBe(7)
+    expect(darkChambers(CHAMBERS)).toEqual([5])
+    expect(CHAMBERS.filter((c) => c.lit).map((c) => c.floorNumber)).toEqual([1, 2, 3, 4, 6, 7, 8])
     // and `lit` is not a second opinion: it is whether the sweep found any arc
     for (const c of CHAMBERS) expect(c.lit, `storey ${c.floorNumber}`).toBe(c.arcDeg > 0)
   })
 
-  it('gives the whole building fourteen degrees of sky, and half of it to the door', () => {
+  it('gives the whole building twenty-nine degrees of sky, a quarter of it to the door', () => {
     /*
-     * Every dark chamber contributes exactly zero, so the total is a fact about
-     * four rooms. Fourteen degrees out of 2880 (eight rooms × 360) is 0.49% of
-     * the sky the model's chambers could in principle see.
+     * Storey 5 contributes exactly zero, so the total is a fact about seven
+     * rooms. Twenty-nine degrees out of 2880 (eight rooms × 360) is 1.0% of the
+     * sky the model's chambers could in principle see — still a dark building,
+     * twice as bright as it was.
+     *
+     * 14.196 → 14.109 on 2026-08-16, when the walker's eye came down from 1.65 to
+     * 1.50 m and the doorway heads from 2.100 to 1.688: storey 1 gained, the
+     * three stair-lit rooms each lost a quarter of a degree to the curve of an
+     * arch the eye now sits inside, and the two nearly cancelled.
+     *
+     * 14.109 → 29.385 on 2026-08-17, which is not a cancellation of anything.
+     * Six FOOT slits started lighting the rooms they open off instead of only the
+     * treads: storeys 2, 3 and 4 gained a band each where they had none, and
+     * storeys 6, 7 and 8 gained a second band apiece on top of the head's.
+     *
+     * The door is no longer half the tower's daylight. It is 26% of it, which is
+     * the honest way round for a building with twelve slits in it.
      */
     const total = CHAMBERS.reduce((s, c) => s + c.arcDeg, 0)
-    expect(total).toBeCloseTo(14.196, 2)
-    expect(of(1).arcDeg / total).toBeGreaterThan(0.5)
-    for (const n of [2, 3, 4, 5]) expect(of(n).arcDeg, `storey ${n}`).toBe(0)
+    expect(total).toBeCloseTo(29.385, 2)
+    expect(of(1).arcDeg / total).toBeGreaterThan(0.25)
+    expect(of(1).arcDeg / total).toBeLessThan(0.27)
+    expect(of(5).arcDeg).toBe(0)
+    // three rooms lit through a foot alone, three through a head and a foot
+    for (const n of [2, 3, 4]) expect(of(n).bands, `storey ${n}`).toHaveLength(1)
+    for (const n of [6, 7, 8]) expect(of(n).bands, `storey ${n}`).toHaveLength(2)
+    for (const n of [2, 3, 4]) expect(of(n).bands[0].through).toMatch(/^foot-/)
   })
 })
 
-describe('why a head lights the room and a foot lights only the passage', () => {
+describe('why a head and a foot now light the room in the same way', () => {
   it('puts every head’s slit inside a doorway on its own landing', () => {
     /*
      * THE MECHANISM, and it is the whole of the finding. At a head the doorway
@@ -225,13 +237,15 @@ describe('why a head lights the room and a foot lights only the passage', () => 
     }
   })
 
-  it('puts every foot’s slit 13.5–16.4° outside every doorway on its landing', () => {
+  it('puts every foot’s slit inside a doorway on its landing too', () => {
     /*
-     * And at a foot the doorway is on the OTHER side of the first tread: you
-     * come through it half a flight-width along the climb, while the slit stays
-     * behind you on the landing. Nothing lines up, so the light falls on the
-     * steps and never reaches the room. The clear stone between the two arcs is
-     * 5.9° at the tightest of the six.
+     * AND A FOOT IS THE SAME MECHANISM NOW, which is the whole of the repair of
+     * 2026-08-17. A foot's doorway used to sit on the OTHER side of the first
+     * tread from its slit — you came through it half a flight-width along the
+     * climb while the slit stayed behind you — and the clear stone between the
+     * two arcs was 5.9° at the tightest of the six. Both are on the landing now,
+     * at the same 3.3–4.1° a head has, because foot-N and head-(N−1) share that
+     * landing and there was never a reason for the two to read differently.
      */
     const feet = BUILT.filter((o) => o.end === 'foot')
     expect(feet.length).toBe(6)
@@ -241,30 +255,46 @@ describe('why a head lights the room and a foot lights only the passage', () => 
         half: d.widthDeg / 2,
       }))
       const nearest = gaps.reduce((a, b) => (a.gap < b.gap ? a : b))
-      expect(nearest.gap, `${o.id} offset`).toBeGreaterThan(13.5)
-      expect(nearest.gap, `${o.id} offset`).toBeLessThan(16.4)
-      for (const g of gaps) {
-        expect(g.gap, `${o.id} clear of doorway`).toBeGreaterThan(g.half + SLIT_HALF_DEG)
-      }
+      expect(nearest.gap, `${o.id} offset`).toBeLessThan(4.1)
+      expect(nearest.gap, `${o.id} overlap`).toBeLessThan(nearest.half + SLIT_HALF_DEG)
     }
   })
 
-  it('lights a chamber through the SLIT’s width and never the doorway’s', () => {
+  it('lights a chamber through the SLIT’s width, all but the last tenth of a degree', () => {
     /*
-     * Which of the two holes is the aperture, settled by arithmetic rather than
-     * by inspection: a slit is 0.4 m at the drum face and a doorway is five
-     * times wider, so the band a room gets is the slit's own 2.778° and the
-     * doorway is never the thing in the way. Storey 7 is the exception and it is
-     * not the doorway that takes it — see the pier, below.
+     * Which of the two holes is the aperture. The slit is 0.4 m at the drum face
+     * and the doorway five times wider, so the slit's own 2.778° is very nearly
+     * the whole band — and it USED to be exactly the whole band, when the doorway
+     * stood 2.100 m tall and the walker's eye at 1.65 m passed 0.45 m below its
+     * head with the arch nowhere near.
+     *
+     * THAT MARGIN IS GONE, and it is the visible consequence of the doorway
+     * ceasing to be sized from the walker. The head is 1.688 m now — measured,
+     * see STAIR.doorwayHeight — and the eye stands 0.19 m under it, INSIDE the
+     * curve of a head struck across the opening. doorwayAdmits() reads that curve
+     * (archHalfSpan), so one edge of every stair-lit band is now the arch and not
+     * the slit, and each room loses a quarter of a degree.
+     *
+     * The slit still sets the band's WIDTH to within 10%; what changed is that
+     * the doorway is no longer irrelevant to it. If a survey ever raises the
+     * doorway, these three numbers go back up to 2.778 and this test should be
+     * the thing that notices.
      */
     for (const o of BUILT) expect(o.outerWidth, o.id).toBeCloseTo(BUILT[0].outerWidth, 9)
     expect(SLIT_HALF_DEG * 2).toBeCloseTo(2.778, 3)
-    for (const n of [6, 8]) {
-      expect(of(n).bands).toHaveLength(1)
-      expect(of(n).arcDeg, `storey ${n}`).toBeCloseTo(SLIT_HALF_DEG * 2, 3)
+    // every band in the building, save the entrance's and the one the beak eats
+    for (const c of CHAMBERS) {
+      for (const b of c.bands) {
+        if (b.through === 'entrance' || b.through === 'head-6-7') continue
+        const w = b.toDeg - b.fromDeg
+        expect(w, `${c.floorNumber} via ${b.through}`).toBeLessThan(SLIT_HALF_DEG * 2)
+        expect(w, `${c.floorNumber} via ${b.through}`).toBeGreaterThan(SLIT_HALF_DEG * 2 * 0.88)
+      }
     }
-    expect(of(6).bands[0].through).toBe('head-4-6')
-    expect(of(8).bands[0].through).toBe('head-7-8')
+    expect(of(6).bands.map((b) => b.through)).toEqual(['head-4-6', 'foot-6-7'])
+    expect(of(8).bands.map((b) => b.through)).toEqual(['head-7-8', 'foot-8-9'])
+    expect(of(6).arcDeg).toBeCloseTo(5.03, 2)
+    expect(of(8).arcDeg).toBeCloseTo(4.925, 3)
   })
 
   it('leaves storey 5 with a doorway that stands at no passage end at all', () => {
@@ -282,43 +312,64 @@ describe('why a head lights the room and a foot lights only the passage', () => 
   })
 })
 
-describe('what the quarter turn costs, so the day it moves the count moves with it', () => {
-  it('is worth exactly two rooms: four chambers at 90, six at 90 + 11.09', () => {
+describe('what the quarter turn costs, which is no longer a single room', () => {
+  it('is worth nothing in rooms: seven chambers at 90 and seven at 90 + 11.09', () => {
     /*
-     * 11.09 is stairBearing.test.ts's bound — the smallest clockwise turn at
-     * which no opening in the tower is cut into stone — and the two ends it
-     * frees, head-2-3 and head-3-4, are the only openings that serve storeys 3
-     * and 4. So the bound and the daylight are the same fact counted twice.
+     * THE FINDING THIS BLOCK USED TO CARRY IS RETIRED, and it is worth being
+     * plain about why rather than letting the numbers change quietly.
      *
-     * THIS IS NOT AN ARGUMENT FOR TURNING IT. See the block below.
+     * It read: 11.09 is stairBearing.test.ts's bound — the smallest clockwise
+     * turn at which no opening is cut into stone — and the two ends it frees,
+     * head-2-3 and head-3-4, are THE ONLY openings that serve storeys 3 and 4, so
+     * the turn is worth exactly two rooms. The second clause was false and was
+     * false because of the sign in approachAzimuthDeg(): the feet below those
+     * heads serve the same two rooms, and the feet are nowhere near the pier.
+     *
+     * So the turn buys a SECOND band in two rooms that already have one. It is
+     * still the difference between eleven openings being cut where they are and
+     * eleven being cut somewhere else; it is no longer the difference between the
+     * middle of the tower seeing daylight and not.
      */
-    expect(litChamberCount(sweptAtQuarterTurn(90))).toBe(4)
-    expect(darkChambers(sweptAtQuarterTurn(90))).toEqual([2, 3, 4, 5])
+    expect(litChamberCount(sweptAtQuarterTurn(90))).toBe(7)
+    expect(darkChambers(sweptAtQuarterTurn(90))).toEqual([5])
+    expect(sweptAtQuarterTurn(90).find((c) => c.floorNumber === 3)!.bands.map((b) => b.through)).toEqual(['foot-3-4'])
 
     const freed = sweptAtQuarterTurn(90 + 11.09)
-    expect(litChamberCount(freed)).toBe(6)
-    expect(darkChambers(freed)).toEqual([2, 5])
-    expect(freed.find((c) => c.floorNumber === 3)!.bands[0].through).toBe('head-2-3')
-    expect(freed.find((c) => c.floorNumber === 4)!.bands[0].through).toBe('head-3-4')
+    expect(litChamberCount(freed)).toBe(7)
+    expect(darkChambers(freed)).toEqual([5])
+    expect(freed.find((c) => c.floorNumber === 3)!.bands.map((b) => b.through)).toEqual([
+      'head-2-3',
+      'foot-3-4',
+    ])
+    expect(freed.find((c) => c.floorNumber === 4)!.bands.map((b) => b.through)).toEqual([
+      'head-3-4',
+      'foot-4-6',
+    ])
   })
 
   it(
-    'cannot reach storeys 2 and 5 at any bearing the quarter turn could take',
+    'cannot reach storey 5 at any bearing the quarter turn could take',
     () => {
       /*
-       * The line between the two causes, drawn by exhaustion rather than by
-       * argument. Storeys 3 and 4 are dark because of where the pier is; storeys
-       * 2 and 5 are dark because of what a foot is, and turning the stair through
-       * a whole revolution never lights either of them. Coarse steps are enough:
-       * the property is structural, and a bearing at which a foot's doorway
-       * swallowed its own slit would have to hold over tens of degrees, not
-       * fractions.
+       * The one structural darkness, drawn by exhaustion rather than by argument.
+       * Storey 5 is reached from the middle of the 4→6 run, so its doorway stands
+       * at no passage end and no turn of the stair puts a slit anywhere near it.
+       * Coarse steps are enough: the property is structural, and a bearing at
+       * which a mid-flight doorway acquired an end would have to hold over tens
+       * of degrees, not fractions.
+       *
+       * STOREY 2 USED TO BE IN THIS LIST AND IS NOT. It is lit at twenty-two of
+       * these twenty-four bearings and dark at two — +240 and +255, where its own
+       * foot slit swings behind the beak — which is a fact about the pier, the
+       * same kind as storeys 3 and 4's used to be, and not about what a foot is.
        */
+      const darkAt: number[] = []
       for (let turn = 0; turn < 360; turn += 15) {
         const dark = darkChambers(sweptAtQuarterTurn(90 + turn))
-        expect(dark, `turn +${turn}`).toContain(2)
         expect(dark, `turn +${turn}`).toContain(5)
+        if (dark.includes(2)) darkAt.push(turn)
       }
+      expect(darkAt).toEqual([240, 255])
     },
     // 24 whole towers replanned and swept ray by ray lands either side of
     // vitest's 5 s default depending on how warm the machine is — the same trap
@@ -329,19 +380,16 @@ describe('what the quarter turn costs, so the day it moves the count moves with 
 
   it('does not brighten with the turn, so there is no bearing to tune toward', () => {
     /*
-     * RULE 7, MADE ARITHMETIC. Anybody reading the test above is one step from
-     * "so turn it until the tower lights up". The count is not monotonic and has
-     * no interior maximum worth chasing: past +30 the head of 4→6 swings into
-     * the pier and storey 6 goes dark, so +45 is WORSE than +11.09, and +90 is
-     * level with it. Six is a ceiling reached by many bearings and by none of
-     * them uniquely, which is what makes daylight useless as a way of choosing
-     * one — and the reason the choice stays the owner's.
+     * RULE 7, MADE ARITHMETIC, and now nearly trivial. The count was 4 at +0, 6
+     * at +11.09, 5 at +45 and 6 at +90 — not monotonic, no interior maximum worth
+     * chasing. It is 7 at all four. Whatever case there is for turning the stair,
+     * daylight is not it and cannot be made into it.
      */
     const at = (t: number) => litChamberCount(sweptAtQuarterTurn(90 + t))
-    expect(at(11.09)).toBe(6)
-    expect(at(45)).toBe(5)
-    expect(at(45)).toBeLessThan(at(11.09))
-    expect(at(90)).toBe(at(11.09))
+    expect(at(0)).toBe(7)
+    expect(at(11.09)).toBe(7)
+    expect(at(45)).toBe(7)
+    expect(at(90)).toBe(7)
   })
 })
 
@@ -358,14 +406,21 @@ describe('what the pier takes off the top, over and above the ends it buries', (
      */
     const edgeDeg = BUTTRESS.azimuthDeg - BUTTRESS.skewDeg + BUTTRESS.rootArcDeg / 2
     expect(edgeDeg).toBeCloseTo(113.5, 6)
-    expect(of(7).bands).toHaveLength(1)
-    expect(of(7).bands[0].fromDeg).toBeCloseTo(edgeDeg, 3)
-    expect(of(7).arcDeg).toBeCloseTo(1.518, 3)
-    // …and it is the pier and nothing else: lift the beak away and the full slit returns
+    const viaHead = of(7).bands.find((b) => b.through === 'head-6-7')!
+    expect(viaHead.fromDeg).toBeCloseTo(edgeDeg, 3)
+    expect(viaHead.toDeg - viaHead.fromDeg).toBeCloseTo(1.518, 3)
+    // …and it is the pier and nothing else: lift the beak away and the slit returns,
+    // less the same tenth of a degree the doorway's arch takes off every band
     const noBeak = chamberDaylight({ ...SHIPPED, buttress: undefined })
-    expect(noBeak.find((c) => c.floorNumber === 7)!.arcDeg).toBeCloseTo(SLIT_HALF_DEG * 2, 3)
-    // which does NOT light the two the beak buries — those ends are not cut at all
-    expect(darkChambers(noBeak)).toEqual([2, 3, 4, 5])
+    expect(noBeak.find((c) => c.floorNumber === 7)!.arcDeg).toBeCloseTo(4.976, 3)
+    /*
+     * AND WHAT LIFTING THE BEAK NO LONGER DOES is light anything. It used to
+     * leave storeys 2, 3, 4 and 5 dark — the two ends it buries are not cut at
+     * all, so removing it could not reach them — and that is still true of the
+     * ends. It just no longer matters to the census, because those rooms are lit
+     * through their own feet whether the pier is there or not.
+     */
+    expect(darkChambers(noBeak)).toEqual([5])
   })
 })
 
@@ -375,20 +430,27 @@ describe('storey 1, the one chamber that owes the stair nothing', () => {
     expect(of(1).bands[0].through).toBe('entrance')
     const noDoor = chamberDaylight({ ...SHIPPED, entrance: undefined })
     expect(noDoor.find((c) => c.floorNumber === 1)!.lit).toBe(false)
-    expect(litChamberCount(noDoor)).toBe(3)
+    expect(litChamberCount(noDoor)).toBe(6)
+    expect(darkChambers(noDoor)).toEqual([1, 5])
   })
 
   it('is narrowed by the arch over that door, not by its width', () => {
     /*
      * A check that the sweep reads the HEAD of an opening and not a rectangle
      * standing in for it. The doorway is 1.1 m wide, which is 7.650° seen from
-     * the axis. The eye at 1.65 m stands 0.20 m above the springing of a
-     * semicircular head struck at 0.55 m radius, so the clear half-span there is
-     * √(0.55² − 0.20²) = 0.512 m and the band closes to 7.121°.
+     * the axis. The eye stands above the springing of a semicircular head struck
+     * at 0.55 m radius, so the clear half-span there is √(0.55² − rise²).
+     *
+     * This is the ONE room in the tower that gained by the walker shrinking:
+     * the eye came down from 1.65 to 1.50 m, so its rise above that springing
+     * fell from 0.20 to 0.05 and the band opened from 7.121° to 7.613°. Nothing
+     * about the door moved — ENTRANCE is untouched by the chamber-section repair
+     * of 2026-08-16 — which is exactly why this test is worth keeping in the
+     * form of the formula rather than the number.
      */
     const half = Math.sqrt(0.55 ** 2 - (PLAYER.eyeHeight - (ENTRANCE.height - 0.55)) ** 2)
     expect(of(1).arcDeg).toBeCloseTo(2 * halfArcDeg(2 * half, TOWER.outerRadius), 3)
-    expect(of(1).arcDeg).toBeCloseTo(7.121, 3)
+    expect(of(1).arcDeg).toBeCloseTo(7.613, 3)
     expect(of(1).arcDeg).toBeLessThan(2 * halfArcDeg(ENTRANCE.width, TOWER.outerRadius))
   })
 })

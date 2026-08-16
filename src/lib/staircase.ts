@@ -1001,14 +1001,15 @@ export function stairTreadVertices(
  * 200/214, 2.69 against 2.67 at 198/216. Symmetric about 207.0 ± 0.1 against a
  * nominal 206.920. There is no skew in the hole.
  *
- * WHAT IS BENT IS THE WAY IN. The lead-in and the lead-out both run AWAY from
- * the flight — see stairPassageSections(), where leadIn walks back from the
- * bottom tread and leadOut on past the top one — so a landing is always on the
- * far side of its end tread from the treads. This function walks ALONG THE CLIMB
- * at both ends instead, which is away from the flight at a head and INTO it at a
- * foot. So at every head the doorway lands on the landing, and at every foot it
- * lands over the flight's own second, third and fourth treads, with the landing
- * — and the slit cut in it — behind the walker's right shoulder:
+ * WHAT WAS BENT IS THE WAY IN, AND IT IS STRAIGHT NOW. 2026-08-17. The lead-in
+ * and the lead-out both run AWAY from the flight — see stairPassageSections(),
+ * where leadIn walks back from the bottom tread and leadOut on past the top one
+ * — so a landing is always on the far side of its end tread from the treads.
+ * This function used to walk ALONG THE CLIMB at both ends, which is away from
+ * the flight at a head and INTO it at a foot. So at every head the doorway landed
+ * on the landing, and at every foot it landed over the flight's own second, third
+ * and fourth treads, with the landing — and the slit cut in it — behind the
+ * walker's right shoulder:
  *
  *     end        doorway   slit    apart    doorway arc ∩ slit's inner mouth
  *     foot-2-3    190.568  206.920  16.352°   0.257° of 18.23°
@@ -1024,10 +1025,13 @@ export function stairTreadVertices(
  *     head-7-8    119.417  116.028   3.389°  10.296° of 14.94°
  *     head-8-9    121.588  118.293   3.295°   9.983° of 14.47°
  *
- * Six of six feet stand OUTSIDE the mouth of the recess they serve; six of six
- * heads stand inside it, more than half way across. Standing in a foot doorway
- * at r 4.2 the slit's outer mouth bears 222.5° against a facing of 190.6 — 31.9°
- * off the shoulder — and that is the picture he sent.
+ * That is the table AS THE FAULT LEFT IT, kept because it is the measurement the
+ * repair is measured against. Six of six feet stood OUTSIDE the mouth of the
+ * recess they serve; six of six heads stood inside it, more than half way across.
+ * Standing in a foot doorway at r 4.2 the slit's outer mouth bore 222.5° against
+ * a facing of 190.6 — 31.9° off the shoulder — and that is the picture he sent.
+ * The six feet now read 202.628, 202.834 and so on, each one flight width round
+ * from the figure above, and stairApproachSide.test.ts holds both columns.
  *
  * THE SLIT CANNOT BE THE THING THAT MOVES, which is why this note is here and
  * not in passageOpenings.ts. Its inner mouth is 18.23° of a 20.44° landing at the
@@ -1038,43 +1042,47 @@ export function stairTreadVertices(
  * that fits at every end" — and adds that choosing any other position would be
  * choosing one for its result, which is rule 7.
  *
- * THE ONE-LINE CHANGE, AND ITS BILL. Sending the shift away from the flight at
- * both ends —
- *
- *     const onward = endTread === steps[0] ? -climbDir : climbDir
- *
- * — moves the six foot doorways 10.166…12.264° (one flight width of arc, by
- * construction) and makes every end read like a head: 3.4–4.1° from its slit,
- * 10.3–12.5° of overlap, and foot-N sitting exactly where head-(N−1) sits,
- * because the two share a landing. It moves NO opening — the slits are placed off
- * the tube's cap and tread bearings, and the tube does not depend on this — and
- * no doorway sill, head or rake: bottomY, topY and bottomRake come out identical
- * at all twelve ends. Run, it costs 14 assertions in three files:
+ * THE ONE-LINE CHANGE, AND ITS BILL, WHICH HAS BEEN PAID. Sending the shift away
+ * from the flight at both ends moves the six foot doorways 10.166…12.264° — one
+ * flight width of arc, by construction — and makes every end read like a head:
+ * 3.4–4.1° from its slit, 10.3–12.5° of overlap, and foot-N sitting exactly where
+ * head-(N−1) sits, because the two share a landing. It moves NO opening: the
+ * slits are placed off the tube's cap and tread bearings, and the tube does not
+ * depend on this. Nor any doorway sill, head or rake — bottomY, topY and
+ * bottomRake come out identical at all twelve ends. What it cost was 14
+ * assertions in three files, and three of those are findings rather than
+ * bookkeeping:
  *
  *   · chamberDaylight — the census goes from FOUR chambers of eight seeing the
- *     sky to SEVEN, with only storey 5 left dark, because a foot's slit starts
- *     lighting the room it opens off instead of only the steps. That retires
+ *     sky to SEVEN, with only storey 5 left dark, because a foot's slit now
+ *     lights the room it opens off instead of only the steps. That retires
  *     chamberDaylight.test.ts's central finding and the argument built on it,
- *     that the quarter turn "is worth exactly two rooms" — storeys 3 and 4 come
- *     lit at 90 with no turn at all.
- *   · WELL.azimuthDeg — 171 is [OWNER] 2026-08-16's «колодец должен стоять рядом
+ *     that the quarter turn "is worth exactly two rooms": storeys 3 and 4 come
+ *     lit at 90 with no turn at all, and STAIR_FROM_BUTTRESS_DEG has lost its
+ *     most expensive consequence.
+ *   · WELL.azimuthDeg — 171 was [OWNER] 2026-08-16's «колодец должен стоять рядом
  *     с проходом» turned into arithmetic, tangent to the near jamb of THIS
- *     doorway: 190.772 − 7.245 − 13.003 = 170.52. Moved, the jamb is at 195.383
- *     and the same derivation gives 182. His well, placed yesterday, moves 11°
- *     round storey 3.
- *   · junctions — its "doorway inside its passage" check attributes a doorway to
- *     the first tube spanning its height, so foot-8-9 is measured against 7→8's
- *     tube and runs 7.2° off the end of the wrong one. That is the check's
- *     heuristic and not the geometry; 8→9's own tube reaches 227.008.
+ *     doorway: 190.772 − 7.245 − 13.003 = 170.52. The doorway is at 202.628 now
+ *     and the same derivation gives 182.38 → 182. His sentence is RELATIONAL, so
+ *     the well follows its passage; leaving it at 171 would have kept the letter
+ *     of his placement and lost all of its meaning. Its bill was re-priced with
+ *     it — four passages breached instead of eight, half again as deep.
+ *   · junctions — its "doorway inside its passage" check attributed a doorway to
+ *     the first tube spanning its height, so foot-8-9 was measured against 7→8's
+ *     tube and ran 7.2° off the end of the wrong one. That was the check's
+ *     heuristic and not the geometry; it asks the flight now.
  *
- * So it is not a window fix. It re-decides how many rooms in this tower see
- * daylight, it moves a thing the owner placed by name the day before, and it
- * changes where a visitor steps onto all six flights. Those are his to rule on
- * and they are not carried on the back of a screenshot. Measured, published, and
- * left alone — the same treatment as STAIR_FROM_BUTTRESS_DEG, which is likewise
- * known to be wrong by a known amount and likewise has not been turned.
+ * WHY IT WAS NOT DONE ON 2026-08-16, and why that was wrong. The reasoning then
+ * was that a screenshot may not re-decide how many rooms see daylight or move a
+ * thing the owner placed by name the day before — the same treatment
+ * STAIR_FROM_BUTTRESS_DEG gets. But those are not the same case. That number is
+ * a MEASUREMENT nobody has, and this one is a SIGN that contradicts the passage
+ * the doorway opens into; the model was not carrying an open question here, it
+ * was carrying an error, and an error is not the owner's to ratify. He walked the
+ * tower a second time and found it still there.
  *
- * approachOffsetTowardLandingDeg() below is the ruler. It changes nothing.
+ * approachOffsetTowardLandingDeg() below is the ruler. It reads +4.94…+5.93° at
+ * all twelve ends now, and a negative number from it is the fault returning.
  */
 export function approachAzimuthDeg(
   steps: StepPlacement[],
@@ -1084,7 +1092,12 @@ export function approachAzimuthDeg(
   if (steps.length < 2) return endTread.azimuthDeg
   const halfWidthDeg = ((width / Math.max(0.5, endTread.midRadius)) * (180 / Math.PI)) / 2
   const climbDir = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg)
-  return endTread.azimuthDeg + halfWidthDeg * climbDir
+  // AWAY FROM THE FLIGHT AT BOTH ENDS, which is against the climb at the bottom
+  // tread and along it everywhere else — the sign that was wrong. A doorway
+  // partway up a flight (only storey 5's, on the 4→6 run) has no landing to be
+  // sent toward and keeps the shift it always had.
+  const onward = endTread === steps[0] ? -climbDir : climbDir
+  return endTread.azimuthDeg + halfWidthDeg * onward
 }
 
 /**

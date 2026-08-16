@@ -8,14 +8,55 @@ import { FLOORS, STAIR } from './tower'
  * The speeds here are deliberately REAL. The Phase-6 spec is explicit about it:
  * a shooter's 5 m/s would destroy the sense of scale — a 29.5 m tower crossed at
  * running speed reads as a small room. 1.4 m/s is ordinary walking pace.
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * THE WALKER IS SHORTER THAN THE SPEC MADE HIM, AND THE TOWER IS WHY.
+ * 2026-08-16.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * height was 1.75 and eyeHeight 1.65, "per the Phase-6 spec" — which is to say
+ * from nowhere. They are the only two lengths in this project that were never
+ * sourced, never measured and never derived: they are what a spec writes down
+ * before anybody has measured the building. They stopped being free on the day
+ * the building's own doorway acquired a measurement.
+ *
+ * STAIR.doorwayHeight is now 1.688 m — the sourced clear height less an
+ * estimated vault rise, times a fraction measured off the owner's footage
+ * (config/tower.ts → DOORWAY_HEAD_FRACTION). Twelve doorways onto the historic
+ * stair, all at that height. A 1.75 m capsule does not go through a 1.688 m
+ * hole, and a capsule cannot stoop; the owner, who is 1.85 m, stoops, and the
+ * footage shows him doing it.
+ *
+ * SO THE AVATAR GIVES AND THE BUILDING DOES NOT, and the direction matters more
+ * than the number. Raising the doorway until the walker fits would be setting a
+ * dimension of a 12th-century wall from a capsule — which is precisely the fault
+ * being repaired here, since `PLAYER.height + 0.35` WAS the doorway height until
+ * today. Rule 7 in the other direction: the model shows what the measurement
+ * gives, and the instrument is what is adjusted to read it.
+ *
+ * 1.60 m with the eye at 1.50 is an adult of ordinary short stature, eye at
+ * 0.938 of it against the spec's own 0.943 — the ratio is kept, the person is
+ * smaller. He clears the measured doorway head by 0.088 m, which is the margin
+ * chamberSection.test.ts guards. Raise CUPOLA_RISE and that margin closes: at
+ * rise 0.36 the doorway is 1.60 and this walker no longer fits either, and the
+ * test says so rather than letting him stick in a wall.
+ *
+ * WHAT DID NOT CHANGE, and should not: `radius` and `stairHeadroom`. The radius
+ * is a shoulder, not a stature, and the passage headroom is a separate
+ * [ASSUMPTION] that PASSAGE_JAMB and therefore WALL_EMBED are built on — moving
+ * it moves the bedding of every floor in the tower and it has nothing to do with
+ * this fault.
  */
 export const PLAYER = {
   /** Capsule radius, per the Phase-6 spec. */
   radius: 0.3,
-  /** Capsule total height, per the Phase-6 spec. */
-  height: 1.75,
-  /** Camera height above the floor. */
-  eyeHeight: 1.65,
+  /**
+   * Capsule total height. Set by the tower's own doorways, not by the spec —
+   * see the note above. Must stay below STAIR.doorwayHeight.
+   */
+  height: 1.6,
+  /** Camera height above the floor, at the spec's own eye/stature ratio. */
+  eyeHeight: 1.5,
   /** Ordinary walking speed, m/s. */
   walkSpeed: 1.4,
   /** Shift — a brisk jog, not a sprint. */
@@ -81,29 +122,31 @@ export const PLAYER = {
  * windows are at the ends of the stair passages — so a room is lit only through
  * its doorway onto the stair and then out of the passage, and whether that works
  * depends on whether the two holes line up. Swept ray by ray from the axis at
- * eyeHeight, four of the eight chambers have no sight line to the sky and four
- * do (lib/chamberDaylight.ts, which is where the argument and the numbers live):
+ * eyeHeight, seven of the eight chambers have a sight line to the sky and one
+ * does not (lib/chamberDaylight.ts, which is where the argument and the numbers
+ * live):
  *
- *   storey 1          7.12° of it, through the west door, no stair involved
- *   storeys 6, 7, 8   2.78°, 1.52° and 2.78°, each through the head of the climb
- *                     that arrives there
- *   storeys 2 and 5   nothing, structurally: their only doorway is at a FOOT, or
- *                     is a doorway the stair merely runs past, and neither is a
- *                     place a slit can be
- *   storeys 3 and 4   nothing, but for the other reason: the heads that serve
- *                     them are the two ends standing inside the buttress, so
- *                     they are not cut. That one is the quarter turn's doing and
- *                     it is unresolved — see STAIR_BEARING_QUESTION.
+ *   storey 1          7.61° of it, through the west door, no stair involved
+ *   storeys 2, 3, 4   2.64°, 2.60° and 2.57°, each through the foot of the climb
+ *                     that leaves there
+ *   storeys 6, 7, 8   5.03°, 4.01° and 4.93° — a head and a foot apiece, the
+ *                     head at storey 7 half eaten by the beak
+ *   storey 5          nothing, structurally: it is reached from the middle of
+ *                     the 4→6 run, which is not a passage end and is not a place
+ *                     a slit can be. No turn of the stair reaches it.
  *
- * So the darkness is testimony at four storeys and an open question at two more,
- * and this lamp is the only reason the other four are not the only ones you can
- * see anything in. Fourteen degrees of sky in the whole building is not lighting.
+ * TWENTY-NINE DEGREES OF SKY IN THE WHOLE BUILDING IS STILL NOT LIGHTING, and
+ * this lamp is still the only reason a visitor sees anything. It was fourteen
+ * degrees and four rooms until 2026-08-17, when approachAzimuthDeg() stopped
+ * putting foot doorways on the far side of their own first tread from the slit
+ * that serves them; the tower did not get brighter, the model stopped being
+ * wrong in a way that made three rooms black.
  *
  * THE COUNT IS ASSERTED, not merely described here, and that is the point of
- * having measured it: chamberDaylight.test.ts states four of eight, so the day
- * the owner rules on the quarter turn and two of these rooms open, the suite
- * says which two and this note fails with it rather than quietly going stale —
- * which is exactly what the sentence it replaced had done.
+ * having measured it: chamberDaylight.test.ts states seven of eight, so the day
+ * anything moves a doorway or a slit the suite says which room gained or lost
+ * and this note fails with it rather than quietly going stale — which is exactly
+ * what the sentence it replaced had done, twice.
  *
  * AND THE MUSEUM HAS PUT FIXTURES IN, which used to be written here as an open
  * question and is not one: the walkthrough shows a continuous concealed strip at
