@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
+  approachGuardBoxes,
   entrancePassageBoxes,
   floorColliders,
   guardRingBoxes,
   rotate,
   stairRampBoxes,
-  straightStairGuardBoxes,
   wallColliders,
   yawThenTilt,
   type BoxSpec,
   type PassageBand,
 } from './collision'
 import { PLAYER } from '../config/player'
-import { EXTERNAL_STAIR } from '../config/site'
-import { ENTRANCE } from '../config/tower'
+import { ENTRANCE_APPROACH, EXTERNAL_STAIR, GROUND_Y } from '../config/site'
+import { ENTRANCE, TOWER } from '../config/tower'
+import { entranceApproach, type ApproachParams } from './externalStair'
 
 /** World-space corners of a box, via its actual quaternion. */
 function corners(b: BoxSpec): Array<[number, number, number]> {
@@ -684,45 +685,173 @@ describe('stairRampBoxes', () => {
   })
 })
 
-describe('straightStairGuardBoxes', () => {
-  // the external entrance flight: 3.6 m of run against 1.98 m of rise, due west
-  const flight = {
-    foot: { azimuthDeg: 270, treadY: 0, midRadius: 11.85 },
-    head: { azimuthDeg: 270, treadY: 1.98, midRadius: 8.25 },
-    width: 1.4,
-    height: 1.215,
+describe('approachGuardBoxes', () => {
+  /*
+   * THE FAULT THIS BLOCK IS FOR. The owner could not get into his own tower.
+   * He climbed the external stair, turned to the doorway and walked into
+   * something solid 0.32 m short of the stone, and the thing he met was the
+   * WALL-SIDE guard slab of this very stair, run the whole length of the
+   * approach and standing across the door.
+   *
+   * The fixture is the real approach rather than a stand-in, because the fault
+   * was an identity in the real numbers and not a rounding: the walking line is
+   * tangent to outerRadius + width/2, the slab stands width/2 + thickness/2 in
+   * from it, and its outer face therefore lands exactly on outerRadius at every
+   * width and every thickness there could ever be.
+   */
+  const APPROACH: ApproachParams = {
+    entranceAzimuthDeg: ENTRANCE.azimuthDeg,
+    outerRadius: TOWER.outerRadius,
+    width: EXTERNAL_STAIR.width,
+    landingLength: ENTRANCE_APPROACH.landingLength,
+    risers: EXTERNAL_STAIR.risers,
+    riser: EXTERNAL_STAIR.riser,
+    going: EXTERNAL_STAIR.going,
+    groundY: GROUND_Y,
+    thresholdY: ENTRANCE.thresholdY,
+    handedness: ENTRANCE_APPROACH.handedness,
   }
-  const RUN = flight.foot.midRadius - flight.head.midRadius
+  const PLAN = entranceApproach(APPROACH)
+  const HEIGHT = EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser
+  const PARAMS = {
+    line: PLAN.walkingLine,
+    width: EXTERNAL_STAIR.width,
+    height: HEIGHT,
+    outward: PLAN.outward,
+  }
+  const [OPEN, WALL, END] = approachGuardBoxes(PARAMS)
 
-  it('leaves the walking surface its full width', () => {
-    const [a, b] = straightStairGuardBoxes(flight)
-    const across = Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2])
-    // the clear gap between the two inner faces IS the ramp's own width: the
-    // guards must not eat any of it, or the walker is stopped short of the edge
-    // they can see, and on this flight the doorway at the head is narrower still
-    expect(across - a.halfExtents[0] - b.halfExtents[0]).toBeCloseTo(flight.width, 9)
-    expect(a.kind).toBe('guard')
-    expect(b.kind).toBe('guard')
+  /** Ground point of a walking-line node. */
+  const ground = (n: { azimuthDeg: number; midRadius: number }) => ({
+    x: Math.sin(n.azimuthDeg * DEG) * n.midRadius,
+    z: -Math.cos(n.azimuthDeg * DEG) * n.midRadius,
+  })
+  const [FOOT, HEAD, LANDING_END] = PLAN.walkingLine.map(ground)
+  /** How far a point stands out from the tower along the doorway's own radius. */
+  const perp = (p: { x: number; z: number }) => p.x * PLAN.outward.x + p.z * PLAN.outward.z
+  /** How far a point lies back UP the approach from the landing's far edge. */
+  const along = (p: { x: number; z: number }) => {
+    const dx = FOOT.x - LANDING_END.x
+    const dz = FOOT.z - LANDING_END.z
+    const len = Math.hypot(dx, dz)
+    return ((p.x - LANDING_END.x) * dx + (p.z - LANDING_END.z) * dz) / len
+  }
+
+  /**
+   * Does an upright capsule standing at `feet` overlap this upright box?
+   *
+   * Every guard here is upright — a separate test says so — so the question is
+   * a plan one with a height band round it, and the closest-point distance in
+   * the box's own frame is exact rather than a sampled approximation.
+   */
+  const capsuleHits = (feet: [number, number, number], b: BoxSpec) => {
+    if (feet[1] + PLAYER.height <= b.position[1] - b.halfExtents[1]) return false
+    if (feet[1] >= b.position[1] + b.halfExtents[1]) return false
+    const inv: [number, number, number, number] = [
+      -b.quaternion[0],
+      -b.quaternion[1],
+      -b.quaternion[2],
+      b.quaternion[3],
+    ]
+    const local = rotate(inv, [feet[0] - b.position[0], 0, feet[2] - b.position[2]])
+    const dx = Math.max(0, Math.abs(local[0]) - b.halfExtents[0])
+    const dz = Math.max(0, Math.abs(local[2]) - b.halfExtents[2])
+    return Math.hypot(dx, dz) < PLAYER.radius
+  }
+
+  it('builds one slab per edge, and they are the edges they claim to be', () => {
+    expect(approachGuardBoxes(PARAMS)).toHaveLength(3)
+    for (const b of [OPEN, WALL, END]) expect(b.kind).toBe('guard')
+    // the open side stands further from the axis than the walking line, the
+    // wall side nearer it, and the end lies across it at the landing's far edge
+    expect(perp({ x: OPEN.position[0], z: OPEN.position[2] })).toBeGreaterThan(PLAN.tangentRadius)
+    expect(perp({ x: WALL.position[0], z: WALL.position[2] })).toBeLessThan(PLAN.tangentRadius)
+    expect(along({ x: END.position[0], z: END.position[2] })).toBeLessThan(0)
   })
 
-  it('grows outward from those edges, never in over the flight', () => {
-    // due west, so the flight's centreline is the −x axis and z is across it
-    for (const b of straightStairGuardBoxes(flight)) {
-      const off = Math.abs(b.position[2])
-      expect(off).toBeCloseTo(flight.width / 2 + b.halfExtents[0], 9)
-      const inner = Math.min(...corners(b).map((c) => Math.abs(c[2])))
-      expect(inner).toBeCloseTo(flight.width / 2, 9)
+  it('leaves the doorway it serves open, which is the whole of the fault', () => {
+    /*
+     * WALKED, and this is the number the walk gave: the capsule stopped at
+     * radius 8.570 with the obstruction's face at 8.250 — the drum's own outer
+     * face, at the one azimuth where the drum is a hole. Vertically the slab
+     * ran to 1.215, leaving 0.785 m of the doorway's 2 m clear, which is not a
+     * way in for a capsule 1.75 m tall, and 1.215 m is a vertical face, which
+     * this controller declines at any autostep setting.
+     *
+     * So: from the landing's own line, in along the doorway's radius and on
+     * through the wall, across the doorway's clear width, nothing the approach
+     * builds may stand in the way.
+     */
+    const tangent = { x: -PLAN.outward.z, z: PLAN.outward.x }
+    const half = ENTRANCE.width / 2 - PLAYER.radius
+    const boxes = approachGuardBoxes(PARAMS)
+    for (let u = -half; u <= half + 1e-9; u += half / 4) {
+      for (let v = -0.5; v <= PLAN.tangentRadius - TOWER.outerRadius + 1e-9; v += 0.05) {
+        const feet: [number, number, number] = [
+          PLAN.outward.x * (TOWER.outerRadius + v) + tangent.x * u,
+          ENTRANCE.thresholdY,
+          PLAN.outward.z * (TOWER.outerRadius + v) + tangent.z * u,
+        ]
+        for (const b of boxes) expect(capsuleHits(feet, b)).toBe(false)
+      }
     }
   })
 
+  it('closes the far end of the landing, where the drop is the whole rise', () => {
+    /*
+     * The other half of the same walk. A walker who climbs the flight and does
+     * NOT turn walks straight off the end of the landing: measured, eye 1.670 →
+     * −0.310, a 1.98 m fall onto the paving, with nothing in the way at all.
+     * DD 06 shows the handrail turning at that end and dying into the stone, so
+     * the photographs guard it too.
+     */
+    const half = EXTERNAL_STAIR.width / 2 - PLAYER.radius
+    const boxes = approachGuardBoxes(PARAMS)
+    for (let k = -half; k <= half + 1e-9; k += half / 4) {
+      const feet: [number, number, number] = [
+        LANDING_END.x + PLAN.outward.x * k,
+        ENTRANCE.thresholdY,
+        LANDING_END.z + PLAN.outward.z * k,
+      ]
+      expect(boxes.some((b) => capsuleHits(feet, b))).toBe(true)
+    }
+  })
+
+  it('leaves the walking surface its full width between the two sides', () => {
+    // the clear gap between the inner faces IS the ramp's own width: the guards
+    // must not eat any of it, or the walker is stopped short of the edge they
+    // can see, and on this flight the doorway at the head is narrower still
+    const gap =
+      perp({ x: OPEN.position[0], z: OPEN.position[2] }) -
+      perp({ x: WALL.position[0], z: WALL.position[2] }) -
+      OPEN.halfExtents[0] -
+      WALL.halfExtents[0]
+    expect(gap).toBeCloseTo(EXTERNAL_STAIR.width, 9)
+    // and never narrower than the sourced doorway it leads to [İçərişəhər]
+    expect(gap).toBeGreaterThanOrEqual(ENTRANCE.width)
+    expect(gap).toBeGreaterThan(PLAYER.radius * 2)
+  })
+
+  it('grows outward from those edges, never in over the walking surface', () => {
+    for (const b of [OPEN, WALL]) {
+      const inner = Math.min(
+        ...corners(b).map((c) => Math.abs(perp({ x: c[0], z: c[2] }) - PLAN.tangentRadius)),
+      )
+      expect(inner).toBeCloseTo(EXTERNAL_STAIR.width / 2, 9)
+    }
+    // and the end slab stands just BEYOND the landing rather than on it
+    const nearest = Math.max(...corners(END).map((c) => along({ x: c[0], z: c[2] })))
+    expect(nearest).toBeCloseTo(0, 9)
+  })
+
   it('stands upright, so it guards the head of the flight at every height', () => {
-    for (const b of straightStairGuardBoxes(flight)) {
+    for (const b of [OPEN, WALL, END]) {
       const up = rotate(b.quaternion, [0, 1, 0])
       expect(up[1]).toBeCloseTo(1, 9)
       /*
        * Which means the plan footprint at the top is the footprint at the
        * bottom. A slab pitched to the rake would carry its top edge
-       * height * sin(29°) ≈ 0.6 m back DOWN the flight, so from about knee
+       * height * sin(29°) ~ 0.6 m back DOWN the flight, so from about knee
        * height upward it would stop short of the landing — the one place on a
        * flight where the drop beside the walker is its whole rise.
        */
@@ -736,54 +865,41 @@ describe('straightStairGuardBoxes', () => {
     }
   })
 
-  it('spans the flight end to end, foot surface to a guard height over the head', () => {
-    for (const b of straightStairGuardBoxes(flight)) {
-      expect(b.halfExtents[2] * 2).toBeCloseTo(RUN, 9)
+  it('spans each side end to end, foot surface to a guard height over the head', () => {
+    expect(OPEN.halfExtents[2] * 2).toBeCloseTo(
+      Math.hypot(LANDING_END.x - FOOT.x, LANDING_END.z - FOOT.z),
+      9,
+    )
+    // the wall side stops at the HEAD, because that is where the wedge between
+    // the straight stair and the round drum closes; past it there is a doorway
+    expect(WALL.halfExtents[2] * 2).toBeCloseTo(Math.hypot(HEAD.x - FOOT.x, HEAD.z - FOOT.z), 9)
+    for (const b of [OPEN, WALL, END]) {
       const ys = corners(b).map((c) => c[1])
-      expect(Math.min(...ys)).toBeCloseTo(flight.foot.treadY, 9)
-      expect(Math.max(...ys)).toBeCloseTo(flight.head.treadY + flight.height, 9)
-      // along the flight, which runs due west: no stopping short at either end
-      const along = corners(b).map((c) => -c[0])
-      expect(Math.min(...along)).toBeCloseTo(flight.head.midRadius, 9)
-      expect(Math.max(...along)).toBeCloseTo(flight.foot.midRadius, 9)
+      expect(Math.min(...ys)).toBeCloseTo(GROUND_Y, 9)
+      expect(Math.max(...ys)).toBeCloseTo(ENTRANCE.thresholdY + HEIGHT, 9)
     }
   })
 
-  it('is a wall rather than a step, at both ends of the flight', () => {
-    for (const b of straightStairGuardBoxes(flight)) {
+  it('is a wall rather than a step, at every end', () => {
+    for (const b of [OPEN, WALL, END]) {
       const top = Math.max(...corners(b).map((c) => c[1]))
       // measured from the HIGHEST walking point, which is the least favourable
-      expect(top - flight.head.treadY).toBeGreaterThan(PLAYER.autostepMaxHeight)
+      expect(top - ENTRANCE.thresholdY).toBeGreaterThan(PLAYER.autostepMaxHeight)
     }
   })
 
   it('is thicker than the walker crosses between solver steps', () => {
     // WALL_BOX_THICKNESS's sum, run the other way: at the run speed and 30 fps
     const worstStep = PLAYER.runSpeed / 30
-    for (const b of straightStairGuardBoxes(flight)) {
+    for (const b of [OPEN, WALL, END]) {
       expect(b.halfExtents[0] * 2).toBeGreaterThan(worstStep)
     }
   })
 
-  it('never pinches the doorway the flight leads to', () => {
-    // the config's own numbers, so that narrowing the stair to less than the
-    // sourced 1.1 m doorway [İçərişəhər] fails here instead of in the walk
-    const [a, b] = straightStairGuardBoxes({
-      ...flight,
-      width: EXTERNAL_STAIR.width,
-      height: EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser,
-    })
-    const across = Math.hypot(a.position[0] - b.position[0], a.position[2] - b.position[2])
-    const clear = across - a.halfExtents[0] - b.halfExtents[0]
-    expect(clear).toBeGreaterThanOrEqual(ENTRANCE.width)
-    // and wide enough for the capsule to walk between them at all
-    expect(clear).toBeGreaterThan(PLAYER.radius * 2)
-  })
-
-  it('emits nothing for a flight with no plan run, or no width or height', () => {
-    expect(straightStairGuardBoxes({ ...flight, head: { ...flight.head, midRadius: 11.85 } }))
-      .toHaveLength(0)
-    expect(straightStairGuardBoxes({ ...flight, width: 0 })).toHaveLength(0)
-    expect(straightStairGuardBoxes({ ...flight, height: 0 })).toHaveLength(0)
+  it('emits nothing for an approach with no plan run, or no width or height', () => {
+    const flat = PLAN.walkingLine[0]
+    expect(approachGuardBoxes({ ...PARAMS, line: [flat, flat, flat] })).toHaveLength(0)
+    expect(approachGuardBoxes({ ...PARAMS, width: 0 })).toHaveLength(0)
+    expect(approachGuardBoxes({ ...PARAMS, height: 0 })).toHaveLength(0)
   })
 })

@@ -782,81 +782,148 @@ export function stairRampBoxes(
   return out
 }
 
-export interface StraightStairGuardParams {
-  /** Foot of the flight's walking line — the point the ramp chain starts at. */
-  foot: RampStep
-  /** Head of it. Must differ from the foot in plan. */
-  head: RampStep
-  /** Clear width between the two guards: the full width of the walking surface. */
+export interface ApproachGuardParams {
+  /**
+   * foot → head of the flight → far end of the landing: the approach's own
+   * chain, the same three nodes the ramp is built from. One straight line in
+   * plan, which is why the guards can be slabs and not chains.
+   */
+  line: [RampStep, RampStep, RampStep]
+  /** Clear width between the guards: the full width of the walking surface. */
   width: number
   /** How far the guard stands above the walking line. */
   height: number
+  /** Across the line, pointing AWAY from the tower. Tells the sides apart. */
+  outward: { x: number; z: number }
   /** Lateral thickness of each slab; defaults to GUARD_BOX_THICKNESS. */
   thickness?: number
 }
 
 /**
- * A guard down each side of a STRAIGHT flight, as one upright slab per side.
+ * The guards round the approach: one slab per edge a walker can leave it by.
+ *
+ * IT USED TO BE A PAIR OF SLABS FOOT TO FAR END, one down each side, and that
+ * is the fault this function exists to have fixed. The owner could not get into
+ * his own tower: he climbed the stair, turned to the door and walked into
+ * something solid 0.32 m short of the stone. The thing he met was the WALL-SIDE
+ * slab, and it was sealing the doorway.
+ *
+ * It was an identity, not a near miss. The walking line is tangent to a circle
+ * half a stair-width outside the drum, so `tangentRadius = outerRadius +
+ * width/2`; the slab stands `width/2 + thickness/2` in from that line and is
+ * `thickness/2` thick from its centre, and the three cancel exactly:
+ * outerRadius + w/2 − w/2 − t/2 + t/2 = outerRadius. The slab's outer face lands
+ * ON the drum's face at every width and every thickness — harmless all the way
+ * round the tower except at the one azimuth where the drum has a hole in it,
+ * and that hole is the door the landing exists to serve. Measured on the walk:
+ * the slab ran x −8.250…−8.130, y −1.980…+1.215, z −4.300…+0.700, so it covered
+ * the doorway's whole 1.1 m width and the bottom 1.215 m of its 2 m height. The
+ * 0.785 m left over is not a way in for a 1.75 m capsule, and 1.215 m is a
+ * vertical face, which this controller will not climb at any autostep setting.
+ *
+ * So the wall-side guard now stops at the HEAD OF THE FLIGHT, and it stops
+ * there for a reason rather than to clear the door. The guard is there to stop
+ * a walker falling off the side, and on the wall side what they would fall into
+ * is the wedge between the straight stair and the round tower — 1.21 m wide at
+ * the foot, and closing to 0.03 m at the head because the construction makes
+ * the flight's inner edge tangent to the stone. Past the head there is nothing
+ * to fall into; there is a doorway and then two hand-widths of masonry.
+ *
+ * AND THE FAR END IS CLOSED, which nothing closed before. A walker who climbed
+ * the flight and did not turn walked off the end of the landing and fell its
+ * whole 1.98 m onto the paving — walked, measured, y 1.670 → −0.310. DD 06
+ * shows the handrail turning at that end and dying into the stone, so the end
+ * is guarded in the photographs too; the model had drawn neither the rail nor
+ * this.
+ *
+ * Each slab is UPRIGHT, and that is the whole of the shape's design. The obvious
+ * slab is one pitched to the rake, occupying exactly the band the drawn
+ * balustrade does. But pitching a cuboid leans its END faces back with it, and
+ * at the head of a flight that is fatal: a 1.2 m guard on a 29° rake carries its
+ * top edge 0.6 m further down the flight than its bottom edge, so from about
+ * knee height upward the slab stops short of the landing — and the landing is
+ * the one place on a flight where the drop beside the walker is its whole rise.
+ * An upright slab makes the opposite error, hanging below the walking line at
+ * the top of the flight and standing proud of the rail at the bottom, and both
+ * of those are in places nothing can reach.
  *
  * It is a wall, not a step, so guardRingBoxes' argument carries over whole: the
  * inner face sits on the walking surface's own edge, at exactly ±width/2, which
  * takes nothing off the width the ramp chain gives; it grows OUTWARD from that
  * edge; and its only horizontal face is the top, a guard height up and far past
- * anything the autostep will try to mount. Nothing here has to be climbed, so
- * the rule that governs every walking surface in this model — ramps, never lips
- * — does not apply. A guard the walker could get onto beside a flight would be
- * a launch pad off it.
- *
- * UPRIGHT, and that is the whole of the shape's design. The obvious slab is one
- * pitched to the rake, occupying exactly the band the drawn balustrade does. But
- * pitching a cuboid leans its END faces back with it, and at the head of a
- * flight that is fatal: a 1.2 m guard on a 29° rake carries its top edge 0.6 m
- * further down the flight than its bottom edge, so from about knee height upward
- * the slab stops short of the landing — and the landing is the one place on a
- * flight where the drop beside the walker is its whole rise. An upright slab
- * makes the opposite error, hanging below the walking line at the top of the
- * flight and standing proud of the rail at the bottom, and both of those are in
- * places nothing can reach: under the flight, where the clear height only
- * becomes a walker's own within the last stride against the wall, and above a
- * guard nobody's capsule can top.
- *
- * One slab, not a chain: the flight is straight, so a single box IS the shape,
- * and a chain would only introduce seams to get wrong.
+ * anything the autostep will try to mount. A guard the walker could get onto
+ * beside a flight would be a launch pad off it.
  */
-export function straightStairGuardBoxes(p: StraightStairGuardParams): BoxSpec[] {
+export function approachGuardBoxes(p: ApproachGuardParams): BoxSpec[] {
   if (p.width <= 0 || p.height <= 0) return []
   const thickness = p.thickness ?? GUARD_BOX_THICKNESS
-  const footRad = p.foot.azimuthDeg * DEG
-  const headRad = p.head.azimuthDeg * DEG
-  const fx = Math.sin(footRad) * p.foot.midRadius
-  const fz = -Math.cos(footRad) * p.foot.midRadius
-  const hx = Math.sin(headRad) * p.head.midRadius
-  const hz = -Math.cos(headRad) * p.head.midRadius
+  const [foot, head, end] = p.line
+  const ground = (n: RampStep) => {
+    const rad = n.azimuthDeg * DEG
+    return { x: Math.sin(rad) * n.midRadius, z: -Math.cos(rad) * n.midRadius }
+  }
+  const f = ground(foot)
+  const h = ground(head)
+  const e = ground(end)
 
-  const run = Math.hypot(hx - fx, hz - fz)
-  if (run < 1e-6) return []
+  const openRun = Math.hypot(e.x - f.x, e.z - f.z)
+  const wallRun = Math.hypot(h.x - f.x, h.z - f.z)
+  if (openRun < 1e-6 || wallRun < 1e-6) return []
 
   // local +Z along the travel, as stairRampBoxes builds it, so the two agree on
   // which way is "across the flight" without either restating the other's maths
-  const quaternion = yawThenPitch(Math.atan2(hx - fx, hz - fz), 0)
+  const yaw = Math.atan2(e.x - f.x, e.z - f.z)
+  const quaternion = yawThenPitch(yaw, 0)
   const lateral = rotate(quaternion, [1, 0, 0])
+  // which way round `lateral` runs is a consequence of where the foot is; the
+  // tower is the thing that decides which side may be closed and which may not
+  const away = lateral[0] * p.outward.x + lateral[2] * p.outward.z >= 0 ? 1 : -1
 
-  const bottomY = Math.min(p.foot.treadY, p.head.treadY)
-  const topY = Math.max(p.foot.treadY, p.head.treadY) + p.height
+  const bottomY = Math.min(foot.treadY, head.treadY, end.treadY)
+  const topY = Math.max(foot.treadY, head.treadY, end.treadY) + p.height
   const offset = p.width / 2 + thickness / 2
 
-  return [-1, 1].map(
-    (side): BoxSpec => ({
-      halfExtents: [thickness / 2, (topY - bottomY) / 2, run / 2],
-      position: [
-        (fx + hx) / 2 + side * lateral[0] * offset,
-        (bottomY + topY) / 2,
-        (fz + hz) / 2 + side * lateral[2] * offset,
-      ],
-      quaternion,
-      kind: 'guard',
-    }),
-  )
+  /** A slab of the guard's own height, centred between `a` and `b`. */
+  const slab = (
+    a: { x: number; z: number },
+    b: { x: number; z: number },
+    shift: { x: number; z: number },
+    boxYaw: number,
+  ): BoxSpec => ({
+    halfExtents: [thickness / 2, (topY - bottomY) / 2, Math.hypot(b.x - a.x, b.z - a.z) / 2],
+    position: [
+      (a.x + b.x) / 2 + shift.x,
+      (bottomY + topY) / 2,
+      (a.z + b.z) / 2 + shift.z,
+    ],
+    quaternion: yawThenPitch(boxYaw, 0),
+    kind: 'guard',
+  })
+
+  const acrossBy = (d: number) => ({ x: lateral[0] * d, z: lateral[2] * d })
+  const alongBy = (d: number) => ({
+    x: ((e.x - f.x) / openRun) * d,
+    z: ((e.z - f.z) / openRun) * d,
+  })
+
+  return [
+    // the OPEN side, foot to the far end of the landing
+    slab(f, e, acrossBy(away * offset), yaw),
+    // the WALL side, foot to the head of the flight and no further
+    slab(f, h, acrossBy(-away * offset), yaw),
+    // and the far END, from the wall across to outside the open guard, standing
+    // just beyond the landing's edge so it closes the corner rather than
+    // stealing walking surface
+    slab(
+      { x: e.x + lateral[0] * -away * (p.width / 2), z: e.z + lateral[2] * -away * (p.width / 2) },
+      {
+        x: e.x + lateral[0] * away * (p.width / 2 + thickness),
+        z: e.z + lateral[2] * away * (p.width / 2 + thickness),
+      },
+      alongBy(thickness / 2),
+      yaw + Math.PI / 2,
+    ),
+  ]
 }
 
 /**

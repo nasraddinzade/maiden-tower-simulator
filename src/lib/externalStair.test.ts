@@ -3,10 +3,12 @@ import { ENTRANCE_APPROACH, EXTERNAL_STAIR, GROUND_Y } from '../config/site'
 import { ENTRANCE, TOWER } from '../config/tower'
 import { azimuthToVector } from './geometry'
 import {
+  approachBalustrade,
   approachNosing,
   entranceApproach,
   type ApproachNode,
   type ApproachParams,
+  type BalustradeParams,
 } from './externalStair'
 
 const DEG = Math.PI / 180
@@ -243,5 +245,182 @@ describe('the balustrade the photographs show', () => {
 
   it('is a strap on edge, deeper than it is thick', () => {
     expect(EXTERNAL_STAIR.strapWidth).toBeGreaterThan(EXTERNAL_STAIR.strapThickness * 2)
+  })
+})
+
+describe('the balustrade has a run down every edge you can walk off', () => {
+  /*
+   * THE FAULT THIS BLOCK IS FOR, and why it could not have been caught before.
+   * The owner reported the stair railed on one side only, and every balustrade
+   * test in the suite passed — because they could all only see the config's
+   * counts and spacings. WHERE the runs went was decided inside a useMemo in
+   * SiteAndEntranceStair.tsx, which rule 6 puts out of reach of a test, and
+   * where the runs went was the thing that was wrong.
+   *
+   * Two things were: the landing's FAR END had no rail at all, though DD 06
+   * shows the handrail turning there and dying into the stone past the far
+   * jamb — and a walker who climbs the flight without turning steps off it and
+   * falls the whole 1.98 m. And the wall-side rail stopped dead at the kink,
+   * three standards short of the head, leaving those three holding nothing up
+   * while the open side carried on level across the front of the door.
+   */
+  const GUARD: BalustradeParams = {
+    guardHeight: EXTERNAL_STAIR.guardHeight,
+    railRadius: EXTERNAL_STAIR.railRadius,
+    postsPerTread: EXTERNAL_STAIR.postsPerTread,
+    doorwayWidth: ENTRANCE.width,
+  }
+  const B = approachBalustrade(PARAMS, GUARD)
+  const HALF_WIDTH = EXTERNAL_STAIR.width / 2 - EXTERNAL_STAIR.railRadius
+  /** Along the DESCENT: t is 0 at the door and grows toward the foot. */
+  const TANGENT = { x: Math.sin(PLAN.descentYaw), z: Math.cos(PLAN.descentYaw) }
+  const T_FOOT = ENTRANCE_APPROACH.landingLength / 2 + RUN
+  const T_HEAD = ENTRANCE_APPROACH.landingLength / 2
+  const T_END = -ENTRANCE_APPROACH.landingLength / 2
+
+  /** How far out from the walking line a point stands; + is away from the tower. */
+  const sideOf = (p: [number, number, number]) =>
+    p[0] * PLAN.outward.x + p[2] * PLAN.outward.z - PLAN.tangentRadius
+  const tOf = (p: [number, number, number]) => p[0] * TANGENT.x + p[2] * TANGENT.z
+
+  /** Rails whose whole length lies on one side's line, at `s` out from centre. */
+  const runsOn = (s: number) =>
+    B.rails.filter((r) => Math.abs(sideOf(r.a) - s) < 1e-9 && Math.abs(sideOf(r.b) - s) < 1e-9)
+
+  /** Is `t` covered by any of these rails? */
+  const covers = (rails: typeof B.rails, t: number) =>
+    rails.some((r) => Math.min(tOf(r.a), tOf(r.b)) - 1e-9 <= t && t <= Math.max(tOf(r.a), tOf(r.b)) + 1e-9)
+
+  it('rails the flight down BOTH sides, the whole way to the head', () => {
+    /*
+     * Not "there are rails on two sides" — there always were. The wall-side
+     * run stopped at the kink, one going short of the head, so the last stretch
+     * of the climb had a rail on the open side and open air on the other.
+     */
+    for (const s of [HALF_WIDTH, -HALF_WIDTH]) {
+      const rails = runsOn(s)
+      expect(rails.length).toBeGreaterThan(0)
+      for (let t = T_FOOT; t >= T_HEAD - 1e-9; t -= 0.05) {
+        expect(covers(rails, t)).toBe(true)
+      }
+    }
+  })
+
+  it('carries the open side on level across the front of the doorway', () => {
+    const rails = runsOn(HALF_WIDTH)
+    for (let t = T_HEAD; t >= T_END - 1e-9; t -= 0.05) expect(covers(rails, t)).toBe(true)
+    // level, because the landing is: the rail that spans the door is flat
+    const landing = rails.find((r) => tOf(r.b) < 0 || tOf(r.a) < 0)
+    expect(landing).toBeDefined()
+    expect(landing!.a[1]).toBeCloseTo(landing!.b[1], 9)
+    expect(landing!.a[1]).toBeCloseTo(ENTRANCE.thresholdY + GUARD.guardHeight, 9)
+  })
+
+  it('turns at the far end of the landing and dies into the stone', () => {
+    /*
+     * DD 06: the handrail runs flat across the front of the door and its end
+     * goes INTO the masonry past the far jamb. That return is the guard on the
+     * one edge of the landing that had nothing, and geometrically it is the
+     * only place a rail on this approach can reach the drum at all — the two
+     * side lines are tangent-parallel and never touch it.
+     */
+    const returns = B.rails.filter((r) => Math.abs(sideOf(r.a) - sideOf(r.b)) > 1e-6)
+    expect(returns).toHaveLength(1)
+    const [r] = returns
+    // it lies across the walking line at the landing's far edge
+    expect(tOf(r.a)).toBeCloseTo(T_END, 9)
+    expect(tOf(r.b)).toBeCloseTo(T_END, 9)
+    // from the open side's own line...
+    expect(Math.max(sideOf(r.a), sideOf(r.b))).toBeCloseTo(HALF_WIDTH, 9)
+    // ...to the drum's face, which is what "dies into the stone" is as a number
+    const wallEnd = Math.hypot(r.a[0], r.a[2]) < Math.hypot(r.b[0], r.b[2]) ? r.a : r.b
+    expect(Math.hypot(wallEnd[0], wallEnd[2])).toBeCloseTo(TOWER.outerRadius, 9)
+    expect(r.a[1]).toBeCloseTo(r.b[1], 9)
+  })
+
+  it('stops the wall-side rail at the near jamb, never across the doorway', () => {
+    /*
+     * The wall-side line passes 0.02 m clear of the drum at the door and never
+     * reaches it, so "dies into the stone" has to mean the only stone on that
+     * side: the JAMB. Past it is a doorway 1.1 m wide [İçərişəhər] and a rail
+     * there is a rail to duck under.
+     */
+    const rails = runsOn(-HALF_WIDTH)
+    const jamb = ENTRANCE.width / 2
+    for (const r of rails) {
+      expect(Math.min(tOf(r.a), tOf(r.b))).toBeGreaterThanOrEqual(jamb - 1e-9)
+    }
+    // and it does reach the jamb, rather than giving up at the kink
+    expect(Math.min(...rails.map((r) => Math.min(tOf(r.a), tOf(r.b))))).toBeCloseTo(jamb, 9)
+  })
+
+  it('stands no standard that holds nothing up', () => {
+    /*
+     * Three of them did: at the top of the wall side, past the end of the rail,
+     * because the rail stopped at the kink and the standards ran to the head.
+     */
+    const distance = (p: [number, number, number], r: { a: number[]; b: number[] }) => {
+      const dx = r.b[0] - r.a[0]
+      const dy = r.b[1] - r.a[1]
+      const dz = r.b[2] - r.a[2]
+      const len2 = dx * dx + dy * dy + dz * dz
+      const u = ((p[0] - r.a[0]) * dx + (p[1] - r.a[1]) * dy + (p[2] - r.a[2]) * dz) / len2
+      const c = Math.min(1, Math.max(0, u))
+      return Math.hypot(p[0] - (r.a[0] + dx * c), p[1] - (r.a[1] + dy * c), p[2] - (r.a[2] + dz * c))
+    }
+    for (const post of B.posts) {
+      const top: [number, number, number] = [
+        post.position[0],
+        post.position[1] + post.height / 2,
+        post.position[2],
+      ]
+      expect(B.rails.some((r) => distance(top, r) < 1e-9)).toBe(true)
+    }
+  })
+
+  it('turns the return standards across the flight, since a strap is flat', () => {
+    // a strap read broadside is a different object; the return runs the other
+    // way from the flight, so its standards are turned a quarter circle with it
+    const onTheRun = B.posts.filter((p) => Math.abs(p.yaw - PLAN.descentYaw) < 1e-9)
+    const onTheReturn = B.posts.filter(
+      (p) => Math.abs(p.yaw - (PLAN.descentYaw + Math.PI / 2)) < 1e-9,
+    )
+    expect(onTheRun.length + onTheReturn.length).toBe(B.posts.length)
+    expect(onTheReturn.length).toBeGreaterThan(0)
+    // and the return's standards are all the same plumb height, on the level
+    for (const p of onTheReturn) expect(p.height).toBeCloseTo(GUARD.guardHeight, 9)
+  })
+
+  it('keeps the fan the config asks for, on every run', () => {
+    /*
+     * The count is not the property — the DENSITY is, and it has to be the same
+     * on all three runs or the return reads as a different object bolted on.
+     * Each run is measured along its own axis: the two sides along the walk,
+     * the return across it.
+     */
+    const spacing = EXTERNAL_STAIR.going / EXTERNAL_STAIR.postsPerTread
+    for (const post of B.posts) expect(post.height).toBeGreaterThan(0)
+
+    const onTheRun = B.posts.filter((p) => Math.abs(p.yaw - PLAN.descentYaw) < 1e-9)
+    const runs = [
+      { of: onTheRun.filter((p) => sideOf(p.position) > 0), axis: tOf, from: T_FOOT },
+      { of: onTheRun.filter((p) => sideOf(p.position) < 0), axis: tOf, from: T_FOOT },
+      {
+        of: B.posts.filter((p) => Math.abs(p.yaw - (PLAN.descentYaw + Math.PI / 2)) < 1e-9),
+        axis: sideOf,
+        from: HALF_WIDTH,
+      },
+    ]
+    for (const run of runs) {
+      const at = run.of.map((p) => run.axis(p.position)).sort((a, b) => b - a)
+      expect(at.length).toBeGreaterThan(1)
+      expect(at[0]).toBeCloseTo(run.from, 9)
+      for (let i = 1; i < at.length; i++) expect(at[i - 1] - at[i]).toBeCloseTo(spacing, 9)
+    }
+  })
+
+  it('emits nothing for a stair with no width or no guard', () => {
+    expect(approachBalustrade({ ...PARAMS, width: 0 }, GUARD).rails).toHaveLength(0)
+    expect(approachBalustrade(PARAMS, { ...GUARD, guardHeight: 0 }).posts).toHaveLength(0)
   })
 })

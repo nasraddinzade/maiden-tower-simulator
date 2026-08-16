@@ -2,11 +2,16 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
 import {
+  approachGuardBoxes,
   entrancePassageBoxes,
   stairRampBoxes,
-  straightStairGuardBoxes,
 } from '../../lib/collision'
-import { approachNosing, entranceApproach, type ApproachParams } from '../../lib/externalStair'
+import {
+  approachBalustrade,
+  entranceApproach,
+  type ApproachParams,
+  type BalustradeParams,
+} from '../../lib/externalStair'
 import { ENTRANCE, TOWER, innerRadiusAt } from '../../config/tower'
 import {
   ENTRANCE_APPROACH,
@@ -17,9 +22,6 @@ import {
 } from '../../config/site'
 
 const DEG = Math.PI / 180
-
-/** Horizontal run of the flight: one going per riser. */
-const RUN = EXTERNAL_STAIR.risers * EXTERNAL_STAIR.going
 
 /**
  * Everything the walker meets on this stair, from one construction.
@@ -46,6 +48,20 @@ const APPROACH_PARAMS: ApproachParams = {
 }
 
 const APPROACH = entranceApproach(APPROACH_PARAMS)
+
+/**
+ * The balustrade's own numbers, which are about the object and not the plan.
+ *
+ * The doorway width is in here because the wall-side rail needs it: that rail
+ * runs on level past the head of the flight and has to die into the near JAMB,
+ * which is the only stone on that side. See approachBalustrade().
+ */
+const BALUSTRADE_PARAMS: BalustradeParams = {
+  guardHeight: EXTERNAL_STAIR.guardHeight,
+  railRadius: EXTERNAL_STAIR.railRadius,
+  postsPerTread: EXTERNAL_STAIR.postsPerTread,
+  doorwayWidth: ENTRANCE.width,
+}
 
 export interface SiteAndEntranceStairProps {
   visible: boolean
@@ -85,7 +101,7 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
   }, [withColliders])
 
   /**
-   * The balustrades in physics: a slab down each side of the flight.
+   * The balustrades in physics: an upright slab along every edge that has one.
    *
    * They are needed, and the sum is the stair's own. The ramp is one box
    * EXTERNAL_STAIR.width across — 1.4 m — so a walker keeps a contact until
@@ -97,13 +113,14 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
    * walk through is the same fault as a floor you can see and fall through, and
    * this model keeps finding the second one.
    *
-   * ONE PAIR OF SLABS FOR FLIGHT AND LANDING ALIKE, foot to the far end of the
-   * landing, because in plan that is one straight line. The landing is the place
-   * this matters most — it is the only spot on the approach where the drop is
-   * the whole rise on the open side and a doorway on the other. The inner slab
-   * there ends up buried in the drum, which costs nothing: it is a fixed
-   * collider inside stone the wall already fills, and the alternative is a
-   * special case at the exact joint where a walker turns.
+   * WHICH EDGES, and the answer used to be "both, the whole way", which sealed
+   * the doorway: the wall-side slab's outer face lands on the drum's face by an
+   * identity, and at the door the drum is a hole. approachGuardBoxes() argues it
+   * where the shapes are made. The one thing to keep in mind here is that the
+   * DRAWN wall-side rail runs 0.15 m further than its slab, on past the head to
+   * the doorway's near jamb; what is behind that stretch of rail is the drum,
+   * 0.02–0.04 m away and solid, so there is nothing to fall through and nothing
+   * for a collider to add.
    *
    * The height is the drawn guard plus a riser. The rail is a guard height above
    * the NOSING line, while the walking line the ramp chain gives passes through
@@ -113,11 +130,11 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
    */
   const guards = useMemo(() => {
     if (!withColliders) return []
-    return straightStairGuardBoxes({
-      foot: APPROACH.walkingLine[0],
-      head: APPROACH.walkingLine[2],
+    return approachGuardBoxes({
+      line: APPROACH.walkingLine,
       width: EXTERNAL_STAIR.width,
       height: EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser,
+      outward: APPROACH.outward,
     })
   }, [withColliders])
 
@@ -163,21 +180,17 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
   )
 
   /**
-   * The balustrades as drawn: a raking handrail either side on plumb standards,
-   * levelling off across the landing on the open side.
+   * The balustrades as drawn: three runs of raking or level handrail on plumb
+   * standards, one along every edge of the approach a visitor can walk off.
    *
-   * Hung off the NOSING line rather than off the ramp collider's walking line,
-   * because a guard height is measured from the surface a visitor's foot is on
-   * and that is the drawn tread. The two lines are a riser apart; see the note
-   * on `guards` above, which is where that difference has to be paid back.
-   *
-   * WHAT HAPPENS AT THE TOP IS NOW KNOWN. This rail used to stop a going short
-   * of the wall, on the ground that a return nobody had seen would be fabric
-   * invented to tidy up a corner. The exterior photographs show the corner: the
-   * rail rakes up the flight, kinks once where the flight meets the landing, and
-   * runs on horizontally across the front of the doorway to die into the stone
-   * past the far jamb. So it is drawn, and only on the OUTER side — the landing's
-   * other side is the wall, and a rail there would be a rail against masonry.
+   * THE SHAPE OF IT IS NO LONGER DECIDED HERE. It used to be, inside this
+   * useMemo, and the owner reported the rail missing down one side while every
+   * balustrade test in the suite passed — because the tests could only see the
+   * config's counts and spacings, and a .tsx is not testable under rule 6. So
+   * the arrangement moved to lib/externalStair.ts, where a test can ask how many
+   * runs there are and where they go. What is left here is the three.js: the
+   * standards' matrices and the rails' quaternions, and nothing that decides
+   * anything.
    *
    * Standards and a top rail, and nothing between them. The footage resolves no
    * infill at all, so none is drawn — the same restraint OPENING_GUARD takes
@@ -189,73 +202,27 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
    * of the stair inside.
    */
   const balustrade = useMemo(() => {
-    const { going, guardHeight, railRadius, width, postsPerTread } = EXTERNAL_STAIR
-    const perTread = Math.max(1, Math.round(postsPerTread))
-    const spacing = going / perTread
-    // set in from the tread's edge by the rail's own radius, so the balustrade
-    // stands ON the flight rather than half off it
-    const halfWidth = width / 2 - railRadius
-    // across the flight is the entrance's own radius: the walking line is
-    // tangent to the drum at the door, so its normal there IS that radius
-    const { outward } = APPROACH
-    /** The topmost nosing, where the rake ends and the landing begins. */
-    const dKink = RUN - going
-    const dEnd = RUN + ENTRANCE_APPROACH.landingLength
-
-    /** A point on one side's nosing line, `d` in from the foot, lifted by `lift`. */
-    const online = (d: number, side: number, lift: number) => {
-      const n = approachNosing(APPROACH_PARAMS, d)
-      return {
-        point: new THREE.Vector3(
-          n.position[0] + side * outward.x * halfWidth,
-          n.position[1] + lift,
-          n.position[2] + side * outward.z * halfWidth,
-        ),
-        treadY: n.treadY,
-      }
+    const { posts, rails } = approachBalustrade(APPROACH_PARAMS, BALUSTRADE_PARAMS)
+    const up = new THREE.Vector3(0, 1, 0)
+    return {
+      posts,
+      rails: rails.map((r) => {
+        const a = new THREE.Vector3(...r.a)
+        const dir = new THREE.Vector3(...r.b).sub(a)
+        return {
+          position: [
+            a.x + dir.x / 2,
+            a.y + dir.y / 2,
+            a.z + dir.z / 2,
+          ] as [number, number, number],
+          // the tube's geometry runs along its own +Y, so the rail is that axis
+          // turned onto the run — which is the only orientation in this file
+          // that is NOT the flight's yaw, because a rake is not level
+          quaternion: new THREE.Quaternion().setFromUnitVectors(up, dir.clone().normalize()),
+          length: dir.length(),
+        }
+      }),
     }
-
-    const posts: Array<{ position: [number, number, number]; height: number }> = []
-    const rails: Array<{
-      position: [number, number, number]
-      quaternion: THREE.Quaternion
-      length: number
-    }> = []
-
-    const stand = (d: number, side: number) => {
-      const { point, treadY } = online(d, side, guardHeight)
-      // a standard is plumb, so it runs from the tread it stands on up to the
-      // raking rail: at a nosing that is exactly the guard height, and anywhere
-      // further into a tread it is longer by the rake
-      posts.push({
-        position: [point.x, (treadY + point.y) / 2, point.z],
-        height: point.y - treadY,
-      })
-    }
-
-    const rail = (dA: number, dB: number, side: number) => {
-      const a = online(dA, side, guardHeight).point
-      const b = online(dB, side, guardHeight).point
-      const dir = b.clone().sub(a)
-      rails.push({
-        position: [(a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2],
-        quaternion: new THREE.Quaternion().setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          dir.clone().normalize(),
-        ),
-        length: dir.length(),
-      })
-    }
-
-    for (const side of [-1, 1]) {
-      for (let d = 0; d < RUN - 1e-9; d += spacing) stand(d, side)
-      rail(0, dKink, side)
-    }
-    // and the landing: one side only, at the same density the fan has
-    for (let d = RUN; d < dEnd - 1e-9; d += spacing) stand(d, 1)
-    rail(dKink, dEnd, 1)
-
-    return { posts, rails }
   }, [])
 
   const postsRef = useRef<THREE.InstancedMesh>(null)
@@ -265,10 +232,14 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     const m = new THREE.Matrix4()
     const pos = new THREE.Vector3()
     const scale = new THREE.Vector3()
-    // a strap is flat, so unlike a tube it has to be turned to face along the
-    // flight — broadside to the climb it would read as a solid screen
-    const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, APPROACH.descentYaw, 0))
+    const spin = new THREE.Quaternion()
+    const euler = new THREE.Euler()
     balustrade.posts.forEach((p, i) => {
+      // a strap is flat, so unlike a tube it has to be turned to face along its
+      // own run — broadside to the walk it would read as a solid screen. The
+      // return at the landing's end runs across the flight, so its standards
+      // carry their own yaw rather than the flight's.
+      spin.setFromEuler(euler.set(0, p.yaw, 0))
       // the geometry is a unit-length tube, so the standard's height is a scale
       pos.set(p.position[0], p.position[1], p.position[2])
       scale.set(1, p.height, 1)
