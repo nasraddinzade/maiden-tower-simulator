@@ -14,6 +14,7 @@ import * as THREE from 'three'
 import { ADDITION, Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg'
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import { azimuthToVector } from './geometry'
+import { archSpringHeight, drawnClearWidth } from './doorwayArch'
 import type { PassageSection, StairDoorway } from './staircase'
 import { countDegenerateTriangles, filterDegenerateTriangles } from './mesh'
 import { ENTRANCE, ROOF, TOWER, innerRadiusAt } from '../config/tower'
@@ -577,7 +578,9 @@ export function chaseCutter(c: WallChase): THREE.BufferGeometry {
  */
 export function archTunnel(width: number, height: number, depth: number, segments = 10): THREE.BufferGeometry {
   const half = width / 2
-  const springY = Math.max(0.01, height - half)
+  // the springing is lib/doorwayArch.ts's, so the stone that is DRAWN here and
+  // the stone that is COLLIDED round it cannot describe two different arches
+  const springY = archSpringHeight(width, height)
 
   const shape = new THREE.Shape()
   shape.moveTo(-half, 0)
@@ -601,8 +604,9 @@ export function archTunnel(width: number, height: number, depth: number, segment
 export function doorwayCutter(d: StairDoorway): THREE.BufferGeometry {
   const midRadius = (d.innerRadius + d.outerRadius) / 2
   const depth = Math.max(0.1, d.outerRadius - d.innerRadius)
-  // chord long enough to span the arc at the far side of the opening
-  const tangential = Math.max(0.2, 2 * d.outerRadius * Math.sin((d.widthDeg * DEG) / 2))
+  // chord long enough to span the arc at the far side of the opening — and the
+  // ONE place that figure is written, because the collider is laid on it too
+  const tangential = drawnClearWidth(d.outerRadius, d.widthDeg)
   const height = Math.max(0.2, d.topY - d.bottomY)
 
   /*

@@ -3,12 +3,14 @@ import { CuboidCollider, RigidBody } from '@react-three/rapier'
 import { BALUSTRADE, ENTRANCE, FLOORS, ROOF, TOWER, innerRadiusAt } from '../../config/tower'
 import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import {
+  doorwayRevealBoxes,
   floorColliders,
   guardRingBoxes,
   stairPassageBandsAt,
   wallColliders,
   type BoxSpec,
 } from '../../lib/collision'
+import { drawnClearWidth } from '../../lib/doorwayArch'
 import type { PassageSection, StairDoorway } from '../../lib/staircase'
 import type { StairwellCut } from './FloorStructures'
 
@@ -112,9 +114,48 @@ export function TowerColliders({
           widthDeg: d.widthDeg,
           sillY: d.bottomY,
           headY: d.topY,
+          // the width the SHELL is cut to, so no neighbouring box may lean into
+          // the drawn opening — see lib/collision.ts → slideOffOpenings
+          clearWidth: drawnClearWidth(d.outerRadius, d.widthDeg),
+          rake: d.bottomRake,
         })),
       ],
       passageAt,
+    })
+
+    /*
+     * THE STONE ROUND EACH DOORWAY, which wallColliders() cannot put back.
+     *
+     * It opens a sector WHOLE wherever a doorway touches it and opens it SQUARE
+     * from sill to head — both on purpose, because a walled-up doorway is the
+     * worse failure and this model has had several. The cost is that the drawn
+     * jambs and the whole haunch of the arch stand in nothing: measured on the
+     * shipped configuration, up to 0.480 m of jamb beside an opening 1.25 m
+     * wide. That is the stone the owner walks through, and it is the same hole
+     * the cupola's skirt used to hang across while nothing stopped him.
+     *
+     * The reveal is laid on the DRAWN opening's own faces, so it can only ever
+     * add stone the shell already shows. Its outer limit is the passage's inner
+     * cheek where the passage crosses — a box past that would stand on the
+     * stair.
+     */
+    const reveals: BoxSpec[] = (doorways ?? []).flatMap((d) => {
+      const bands = passageAt(d.azimuthDeg).filter(
+        (b) => b.topY > d.bottomY && b.bottomY < d.topY,
+      )
+      const cheek = bands.length ? Math.min(...bands.map((b) => b.innerRadius)) : TOWER.outerRadius
+      return doorwayRevealBoxes({
+        azimuthDeg: d.azimuthDeg,
+        // the width the SHELL is cut to, not STAIR.doorwayWidth — see
+        // lib/doorwayArch.ts → drawnClearWidth for why the two differ
+        clearWidth: drawnClearWidth(d.outerRadius, d.widthDeg),
+        sillY: d.bottomY,
+        headY: d.topY,
+        bottomRake: d.bottomRake,
+        innerRadiusAt,
+        outerRadius: Math.min(cheek, TOWER.outerRadius),
+        sectors,
+      })
     })
 
     const floors: BoxSpec[] = []
@@ -273,7 +314,7 @@ export function TowerColliders({
       )
     }
 
-    return [...walls, ...floors, ...guards]
+    return [...walls, ...reveals, ...floors, ...guards]
   }, [stairPassage, stairwells, doorways, sectors])
 
   onCount?.(boxes.length)

@@ -15,6 +15,7 @@
  * clockwise from north.
  */
 
+import { revealFacets } from './doorwayArch'
 import type { PassageSection } from './staircase'
 
 const DEG = Math.PI / 180
@@ -119,7 +120,36 @@ export interface WallColliderParams {
    * Treated exactly like the entrance: no collider across the opening, wall
    * above and below it intact.
    */
-  openings?: Array<{ azimuthDeg: number; widthDeg: number; sillY: number; headY: number }>
+  openings?: Array<{
+    azimuthDeg: number
+    widthDeg: number
+    sillY: number
+    headY: number
+    /**
+     * The width the SHELL is cut to, if it is known — see doorwayArch.ts →
+     * drawnClearWidth(). It is not `widthDeg` in metres and it is wider: the
+     * cutter strikes one straight section and has to clear the arc at the far
+     * end of its run, so the chord it uses subtends about 9.9° at the room face
+     * where widthDeg is 15.0/2 = 7.5.
+     *
+     * Given, no box may lean inside it. Withheld, the opening is still opened —
+     * the doorway is never walled up — but a neighbouring box may overhang the
+     * drawn jamb, which is what it did: measured, up to 0.230 m of a 1.25 m
+     * opening standing full of invisible stone.
+     */
+    clearWidth?: number
+    /**
+     * The threshold's rake, if the opening has one — doorwayCutter() shears the
+     * whole tool by it, so the drawn hole is a parallelogram and not a rectangle.
+     *
+     * One doorway in the tower rakes, the opening onto storey 5 off the middle
+     * of the 4→6 flight, and its sill drops 0.32 m across the opening. Treated
+     * as upright, the collider left that much stone standing in the low corner
+     * of a hole the shell had cut — a step out of nothing, at the one doorway
+     * where the treads really are climbing past.
+     */
+    rake?: number
+  }>
   /**
    * For an azimuth, the parts of the passage that cross it. Where the passage
    * crosses, the wall box starts at the passage's OUTER face instead of the
@@ -227,11 +257,61 @@ export function stairPassageBandsAt(
 }
 
 
+/**
+ * The height range an opening REALLY occupies over one sector's slice of it.
+ *
+ * A rake shears the drawn hole — `y += rake·t` — so its sill and head are not
+ * level and a sector away from the centre line meets them somewhere else. The
+ * range is taken over the whole slice and to the outside on both ends, so the
+ * collider's hole always contains the drawn one: leaving stone inside a cut
+ * opening is a step out of nothing, and the extra opened at the far corner is
+ * put straight back by doorwayRevealBoxes(), whose jambs are sheared with the
+ * same arithmetic.
+ */
+function rakedOpeningRange(
+  o: { sillY: number; headY: number; clearWidth?: number; rake?: number },
+  deltaDeg: number,
+  sectorDeg: number,
+  innerRadiusAt: (y: number) => number,
+): [number, number] {
+  const rake = o.rake ?? 0
+  const half = (o.clearWidth ?? 0) / 2
+  if (!rake || half <= 0) return [o.sillY, o.headY]
+  const r = Math.max(0.05, innerRadiusAt((o.sillY + o.headY) / 2))
+  // the tangential offsets this sector covers, clipped to the opening's own width
+  const lo = Math.max(-half, (deltaDeg - sectorDeg / 2) * DEG * r)
+  const hi = Math.min(half, (deltaDeg + sectorDeg / 2) * DEG * r)
+  if (hi < lo) return [o.sillY, o.headY]
+  const shifts = [rake * lo, rake * hi]
+  return [o.sillY + Math.min(...shifts), o.headY + Math.max(...shifts)]
+}
+
 export function wallColliders(p: WallColliderParams): BoxSpec[] {
   const out: BoxSpec[] = []
   const sectorDeg = 360 / p.sectors
   // half-width of the chord, plus a little so neighbours overlap and leave no seam
   const halfChord = p.outerRadius * Math.tan((sectorDeg / 2) * DEG) * 1.06
+
+  /**
+   * The openings a box spanning this height range must not lean into.
+   *
+   * A box overhangs its own sector by design — `boxAt` gives it 1.2 chords so
+   * neighbours meet with no seam — and beside a doorway that overhang is stone
+   * standing in a hole. Measured before this: a jamb box two sectors away
+   * reaching 0.230 m inside a drawn opening 1.25 m wide, invisible, right where
+   * a visitor turns onto the stair.
+   *
+   * Only openings that state their drawn width are kept out of; see the note on
+   * `clearWidth`. It is a keep-out and not a reason to open the wall: the box
+   * SLIDES, exactly as floorColliders() slides a deck segment off the stair
+   * well, and for the same reason — narrowing it to fit would starve its far
+   * side and put a hole where the drawing shows stone.
+   */
+  const keepOutFor = (lo: number, hi: number) =>
+    (p.openings ?? []).filter(
+      (o): o is typeof o & { clearWidth: number } =>
+        o.clearWidth !== undefined && o.headY > lo + 1e-9 && o.sillY < hi - 1e-9,
+    )
 
   for (let b = 0; b < p.bandBoundaries.length - 1; b++) {
     const y0 = p.bandBoundaries[b]
@@ -263,11 +343,11 @@ export function wallColliders(p: WallColliderParams): BoxSpec[] {
       }> = []
 
       for (const o of [p.entrance, ...(p.openings ?? [])]) {
-        const d = Math.abs(angleDelta(azimuthDeg, o.azimuthDeg))
-        if (d <= o.widthDeg / 2 + sectorDeg / 2) {
-          // right through the wall: no box at all across the opening
-          cuts.push({ bottomY: o.sillY, topY: o.headY, startRadius: null })
-        }
+        const d = angleDelta(azimuthDeg, o.azimuthDeg)
+        if (Math.abs(d) > o.widthDeg / 2 + sectorDeg / 2) continue
+        // right through the wall: no box at all across the opening
+        const [bottomY, topY] = rakedOpeningRange(o, d, sectorDeg, p.innerRadiusAt)
+        cuts.push({ bottomY, topY, startRadius: null })
       }
       for (const w of p.passageAt(azimuthDeg)) {
         /*
@@ -294,7 +374,7 @@ export function wallColliders(p: WallColliderParams): BoxSpec[] {
         .map((c) => [Math.max(c.bottomY, y0), Math.min(c.topY, y1)])
 
       if (inBand.length === 0) {
-        out.push(boxAt(azimuthDeg, innerMid, p.outerRadius, midY, halfHeight, halfChord, tilt, 'wall', sectorDeg))
+        out.push(boxAt(azimuthDeg, innerMid, p.outerRadius, midY, halfHeight, halfChord, tilt, 'wall', sectorDeg, keepOutFor(y0, y1)))
         continue
       }
 
@@ -305,7 +385,7 @@ export function wallColliders(p: WallColliderParams): BoxSpec[] {
         if (cBottom > cursor) {
           const mid = (cursor + cBottom) / 2
           out.push(
-            boxAt(azimuthDeg, p.innerRadiusAt(mid), p.outerRadius, mid, (cBottom - cursor) / 2, halfChord, tilt, 'wall', sectorDeg),
+            boxAt(azimuthDeg, p.innerRadiusAt(mid), p.outerRadius, mid, (cBottom - cursor) / 2, halfChord, tilt, 'wall', sectorDeg, keepOutFor(cursor, cBottom)),
           )
         }
         if (cTop > cBottom && c.startRadius !== null) {
@@ -350,7 +430,7 @@ export function wallColliders(p: WallColliderParams): BoxSpec[] {
                */
               const jambTo = Math.max(c.jambTo, face + MIN_JAMB_THICKNESS)
               out.push(
-                boxAt(azimuthDeg, face, jambTo, jMid, (jt - jb) / 2, halfChord, tilt, 'wall', sectorDeg),
+                boxAt(azimuthDeg, face, jambTo, jMid, (jt - jb) / 2, halfChord, tilt, 'wall', sectorDeg, keepOutFor(jb, jt)),
               )
             }
           }
@@ -360,7 +440,7 @@ export function wallColliders(p: WallColliderParams): BoxSpec[] {
       if (cursor < y1) {
         const mid = (cursor + y1) / 2
         out.push(
-          boxAt(azimuthDeg, p.innerRadiusAt(mid), p.outerRadius, mid, (y1 - cursor) / 2, halfChord, tilt, 'wall', sectorDeg),
+          boxAt(azimuthDeg, p.innerRadiusAt(mid), p.outerRadius, mid, (y1 - cursor) / 2, halfChord, tilt, 'wall', sectorDeg, keepOutFor(cursor, y1)),
         )
       }
     }
@@ -380,6 +460,50 @@ export function wallColliders(p: WallColliderParams): BoxSpec[] {
  */
 const WALL_BOX_THICKNESS = 0.8
 
+/**
+ * Move a box off an opening it would otherwise lean into, keeping its width.
+ *
+ * The rule and the reasoning are floorColliders()' — a slide only ever moves a
+ * box AWAY from the hole and INTO its far neighbour's overlap, so it can open
+ * nothing, whereas narrowing it to fit starves the far side and puts a hole
+ * where the drawing shows stone. What is new is that a wall box has to obey it
+ * as well, which nobody had asked: an opening in a WALL is entered head-on, and
+ * an overhang there is invisible stone standing in a doorway.
+ *
+ * A box whose centre is inside an opening is left alone. It should not exist —
+ * that sector is opened over the opening's height — and shoving it would be
+ * guessing which way.
+ */
+function slideOffOpenings(
+  azimuthDeg: number,
+  halfChord: number,
+  innerRadius: number,
+  keepOut: Array<{ azimuthDeg: number; clearWidth: number }>,
+): number {
+  /*
+   * BOTH ANGLES ARE READ AT THE BOX'S INNERMOST CORNER, and it is the same
+   * argument floorColliders() makes about a ring: a box is a rectangle, so its
+   * tangential half-extent is a fixed length, and a fixed length subtends MORE
+   * angle the nearer the axis you read it. Read at the mid-radius instead, the
+   * slide came out 0.7° short and left 0.090 m of the opening still blocked.
+   */
+  const r = Math.max(0.05, innerRadius)
+  const cornerRadius = Math.hypot(r, halfChord)
+  const reachDeg = Math.atan(halfChord / r) / DEG
+  let az = azimuthDeg
+  for (const o of keepOut) {
+    // the drawn opening is a straight chord too, so its half-angle is an
+    // arcsine at the same corner — not half of the opening's own widthDeg
+    const halfDeg = Math.asin(Math.min(1, o.clearWidth / 2 / cornerRadius)) / DEG
+    const d = angleDelta(o.azimuthDeg, az)
+    if (Math.abs(d) <= halfDeg) continue
+    const gap = Math.abs(d) - halfDeg
+    if (gap >= reachDeg) continue
+    az += (d > 0 ? -1 : 1) * (reachDeg - gap)
+  }
+  return az
+}
+
 function boxAt(
   azimuthDeg: number,
   innerRadius: number,
@@ -390,11 +514,15 @@ function boxAt(
   tilt: number,
   kind: BoxSpec['kind'],
   sectorDeg: number,
+  keepOut: Array<{ azimuthDeg: number; clearWidth: number }> = [],
 ): BoxSpec {
   const thickness = Math.max(0.05, Math.min(outerRadius - innerRadius, WALL_BOX_THICKNESS))
   const midRadius = innerRadius + thickness / 2
   // chord at this box's own radius, with enough overlap that neighbours meet
   const halfChord = (midRadius + thickness) * Math.tan((sectorDeg / 2) * DEG) * 1.2
+  if (keepOut.length > 0) {
+    azimuthDeg = slideOffOpenings(azimuthDeg, halfChord, innerRadius, keepOut)
+  }
   const rad = azimuthDeg * DEG
   // Tilt sign: rotating +X (radial) about local Z carries the upper half of the
   // face INWARD for a positive angle, and the room widens upward, so the tilt
@@ -405,6 +533,133 @@ function boxAt(
     quaternion: yawThenTilt(radialYaw(rad), -tilt),
     kind,
   }
+}
+
+export interface DoorwayRevealParams {
+  azimuthDeg: number
+  /**
+   * Clear width of the DRAWN opening — the chord doorwayCutter strikes, not
+   * STAIR.doorwayWidth and not the arc `widthDeg` subtends. The reveal has to be
+   * laid on the stone that is actually there, so it takes the cutter's own
+   * figure and the caller is responsible for handing over the same one.
+   */
+  clearWidth: number
+  sillY: number
+  headY: number
+  /** The threshold's rake, as doorwayCutter shears the tool by it. */
+  bottomRake?: number
+  /** Room-side face of the wall at a height. */
+  innerRadiusAt: (y: number) => number
+  /**
+   * Where the stone round the doorway ENDS going outward — the stair passage's
+   * inner cheek where the passage crosses, the drum otherwise. A reveal box that
+   * ran past this would stand in the passage and stop the walker on the stair.
+   */
+  outerRadius: number
+  /** Sectors the drum's own collider ring is built from; see below. */
+  sectors: number
+}
+
+/**
+ * The stone round a chamber doorway, which the collider did not have.
+ *
+ * wallColliders() opens a sector WHOLE wherever an opening touches it and opens
+ * it SQUARE from sill to head. Both are deliberate — a doorway that gets walled
+ * up is the worse failure, and this file's history is mostly that failure — but
+ * together they leave the drawn jambs and the whole haunch of the arch standing
+ * in nothing. Measured on the shipped configuration: up to 0.480 m of jamb
+ * beside an opening 1.25 m wide, and the entire arch above its springing.
+ *
+ * So the hole stays as it is and the stone is put BACK, laid on the drawn
+ * opening's own faces (lib/doorwayArch.ts). Nothing here can wall a doorway up:
+ * every face is tangent to the opening, so the boxes lie outside it by
+ * construction whatever the arithmetic does.
+ *
+ * THE FIDELITY IS THE DRUM'S OWN. A flat facet on a curve falls short of it, and
+ * the question is how short is short enough. It is answered by the collider the
+ * doorway is cut in: the wall ring is a `sectors`-gon, whose chord dips
+ * `r·(1 − cos(π/sectors))` inside the drawn face — 17 mm at 32 sectors and the
+ * radius of these chambers. The arch is held to the same and no finer, which
+ * costs seven facets over the semicircle. Making it sharper than the wall it
+ * stands in would buy nothing anybody can feel.
+ *
+ * THE TAPER IS TAKEN IN COURSES, not by tilting the boxes. A reveal box is
+ * turned about the radial axis to lay its face on the opening, and that turn has
+ * already spent the freedom the wall boxes use for the cone. So a face that
+ * spans height is cut into courses short enough that the room face does not run
+ * away from it by more than the same tolerance — the wall leans out 0.044 m per
+ * metre, so a course is about a third of a metre and a jamb is five of them.
+ */
+export function doorwayRevealBoxes(p: DoorwayRevealParams): BoxSpec[] {
+  const height = p.headY - p.sillY
+  if (height <= 0 || p.clearWidth <= 0) return []
+
+  const faceAtSill = p.innerRadiusAt(p.sillY)
+  if (p.outerRadius <= faceAtSill + 0.02) return []
+
+  // the drum ring's own chord dip at this doorway's radius — see the note above
+  const tolerance = Math.max(1e-3, faceAtSill * (1 - Math.cos(Math.PI / Math.max(3, p.sectors))))
+  // how fast the room face runs away from a flat box, metres per metre of height
+  const taperSlope = Math.abs((p.innerRadiusAt(p.headY) - faceAtSill) / height)
+  const courseHeight = taperSlope > 1e-6 ? tolerance / taperSlope : height
+
+  const rad = p.azimuthDeg * DEG
+  const yaw = radialYaw(rad)
+  // outward radial and tangential unit vectors at the doorway's bearing
+  const outward: [number, number] = [Math.sin(rad), -Math.cos(rad)]
+  const along: [number, number] = [Math.cos(rad), Math.sin(rad)]
+
+  /*
+   * How far the stone reaches away from the opening. It has to cross the hole
+   * wallColliders() leaves, which is the doorway's own arc widened by one sector
+   * each side — comfortably less than the opening's width — and it must not
+   * reach so far that a head facet climbs out of the storey it belongs to. The
+   * clear width answers both.
+   */
+  const depth = Math.max(0.5, p.clearWidth)
+
+  const out: BoxSpec[] = []
+
+  for (const f of revealFacets({
+    clearWidth: p.clearWidth,
+    clearHeight: height,
+    depth,
+    tolerance,
+    rake: p.bottomRake,
+  })) {
+    // how much of the facet's run is vertical: only that part meets the taper
+    const rise = Math.abs(f.normalT) * f.halfLength * 2
+    const courses = Math.max(1, Math.ceil(rise / Math.max(0.05, courseHeight)))
+    const halfLen = f.halfLength / courses
+    for (let c = 0; c < courses; c += 1) {
+      const centre = -f.halfLength + (2 * c + 1) * halfLen
+      // step along the facet's own face: perpendicular to its normal
+      const t = f.faceT - f.normalY * centre
+      const y = p.sillY + f.faceY + f.normalT * centre
+      /*
+       * Radially the course starts at the LOWEST room face it spans, so it can
+       * never stand proud of the wall into the room; the price is the tolerance
+       * above, paid at the top of the course, which is what sizes a course.
+       */
+      const lo = y - Math.abs(f.normalT) * halfLen
+      const inner = Math.min(p.innerRadiusAt(lo), p.outerRadius - 0.02)
+      const thickness = Math.max(0.05, Math.min(p.outerRadius - inner, WALL_BOX_THICKNESS))
+      const px = t * along[0] + (inner + thickness / 2) * outward[0]
+      const pz = t * along[1] + (inner + thickness / 2) * outward[1]
+      out.push({
+        halfExtents: [thickness / 2, depth / 2, halfLen],
+        position: [
+          px + f.normalT * (depth / 2) * along[0],
+          y + f.normalY * (depth / 2),
+          pz + f.normalT * (depth / 2) * along[1],
+        ],
+        // local +Y onto the facet's normal: pitch about the radial axis
+        quaternion: yawThenPitch(yaw, Math.atan2(f.normalT, f.normalY)),
+        kind: 'wall',
+      })
+    }
+  }
+  return out
 }
 
 export interface FloorColliderParams {
