@@ -7,6 +7,7 @@ import { stairwellCutTools } from '../../lib/staircase'
 import { FLOORS, ROOF, TOWER, innerRadiusAt } from '../../config/tower'
 import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import { MIN_LATHE_SEGMENTS, WALL_EMBED } from '../../lib/bedding'
+import { annularSlabProfile } from '../../lib/meridian'
 import { isStoreyVisible, lodSegments } from '../../lib/visibility'
 
 /** Where a flight breaks through the structure above, in plan. */
@@ -171,14 +172,34 @@ function useSlabGeometry(
     // Bedded into the wall for the same reason as the cupola: a slab whose edge
     // only touches the tapering wall leaves a ring of daylight round the room.
     const outer = innerR + WALL_EMBED
-    const pts = [
-      new THREE.Vector2(safeHole, 0),
-      new THREE.Vector2(outer, 0),
-      new THREE.Vector2(outer, -thickness),
-      new THREE.Vector2(safeHole, -thickness),
-      new THREE.Vector2(safeHole, 0),
-    ]
-    const geom = new THREE.LatheGeometry(pts, segments).translate(0, y, 0)
+    /*
+     * THE ORDER OF THESE POINTS IS THE FLOOR.
+     *
+     * It used to be written top-first — hole, out, down, in — which is CLOCKWISE
+     * in (r, y), and LatheGeometry turns a clockwise meridian into a surface with
+     * every normal reversed. Under this single-sided stone that made the walking
+     * surface back-face culled: you looked straight through the floor you were
+     * standing on and saw the ceiling fill of the storey below, TOWER.floorSlab
+     * lower. Only storeys 2, 5 and 8 ever showed it, because they are the pierced
+     * ones and an unpierced floor goes down the cylinder branch instead — which
+     * is why it survived so long, and why the fix is a tested function rather
+     * than a corrected literal. See lib/meridian.ts; the identical fault was
+     * found and fixed on the terrace paving in 60ac45e and the rule was left as
+     * prose, so it guarded only the roof.
+     *
+     * Built in world Y already, so no translate: the profile is pinned to floorY
+     * in metres by meridian.test.ts, and re-offsetting it here would put a second
+     * expression for the floor's height back into a component.
+     */
+    const geom = new THREE.LatheGeometry(
+      annularSlabProfile({
+        holeRadius: safeHole,
+        outerRadius: outer,
+        topY: y,
+        thickness,
+      }).map((p) => new THREE.Vector2(p.r, p.y)),
+      segments,
+    )
     if (!cut) return geom
     return cutStairwell(geom, cut, y - thickness / 2, thickness * 3, outer, segments)
   }, [innerR, holeR, thickness, y, cut, segments])
