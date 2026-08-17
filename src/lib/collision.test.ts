@@ -1,12 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
   approachGuardBoxes,
+  capsuleRadiusAtHeight,
+  capsuleWidestIn,
   entrancePassageBoxes,
   floorColliders,
   guardRingBoxes,
+  helicalGuardBoxes,
+  radialGuardBox,
   rotate,
+  sectorSlabBoxes,
   stairRampBoxes,
   throughOpeningWalkBand,
+  walkBandAtFeet,
   wallColliders,
   yawThenTilt,
   type BoxSpec,
@@ -975,5 +981,333 @@ describe('throughOpeningWalkBand', () => {
     const b = throughOpeningWalkBand({ ...PARAMS, openingRadius: PARAMS.openingRadius + 0.25 })!
     expect(b.width - a.width).toBeCloseTo(0.25, 12)
     expect(b.innerRadius).toBeCloseTo(a.innerRadius, 12)
+  })
+})
+
+/**
+ * WHERE A BODY MAY BE AT EACH HEIGHT OF A CLIMB, and why one band for the whole
+ * flight was not it.
+ *
+ * throughOpeningWalkBand above states the constraint the rim of a hole imposes
+ * and states it once. That is right about the tread that passes through the
+ * hole and wrong about every tread below it: the rim is 0.3 m of stone at the
+ * head of a 3.78 m flight, and a walker whose head is two metres under the
+ * soffit is not near it. Applying the tightest section of a journey to the whole
+ * of it cost the modern spiral 0.14 m of standing room on two thirds of its
+ * treads, and the owner reported the consequence three times.
+ *
+ * Everything here is the capsule's own geometry against two radii and two
+ * levels (CLAUDE.md rule 6). Nothing reads a mesh.
+ */
+describe('capsuleRadiusAtHeight', () => {
+  const A = 0.3
+  const H = 1.6
+  const FEET = 2
+
+  it('is the full radius only between the two cap centres', () => {
+    expect(capsuleRadiusAtHeight(A, H, FEET, FEET + A)).toBeCloseTo(A, 12)
+    expect(capsuleRadiusAtHeight(A, H, FEET, FEET + H - A)).toBeCloseTo(A, 12)
+    expect(capsuleRadiusAtHeight(A, H, FEET, FEET + H / 2)).toBeCloseTo(A, 12)
+  })
+
+  it('is nothing at all outside the body it describes', () => {
+    expect(capsuleRadiusAtHeight(A, H, FEET, FEET - 1e-9)).toBe(0)
+    expect(capsuleRadiusAtHeight(A, H, FEET, FEET + H + 1e-9)).toBe(0)
+    // and exactly nothing at the two poles, which is the whole difference from
+    // a cylinder and the reason a walker eleven treads down is not in the slab
+    // (to a hundredth of a millimetre: a sphere's tangent is a square root, and
+    // at the pole the argument is a difference of two floats)
+    expect(capsuleRadiusAtHeight(A, H, FEET, FEET)).toBeCloseTo(0, 7)
+    expect(capsuleRadiusAtHeight(A, H, FEET, FEET + H)).toBeCloseTo(0, 7)
+  })
+
+  it('follows the cap by Pythagoras, not by a straight taper', () => {
+    for (const d of [0.05, 0.1, 0.2, 0.29]) {
+      const want = Math.sqrt(A * A - d * d)
+      expect(capsuleRadiusAtHeight(A, H, FEET, FEET + A - d)).toBeCloseTo(want, 12)
+      expect(capsuleRadiusAtHeight(A, H, FEET, FEET + H - A + d)).toBeCloseTo(want, 12)
+    }
+  })
+})
+
+describe('capsuleWidestIn', () => {
+  const A = 0.3
+  const H = 1.6
+  // storey 2's slab: the band the modern spiral's walker has to pass through
+  const LO = 3.48114025
+  const HI = 3.78114025
+
+  /** The same answer by brute force, so the closed form has something to fail against. */
+  const sampled = (feetY: number) => {
+    let max = 0
+    for (let t = 0; t <= 1; t += 1 / 4000) {
+      max = Math.max(max, capsuleRadiusAtHeight(A, H, feetY, LO + (HI - LO) * t))
+    }
+    return max
+  }
+
+  it('agrees with a fine sample of the profile at every height of a climb', () => {
+    for (let feet = 0; feet <= 4; feet += 0.05) {
+      expect(capsuleWidestIn(A, H, feet, LO, HI)).toBeCloseTo(sampled(feet), 5)
+    }
+  })
+
+  it('is nothing when the body never reaches the band', () => {
+    expect(capsuleWidestIn(A, H, 0, LO, HI)).toBe(0)
+    expect(capsuleWidestIn(A, H, 4.2, LO, HI)).toBe(0)
+  })
+
+  it('is the full radius exactly while the barrel crosses the band', () => {
+    expect(capsuleWidestIn(A, H, 2.5, LO, HI)).toBeCloseTo(A, 12)
+  })
+})
+
+describe('walkBandAtFeet', () => {
+  const P = {
+    newelRadius: 0.0575,
+    railRadius: 1.04,
+    treadOuterRadius: 1.1,
+    walkerRadius: 0.3,
+    walkerHeight: 1.6,
+    skin: 0.02,
+    opening: { radius: 0.9, bottomY: 3.48114025, topY: 3.78114025 },
+  }
+  const FLOOR_Y = 3.78114025
+
+  it('never lets any part of the walker into the hole, at any height of the climb', () => {
+    /*
+     * THE PROPERTY THE FLAT BAND ONLY HELD AT ONE HEIGHT, generalised to all of
+     * them — and stated over the whole band rather than over the walking line,
+     * which is the distinction 9c97c79 was written to make. Every radius the
+     * band offers, at every tread, against the capsule's real cross-section at
+     * every level the rim exists at.
+     */
+    for (let feet = 0; feet <= FLOOR_Y; feet += 0.05) {
+      const band = walkBandAtFeet(P, feet)
+      expect(band).not.toBeNull()
+      for (let t = 0; t <= 1; t += 0.1) {
+        const r = band!.innerRadius + band!.width * t
+        for (let y = P.opening.bottomY; y <= P.opening.topY; y += 0.02) {
+          const half = capsuleRadiusAtHeight(P.walkerRadius, P.walkerHeight, feet, y)
+          if (half === 0) continue
+          expect(r + half).toBeLessThanOrEqual(P.opening.radius - P.skin + 1e-12)
+        }
+      }
+    }
+  })
+
+  it('ends exactly at the rail everywhere the rim is not in the way', () => {
+    /*
+     * And this is what the flat band cost. A guard the walker cannot reach
+     * without first stepping off the collider is worse than no guard: it invites
+     * them to an edge the flight does not carry. Here the two coincide by
+     * construction — the last radius a body may stand on is the radius at which
+     * their shoulder meets the drawn steel.
+     */
+    const low = walkBandAtFeet(P, 1)!
+    expect(low.outerRadius + P.walkerRadius + P.skin).toBeCloseTo(P.railRadius, 12)
+
+    const flat = throughOpeningWalkBand({
+      newelRadius: P.newelRadius,
+      openingRadius: P.opening.radius,
+      walkerRadius: P.walkerRadius,
+      skin: P.skin,
+    })!
+    // the flat band stopped 0.14 m short of the rail, on every tread of the flight
+    expect(P.railRadius - (flat.outerRadius + P.walkerRadius + P.skin)).toBeCloseTo(0.14, 6)
+    expect(low.width - flat.width).toBeCloseTo(0.14, 6)
+  })
+
+  it('is at its narrowest exactly where the body is inside the slab', () => {
+    const narrow = walkBandAtFeet(P, 2.6)!
+    const wide = walkBandAtFeet(P, 1)!
+    expect(narrow.width).toBeLessThan(wide.width)
+    /*
+     * One skin inside the flat band's own outer edge, and that skin is the
+     * difference between leaning on stone and being welded to it: at the exact
+     * tangency the controller's inflated capsule is touching the rim on every
+     * frame, and the walk that measured this stood still at r 0.5825 for a
+     * thousand frames.
+     */
+    expect(narrow.outerRadius).toBeCloseTo(P.opening.radius - P.walkerRadius - 2 * P.skin, 12)
+    // widest under the flight, and open again once the feet are on the floor
+    expect(walkBandAtFeet(P, 0.2)!.width).toBeCloseTo(wide.width, 12)
+    expect(walkBandAtFeet(P, FLOOR_Y)!.width).toBeCloseTo(wide.width, 12)
+  })
+
+  it('keeps the walking line off the newel by a whole body, at every height', () => {
+    for (let feet = 0; feet <= FLOOR_Y; feet += 0.1) {
+      expect(walkBandAtFeet(P, feet)!.innerRadius - P.walkerRadius).toBeCloseTo(P.newelRadius, 12)
+    }
+  })
+
+  it('never carries a body off the drawn treads', () => {
+    for (let feet = 0; feet <= FLOOR_Y; feet += 0.1) {
+      const band = walkBandAtFeet(P, feet)!
+      expect(band.outerRadius + P.walkerRadius).toBeLessThanOrEqual(P.treadOuterRadius + 1e-12)
+    }
+  })
+
+  it('falls back to the flight itself when there is no hole and no rail', () => {
+    const open = walkBandAtFeet({ ...P, railRadius: null, opening: null }, 1)!
+    expect(open.outerRadius).toBeCloseTo(P.treadOuterRadius - P.walkerRadius, 12)
+  })
+
+  it('returns null rather than a hair-wide band when nobody fits', () => {
+    expect(walkBandAtFeet({ ...P, railRadius: 0.35 }, 1)).toBeNull()
+    expect(walkBandAtFeet({ ...P, opening: { ...P.opening, radius: 0.6 } }, 2.6)).toBeNull()
+  })
+})
+
+/**
+ * The balustrade, as a wall rather than a drawing.
+ *
+ * It carried no collider at all until the owner walked through it. Measured on
+ * the built model beforehand, standing on the tenth tread and casting straight
+ * outward at capsule height: the first thing in the physics world was the drum's
+ * inner face at 2.99 m, with the posts drawn 0.59 m in front of him.
+ */
+describe('helicalGuardBoxes', () => {
+  const STEPS = Array.from({ length: 8 }, (_, i) => ({ azimuthDeg: i * 30, treadY: i * 0.2 }))
+  const P = { steps: STEPS, innerRadius: 1.04, height: 1 }
+  const midOf = (b: BoxSpec) => Math.hypot(b.position[0], b.position[2])
+  const azOf = (b: BoxSpec) => (Math.atan2(b.position[0], -b.position[2]) * 180) / Math.PI
+
+  it('presents its face at the radius asked for, never further out', () => {
+    for (const b of helicalGuardBoxes(P)) {
+      expect(midOf(b) - b.halfExtents[0]).toBeCloseTo(P.innerRadius, 12)
+    }
+  })
+
+  it("takes the TIGHTER of a chord's two ends where the wall closes in", () => {
+    /*
+     * Over the top third of the modern spiral the balustrade is inside the
+     * storey's slab and the wall beside the walker is the rim instead, so the
+     * face changes with height. A box built on the wider end would leave a
+     * pocket at the narrower one, and a walker the climb is already pushing
+     * outward would be pushed into it.
+     */
+    const tapered = [
+      { azimuthDeg: 0, treadY: 0, faceRadius: 1.04 },
+      { azimuthDeg: 30, treadY: 0.2, faceRadius: 0.88 },
+    ]
+    const [b] = helicalGuardBoxes({ ...P, steps: tapered })
+    expect(midOf(b) - b.halfExtents[0]).toBeCloseTo(0.88, 12)
+  })
+
+  it('runs from the lower tread to the higher head, leaving no gap at either', () => {
+    for (let j = 0; j < STEPS.length - 1; j++) {
+      const [b] = helicalGuardBoxes({ ...P, fromChord: j, toChord: j })
+      expect(b.position[1] - b.halfExtents[1]).toBeCloseTo(
+        Math.min(STEPS[j].treadY, STEPS[j + 1].treadY),
+        12,
+      )
+      expect(b.position[1] + b.halfExtents[1]).toBeCloseTo(
+        Math.max(STEPS[j].treadY, STEPS[j + 1].treadY) + P.height,
+        12,
+      )
+    }
+  })
+
+  it('honours a head capped below the tread plus the guard height', () => {
+    const capped = [
+      { azimuthDeg: 0, treadY: 3.2, topY: 3.78 },
+      { azimuthDeg: 30, treadY: 3.4, topY: 3.78 },
+    ]
+    const [b] = helicalGuardBoxes({ ...P, steps: capped })
+    expect(b.position[1] + b.halfExtents[1]).toBeCloseTo(3.78, 12)
+  })
+
+  it('leaves out the chords the caller withholds, and only those', () => {
+    expect(helicalGuardBoxes(P)).toHaveLength(STEPS.length - 1)
+    expect(helicalGuardBoxes({ ...P, fromChord: 1, toChord: STEPS.length - 3 })).toHaveLength(
+      STEPS.length - 3,
+    )
+  })
+
+  it('meets its neighbours in azimuth rather than leaving a slot at each joint', () => {
+    const boxes = helicalGuardBoxes(P)
+    const reach = (b: BoxSpec) => (Math.asin(b.halfExtents[2] / midOf(b)) * 180) / Math.PI
+    for (let i = 0; i < boxes.length - 1; i++) {
+      const gap = azOf(boxes[i + 1]) - azOf(boxes[i]) - reach(boxes[i]) - reach(boxes[i + 1])
+      expect(gap).toBeLessThan(0)
+    }
+  })
+})
+
+describe('sectorSlabBoxes', () => {
+  const P = {
+    centreAzimuthDeg: 40,
+    widthDeg: 14,
+    innerRadius: 0.0575,
+    outerRadius: 1.1,
+    surfaceY: 3.78114025,
+    thickness: 0.08,
+    sectors: 3,
+  }
+
+  it('puts its TOP on the surface, so a floor at the same level has no lip', () => {
+    /*
+     * The whole point of the landing. floorColliders hangs its slabs below
+     * floorY for the same reason, and this one has to agree with them to the
+     * millimetre or the walker arriving at the head of the flight steps UP onto
+     * their own storey — and this controller will not climb a lip of any height.
+     */
+    for (const b of sectorSlabBoxes(P)) {
+      expect(b.position[1] + b.halfExtents[1]).toBeCloseTo(P.surfaceY, 12)
+    }
+  })
+
+  it('spans the wedge it was given, from the newel to the drawn edge', () => {
+    for (const b of sectorSlabBoxes(P)) {
+      const mid = Math.hypot(b.position[0], b.position[2])
+      expect(mid - b.halfExtents[0]).toBeCloseTo(P.innerRadius, 12)
+      expect(mid + b.halfExtents[0]).toBeCloseTo(P.outerRadius, 12)
+    }
+  })
+
+  it('covers the wedge without a slot between its own boxes', () => {
+    const boxes = sectorSlabBoxes(P)
+    expect(boxes).toHaveLength(3)
+    const az = (b: BoxSpec) => (Math.atan2(b.position[0], -b.position[2]) * 180) / Math.PI
+    const reach = (b: BoxSpec) => (Math.asin(b.halfExtents[2] / P.outerRadius) * 180) / Math.PI
+    for (let i = 0; i < boxes.length - 1; i++) {
+      expect(az(boxes[i + 1]) - az(boxes[i]) - reach(boxes[i]) - reach(boxes[i + 1])).toBeLessThan(0)
+    }
+  })
+
+  it('emits nothing for a wedge with no width, no depth or no thickness', () => {
+    expect(sectorSlabBoxes({ ...P, widthDeg: 0 })).toHaveLength(0)
+    expect(sectorSlabBoxes({ ...P, outerRadius: P.innerRadius })).toHaveLength(0)
+    expect(sectorSlabBoxes({ ...P, thickness: 0 })).toHaveLength(0)
+  })
+})
+
+describe('radialGuardBox', () => {
+  const P = {
+    azimuthDeg: 236,
+    innerRadius: 0.0575,
+    outerRadius: 0.9,
+    floorY: 3.78114025,
+    height: 1,
+  }
+
+  it('stands ON the floor and reaches from the newel to the edge of the well', () => {
+    const [b] = radialGuardBox(P)
+    expect(b.position[1] - b.halfExtents[1]).toBeCloseTo(P.floorY, 12)
+    expect(b.position[1] + b.halfExtents[1]).toBeCloseTo(P.floorY + P.height, 12)
+    const mid = Math.hypot(b.position[0], b.position[2])
+    expect(mid - b.halfExtents[0]).toBeCloseTo(P.innerRadius, 12)
+    expect(mid + b.halfExtents[0]).toBeCloseTo(P.outerRadius, 12)
+  })
+
+  it('is thin along the way the walker is travelling, not across it', () => {
+    const [b] = radialGuardBox(P)
+    expect(b.halfExtents[2] * 2).toBeLessThan(b.halfExtents[0])
+  })
+
+  it('emits nothing where there is nothing to close', () => {
+    expect(radialGuardBox({ ...P, outerRadius: P.innerRadius })).toHaveLength(0)
+    expect(radialGuardBox({ ...P, height: 0 })).toHaveLength(0)
   })
 })

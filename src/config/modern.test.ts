@@ -2,12 +2,21 @@ import { describe, expect, it } from 'vitest'
 import {
   GUARDED_OPENINGS,
   MODERN_SPIRAL,
+  MODERN_SPIRAL_BAND_AT,
+  MODERN_SPIRAL_DRAWN_LINE,
+  MODERN_SPIRAL_GUARD_AT,
+  MODERN_SPIRAL_LIFT,
+  MODERN_SPIRAL_RAIL,
+  MODERN_SPIRAL_RISER,
+  MODERN_SPIRAL_STEP_ANGLE_DEG,
   MODERN_SPIRAL_WALK_BAND,
+  MODERN_SPIRAL_WELL,
   MODERN_SPIRAL_WELL_RADIUS,
   OPENING_GUARD,
 } from './modern'
-import { FLOORS, LIFTS } from './tower'
+import { FLOORS, LIFTS, TOWER } from './tower'
 import { PLAYER } from './player'
+import { capsuleRadiusAtHeight } from '../lib/collision'
 import { planFlight } from '../lib/staircase'
 
 /**
@@ -171,5 +180,161 @@ describe('the band the steel spiral is collided on', () => {
     const drawnPitch = Math.atan2(riser, 2 * drawnLine * Math.sin(stepAngleRad / 2))
     const drawnLip = (0.55 / 2) * Math.sin(stepAngleRad) * Math.tan(drawnPitch)
     expect(lip).toBeLessThan(drawnLip)
+  })
+})
+
+/**
+ * THE STEEL SPIRAL AS SOMETHING A BODY CAN WALK, which it was not.
+ *
+ * [OWNER] 2026-08-17: «по винтовой лестнице проходить сложно. постоянно через
+ * перила обваливаешься. кажется там перила просто фасад прозрачный. плюс
+ * последние ступени неудобно на ярус выходят.»
+ *
+ * Three faults and all three were arithmetic. The balustrade had no collider at
+ * all — measured on the built model, a ray straight outward from the tenth tread
+ * found the drum at 2.99 m and nothing where the posts are drawn 0.59 m ahead.
+ * The band was 0.2225 m wide on treads drawn 1.0425 m wide, because the rim of
+ * the well was applied to every tread instead of to the ones that pass through
+ * it. And the collider stopped AT the last nosing while the drawn tread runs
+ * half a wedge further, so arriving meant overrunning the floor onto steel with
+ * nothing under it.
+ *
+ * These are config derivations, not renderer behaviour: where a body may stand,
+ * and where the wall beside it is, must follow from the survey and the walker's
+ * own size rather than from numbers typed into a component.
+ */
+describe('the steel spiral, as a thing to walk', () => {
+  const treads = () =>
+    planFlight({
+      fromY: MODERN_SPIRAL_LIFT!.fromY,
+      toY: MODERN_SPIRAL_LIFT!.toY,
+      startAzimuthDeg: 0,
+      innerRadiusAt: () => MODERN_SPIRAL.columnRadius,
+      width: MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius,
+      riserTarget: MODERN_SPIRAL.riser,
+      goingTarget: MODERN_SPIRAL.going,
+      winding: MODERN_SPIRAL.winding,
+    })
+
+  it('agrees with the planner about the angle each tread turns through', () => {
+    /*
+     * The band, the balustrade and the landing are all built from this config
+     * without any of them being able to see the planned flight. If the two
+     * derivations ever part company the guard stops standing over the treads.
+     */
+    const steps = treads()
+    expect(MODERN_SPIRAL_STEP_ANGLE_DEG).toBeCloseTo(steps[0].angularWidthDeg, 12)
+    expect(MODERN_SPIRAL_RISER).toBeCloseTo(steps[1].treadY - steps[0].treadY, 12)
+    expect(MODERN_SPIRAL_DRAWN_LINE).toBeCloseTo(steps[0].midRadius, 12)
+  })
+
+  it('puts the rail face where a shoulder meets the drawn tube', () => {
+    // the posts are drawn on their axis; a body meets the near side of them
+    expect(MODERN_SPIRAL_RAIL.postRadius).toBeCloseTo(
+      MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.rodRadius * 2,
+      12,
+    )
+    expect(MODERN_SPIRAL_RAIL.faceRadius).toBeCloseTo(
+      MODERN_SPIRAL_RAIL.postRadius - MODERN_SPIRAL.rodRadius,
+      12,
+    )
+    // and inside the treads, or the guard would stand over nothing
+    expect(MODERN_SPIRAL_RAIL.faceRadius).toBeLessThan(MODERN_SPIRAL.outerRadius)
+  })
+
+  it('reads the well as a solid with two levels, not as a radius', () => {
+    expect(MODERN_SPIRAL_WELL).not.toBeNull()
+    expect(MODERN_SPIRAL_WELL!.radius).toBe(MODERN_SPIRAL_WELL_RADIUS)
+    expect(MODERN_SPIRAL_WELL!.topY).toBe(MODERN_SPIRAL_LIFT!.toY)
+    expect(MODERN_SPIRAL_WELL!.topY - MODERN_SPIRAL_WELL!.bottomY).toBeCloseTo(TOWER.floorSlab, 12)
+  })
+
+  it('never lets a body into the well, on any tread of the flight', () => {
+    /*
+     * The property MODERN_SPIRAL_WALK_BAND holds at one height, held at all of
+     * them — over the whole band, not over the walking line. 9c97c79 measured
+     * what the line-only version costs: the walker jammed at r 0.581 against a
+     * rim at 0.900, three runs out of three.
+     */
+    for (const s of treads()) {
+      const band = MODERN_SPIRAL_BAND_AT(s.treadY)!
+      expect(band).not.toBeNull()
+      for (let t = 0; t <= 1; t += 0.1) {
+        const r = band.innerRadius + band.width * t
+        for (let y = MODERN_SPIRAL_WELL!.bottomY; y <= MODERN_SPIRAL_WELL!.topY; y += 0.02) {
+          const half = capsuleRadiusAtHeight(PLAYER.radius, PLAYER.height, s.treadY, y)
+          if (half === 0) continue
+          expect(r + half).toBeLessThanOrEqual(MODERN_SPIRAL_WELL!.radius - PLAYER.characterOffset + 1e-12)
+        }
+      }
+    }
+  })
+
+  it('gives back the 0.14 m the flat band was taking from most of the flight', () => {
+    /*
+     * WHAT THE OWNER WAS ACTUALLY WALKING ON. Two thirds of this stair is
+     * nowhere near the slab, and on those treads the band now runs out to the
+     * balustrade — so the rail is a thing you lean on rather than an edge you
+     * are invited to and then fall through.
+     */
+    const flat = MODERN_SPIRAL_WALK_BAND!
+    const foot = MODERN_SPIRAL_BAND_AT(MODERN_SPIRAL_RISER)!
+    expect(foot.width - flat.width).toBeCloseTo(0.14, 6)
+    expect(foot.outerRadius + PLAYER.radius + PLAYER.characterOffset).toBeCloseTo(
+      MODERN_SPIRAL_RAIL.faceRadius,
+      12,
+    )
+
+    // and the count: how many treads keep the full width, and how many pay for
+    // the well. Asserted so that moving the storey height says which.
+    const wide = treads().filter(
+      (s) => MODERN_SPIRAL_BAND_AT(s.treadY)!.width > flat.width + 1e-9,
+    )
+    expect(wide.length).toBe(14)
+    expect(treads().length - wide.length).toBe(8)
+  })
+
+  it('stands the guard where the walker is stopped, whatever is standing there', () => {
+    /*
+     * Below the slab that is the balustrade, and the two coincide by
+     * construction. Above it the rail is inside storey 2's floor and the thing
+     * beside the walker is the rim — 24 cuboids whose inner faces are chords,
+     * 0.900 m at the middle of each sector and 1.024 m at every corner. The
+     * walk that found this jammed in one of those corners.
+     */
+    for (const s of treads()) {
+      const band = MODERN_SPIRAL_BAND_AT(s.treadY)!
+      const guard = MODERN_SPIRAL_GUARD_AT(s.treadY)!
+      expect(guard.faceRadius).toBeCloseTo(
+        band.outerRadius + PLAYER.radius + PLAYER.characterOffset,
+        12,
+      )
+      expect(guard.faceRadius).toBeLessThanOrEqual(MODERN_SPIRAL_RAIL.faceRadius + 1e-12)
+      // where it is inside the well it is the stone, and stone stops at the floor
+      if (guard.faceRadius < MODERN_SPIRAL_WELL!.radius) {
+        expect(guard.topY).toBeLessThanOrEqual(MODERN_SPIRAL_WELL!.topY + 1e-12)
+      }
+    }
+  })
+
+  it('lands the last tread ON storey 2, which is what makes a landing possible', () => {
+    /*
+     * The collider for the head of the flight is the drawn top tread carried out
+     * to the storey's own slab, and that is only legitimate because the tread is
+     * at the floor's own level: a body standing there has its feet above the
+     * slab, so the rim it has been dodging the whole way up is behind it. If the
+     * flight ever stopped landing exactly on floorY this would be a shelf in
+     * mid-air.
+     */
+    const steps = treads()
+    const last = steps[steps.length - 1]
+    expect(last.treadY).toBeCloseTo(FLOORS[1].floorY, 12)
+    const band = MODERN_SPIRAL_BAND_AT(last.treadY)!
+    expect(band.outerRadius).toBeCloseTo(
+      MODERN_SPIRAL_RAIL.faceRadius - PLAYER.radius - PLAYER.characterOffset,
+      12,
+    )
+    // and the landing reaches past the edge of the well, so it meets the stone
+    expect(MODERN_SPIRAL.outerRadius).toBeGreaterThan(MODERN_SPIRAL_WELL!.radius)
   })
 })

@@ -88,6 +88,9 @@ export function FirstPersonPlayer({
     c.setMaxSlopeClimbAngle(PLAYER.maxSlopeClimbAngleDeg * DEG)
     c.setMinSlopeSlideAngle(PLAYER.minSlopeSlideAngleDeg * DEG)
     c.setApplyImpulsesToDynamicBodies(false)
+    // see PLAYER.normalNudgeFactor: rapier's own default leaves the walker
+    // welded to any wall they meet while standing on a slope
+    c.setNormalNudgeFactor(PLAYER.normalNudgeFactor)
     controller.current = c
     return () => {
       controller.current = null

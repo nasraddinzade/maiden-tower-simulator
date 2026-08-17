@@ -967,6 +967,197 @@ export function guardRingBoxes(p: GuardRingParams): BoxSpec[] {
   return out
 }
 
+export interface HelicalGuardParams {
+  /**
+   * The flight's nosings, in order: azimuth, the height of each tread, and —
+   * where the outer wall of the stair is not the balustrade — the radius and
+   * head height of whatever is standing there instead.
+   */
+  steps: Array<{ azimuthDeg: number; treadY: number; faceRadius?: number; topY?: number }>
+  /**
+   * Radius of the face a shoulder meets — the INNER surface of the balustrade,
+   * not the axis of its posts. The boxes grow outward from it, so this is where
+   * the walker is stopped and the drawn steel is what they see stopping them.
+   */
+  innerRadius: number
+  /** Height of the guard above each tread. */
+  height: number
+  /** Radial thickness, grown outward. Defaults to GUARD_BOX_THICKNESS. */
+  thickness?: number
+  /** First chord of the chain to build, inclusive. Chord j spans step j → j+1. */
+  fromChord?: number
+  /** Last chord to build, inclusive. Defaults to the end of the flight. */
+  toChord?: number
+}
+
+/**
+ * The balustrade of a helical flight, as a chain of upright slabs.
+ *
+ * THE OWNER, ON THE ONE STAIR THIS MODEL HAS THAT NEEDS ONE: «постоянно через
+ * перила обваливаешься. кажется там перила просто фасад прозрачный.» Measured
+ * on the built model before anything was touched: standing on the tenth tread
+ * and casting straight outward from the capsule's centre, the first thing in
+ * the physics world was the drum's inner face at 2.99 m. The posts drawn 0.59 m
+ * in front of him were not there. He was right in the strongest sense — the
+ * balustrade was a facade, and the walk that measured it went through the posts,
+ * through the rail, through the drawn tread beyond them and fell to the floor.
+ *
+ * It is a WALL, on guardRingBoxes' own principle: nothing here is climbed, so
+ * the rule that governs walking surfaces — ramps, never lips — does not apply,
+ * and a guard the walker could get onto would be a launch pad into the well.
+ * Like that one it grows AWAY from the side the walker is on, so the face they
+ * meet is the face that is drawn.
+ *
+ * Each slab spans one chord between nosings and runs from the LOWER of the two
+ * treads to the higher one plus the guard's height. The extra riser at the foot
+ * is buried under the flight and stops a body squeezing under the rail where
+ * the tread rises away from a level box; the extra at the head keeps the guard
+ * as tall as the drawn rail at every point of the chord rather than at one end
+ * of it.
+ *
+ * WHICH chords is the caller's business and it is not a detail. On the modern
+ * spiral the first chord carries no guard, because that is where the approach
+ * ramps deliver a visitor onto the flight and a guard there would seal the only
+ * way on; and the last carries none either, because the flight is wider than
+ * the well it rises through, so at the top the drawn rail stands OUTSIDE the
+ * floor it arrives on — a collider there is not a handrail, it is a fence
+ * between the landing and the room.
+ *
+ * AND WHAT THE WALL IS MADE OF CHANGES WITH HEIGHT, which is why each step may
+ * carry its own face. Over the top third of the modern spiral the balustrade is
+ * inside the storey's slab and the thing actually beside the walker is the rim
+ * of the hole — a ring of 24 cuboids whose inner faces are CHORDS, so it stands
+ * at 0.900 m at each sector's middle and bulges to 1.024 at every corner.
+ * Walked, that is a trap rather than a wall: the walker rides the outer edge of
+ * the flight (climbing deflects them outward, measured below), grazes the
+ * inscribed circle and jams in the next corner — pinned, grounded, nothing in
+ * front of them at capsule height, which is 9c97c79's symptom exactly. So the
+ * caller may put the guard where the WALKER's own limit is instead, a smooth
+ * face just inside the stone, and the polygon is never touched.
+ */
+export function helicalGuardBoxes(p: HelicalGuardParams): BoxSpec[] {
+  const out: BoxSpec[] = []
+  if (p.steps.length < 2 || p.height <= 0 || p.innerRadius <= 0) return out
+  const thickness = p.thickness ?? GUARD_BOX_THICKNESS
+  const from = Math.max(0, p.fromChord ?? 0)
+  const to = Math.min(p.steps.length - 2, p.toChord ?? p.steps.length - 2)
+
+  for (let j = from; j <= to; j++) {
+    const a = p.steps[j]
+    const b = p.steps[j + 1]
+    const spanDeg = Math.abs(b.azimuthDeg - a.azimuthDeg)
+    if (spanDeg <= 0) continue
+    const centreDeg = (a.azimuthDeg + b.azimuthDeg) / 2
+    // the tighter of the two ends: a wall that steps outward mid-chord would
+    // leave the walker a pocket to be pushed into
+    const face = Math.min(a.faceRadius ?? p.innerRadius, b.faceRadius ?? p.innerRadius)
+    if (face <= 0) continue
+    const midRadius = face + thickness / 2
+    // half-chord at the OUTER face and a little over, so neighbours interpenetrate
+    // at the corners rather than leaving a slot on the outside of every joint
+    const halfChord = (face + thickness) * Math.tan((spanDeg / 2) * DEG) * 1.06
+    const bottomY = Math.min(a.treadY, b.treadY)
+    const topY = Math.max(a.topY ?? a.treadY + p.height, b.topY ?? b.treadY + p.height)
+    if (topY <= bottomY) continue
+    const rad = centreDeg * DEG
+    out.push({
+      halfExtents: [thickness / 2, (topY - bottomY) / 2, halfChord],
+      position: [
+        Math.sin(rad) * midRadius,
+        (bottomY + topY) / 2,
+        -Math.cos(rad) * midRadius,
+      ],
+      quaternion: yawThenTilt(radialYaw(rad), 0),
+      kind: 'guard',
+    })
+  }
+  return out
+}
+
+export interface SectorSlabParams {
+  centreAzimuthDeg: number
+  widthDeg: number
+  innerRadius: number
+  outerRadius: number
+  /** World Y of the walking surface. The slab hangs BELOW it, as floors do. */
+  surfaceY: number
+  thickness: number
+  /** Boxes across the wedge; more of them follow the arc more closely. */
+  sectors?: number
+  kind?: BoxSpec['kind']
+}
+
+/**
+ * A wedge of walking surface — one sector of an annulus, and nothing else.
+ *
+ * floorColliders builds whole rings and cannot be asked for a piece of one; this
+ * is for the piece. The modern spiral's top tread is the only tread in the tower
+ * that lands ON a floor level, so it is the only one that may be collided at its
+ * full drawn width: everywhere else the flight is inside a hole narrower than
+ * itself, and here it is out of it. Carrying that one wedge out to the storey's
+ * own slab is what turns the head of the stair from a ledge over a 3.78 m drop
+ * into a landing.
+ *
+ * The chord is taken at the outer radius, exactly as floorColliders takes it, so
+ * neighbouring boxes meet at the rim instead of leaving a slot there.
+ */
+export function sectorSlabBoxes(p: SectorSlabParams): BoxSpec[] {
+  const out: BoxSpec[] = []
+  const sectors = Math.max(1, p.sectors ?? 3)
+  if (p.outerRadius <= p.innerRadius || p.widthDeg <= 0 || p.thickness <= 0) return out
+  const spanDeg = p.widthDeg / sectors
+  const halfChord = p.outerRadius * Math.tan((spanDeg / 2) * DEG) * 1.06
+  const half = (p.outerRadius - p.innerRadius) / 2
+  const mid = (p.outerRadius + p.innerRadius) / 2
+  for (let s = 0; s < sectors; s++) {
+    const rad =
+      (p.centreAzimuthDeg - p.widthDeg / 2 + spanDeg * (s + 0.5)) * DEG
+    out.push({
+      halfExtents: [half, p.thickness / 2, halfChord],
+      position: [Math.sin(rad) * mid, p.surfaceY - p.thickness / 2, -Math.cos(rad) * mid],
+      quaternion: yawThenTilt(radialYaw(rad), 0),
+      kind: p.kind ?? 'floor',
+    })
+  }
+  return out
+}
+
+/**
+ * A guard standing ACROSS a flight rather than along it — the head of the run.
+ *
+ * approachGuardBoxes closes the far end of the external stair's landing for the
+ * reason this exists: a walker who climbs and does not turn walks off the end.
+ * On the modern spiral the end of the run is worse than a fall onto paving,
+ * because what is past it is the well the flight has just come up, and the walk
+ * measured the consequence — reaching the top, overrunning the last nosing by
+ * 0.09 m, losing the ground and landing seven treads down, four times over,
+ * with the flight feeding the walker back into its own well each time.
+ */
+export function radialGuardBox(p: {
+  azimuthDeg: number
+  innerRadius: number
+  outerRadius: number
+  /** Surface the guard stands on. */
+  floorY: number
+  height: number
+  /** Thickness along the direction of travel. */
+  thickness?: number
+  kind?: BoxSpec['kind']
+}): BoxSpec[] {
+  if (p.outerRadius <= p.innerRadius || p.height <= 0) return []
+  const thickness = p.thickness ?? GUARD_BOX_THICKNESS
+  const rad = p.azimuthDeg * DEG
+  const mid = (p.innerRadius + p.outerRadius) / 2
+  return [
+    {
+      halfExtents: [(p.outerRadius - p.innerRadius) / 2, p.height / 2, thickness / 2],
+      position: [Math.sin(rad) * mid, p.floorY + p.height / 2, -Math.cos(rad) * mid],
+      quaternion: yawThenTilt(radialYaw(rad), 0),
+      kind: p.kind ?? 'guard',
+    },
+  ]
+}
+
 export interface WalkBand {
   /** Nearest the axis a walker may put their feet. */
   innerRadius: number
@@ -1036,11 +1227,169 @@ export function throughOpeningWalkBand(p: ThroughOpeningBandParams): WalkBand | 
   }
 }
 
+/**
+ * How wide the walker's capsule is where it crosses one height.
+ *
+ * A capsule is not a cylinder, and on this stair the difference is the whole
+ * argument. throughOpeningWalkBand above takes the walker's FULL radius off the
+ * rim of the hole at every height of the flight, because it has no height to
+ * work with. But a body only presents its full width over the span between the
+ * two cap centres; below and above that it tapers, and a walker eleven treads
+ * down is not inside the slab at all — nothing up there is anywhere near them.
+ *
+ * feetY is the walking surface. The capsule stands on it: caps centred at
+ * feetY + radius and feetY + height − radius, which is why `height` must exceed
+ * twice the radius for this to describe a capsule rather than a sphere.
+ */
+export function capsuleRadiusAtHeight(
+  radius: number,
+  height: number,
+  feetY: number,
+  y: number,
+): number {
+  if (y < feetY || y > feetY + height) return 0
+  const lowCap = feetY + radius
+  const highCap = feetY + height - radius
+  if (y >= lowCap && y <= highCap) return radius
+  const d = y < lowCap ? lowCap - y : y - highCap
+  const inside = radius * radius - d * d
+  return inside <= 0 ? 0 : Math.sqrt(inside)
+}
+
+/**
+ * The widest the capsule is anywhere inside a horizontal band — 0 if it never
+ * reaches the band at all.
+ *
+ * The maximum is analytic, not sampled: the profile rises, holds and falls, so
+ * the largest value in any interval is at whichever end is nearest the middle
+ * of the capsule, or the full radius when the interval straddles the barrel.
+ */
+export function capsuleWidestIn(
+  radius: number,
+  height: number,
+  feetY: number,
+  bandBottomY: number,
+  bandTopY: number,
+): number {
+  const lo = Math.max(bandBottomY, feetY)
+  const hi = Math.min(bandTopY, feetY + height)
+  if (hi < lo) return 0
+  const mid = feetY + height / 2
+  const nearest = mid < lo ? lo : mid > hi ? hi : mid
+  return capsuleRadiusAtHeight(radius, height, feetY, nearest)
+}
+
+export interface HelicalWalkBandParams {
+  /** Radius of the tube the flight winds round. */
+  newelRadius: number
+  /**
+   * Radius of the face a shoulder meets on the balustrade, or null where the
+   * flight has no guard and the drawn tread is the only outer limit.
+   */
+  railRadius: number | null
+  /** Outermost the drawn treads reach — nothing may be collided past it. */
+  treadOuterRadius: number
+  walkerRadius: number
+  walkerHeight: number
+  /** The gap the character controller keeps from every surface it meets. */
+  skin: number
+  /**
+   * The hole the flight rises through, and the slab that cuts it. `bottomY` and
+   * `topY` are the soffit and the floor surface: between them the rim is solid,
+   * outside them there is nothing to keep clear of.
+   */
+  opening: { radius: number; bottomY: number; topY: number } | null
+}
+
+/**
+ * THE BAND, AS A FUNCTION OF HOW HIGH UP THE FLIGHT THE WALKER IS.
+ *
+ * throughOpeningWalkBand states the constraint the rim imposes and states it
+ * once, for the whole flight. That was right about the top of this stair and
+ * wrong about the bottom, and the cost was measured by the owner: 0.2225 m of
+ * standing room, on treads drawn 1.0425 m wide, for twenty-two treads — when
+ * the rim only exists across the last third of them. The walker's own body is
+ * what decides where it starts to matter, and a body has a height.
+ *
+ * So the outer limit is the tighter of two things:
+ *
+ *   the RAIL     railRadius − walkerRadius − skin
+ *                — where a shoulder meets the balustrade. It bounds the band
+ *                  everywhere, and it is the reason a walker who wanders out
+ *                  now meets steel instead of falling through it.
+ *   the RIM      openingRadius − skin − (the widest the capsule is inside the
+ *                  slab). Which is nothing at all until the walker's head
+ *                  reaches the soffit, full width while they are passing
+ *                  through, and nothing again once their feet are on the floor.
+ *
+ * Neither surveyed diameter moves. MODERN_SPIRAL_VS_OPENING still records that
+ * the stair measures wider than its own well and still refuses to reconcile
+ * them; this only says where a BODY may be, which is what 9c97c79 established,
+ * and adds the one term that argument left out — that a body 1.6 m tall is not
+ * in the slab when it is two metres below it.
+ *
+ * Returns null when nobody fits at that height, for the same reason as
+ * throughOpeningWalkBand: a hair-wide band is a lie about a building.
+ */
+export function walkBandAtFeet(p: HelicalWalkBandParams, feetY: number): WalkBand | null {
+  const innerRadius = p.newelRadius + p.walkerRadius
+  const limits: number[] = [p.treadOuterRadius - p.walkerRadius]
+  if (p.railRadius !== null) limits.push(p.railRadius - p.walkerRadius - p.skin)
+  if (p.opening) {
+    const widest = capsuleWidestIn(
+      p.walkerRadius,
+      p.walkerHeight,
+      feetY,
+      p.opening.bottomY,
+      p.opening.topY,
+    )
+    /*
+     * TWO SKINS OFF THE RIM, NOT ONE, AND THE SECOND IS THE ONE THAT MATTERS.
+     *
+     * throughOpeningWalkBand takes one, and it is right about where a BODY
+     * fits: at openingRadius − walkerRadius − skin the controller's inflated
+     * capsule is exactly touching the rim. What the walk shows is that exactly
+     * touching is not a place to stand. A capsule of 0.300 m cannot follow a
+     * flight whose going is 0.259 m and whose riser is 0.172 m without bridging
+     * — its underside rests on the nosings about a tread AHEAD — and on a helix
+     * those nosings are yawed, so the ride is steadily outward: measured on the
+     * built chain at 1/60 s, 0.005 m per frame at r 0.45, falling to 0.001 at
+     * r 0.66. Every walker therefore arrives at the band's outer edge and stays
+     * there, whatever line they are put on — five starts from 0.40 to 0.69 all
+     * converged on it — so the outer edge has to be somewhere it is SAFE to be
+     * pressed against.
+     *
+     * Below the slab it already is: the rail stands at exactly that radius and
+     * holds them. Against the rim it was not, and the symptom is 9c97c79's own
+     * — the walker pinned at r 0.580, grounded, nothing in front of them at
+     * capsule height, not moving. Pulling the collider one more skin inside
+     * leaves 0.020 m of clear air between the inflated capsule and the stone,
+     * and the wedge has nothing to close on.
+     */
+    if (widest > 0) limits.push(p.opening.radius - 2 * p.skin - widest)
+  }
+  const outerRadius = Math.min(...limits)
+  if (!(outerRadius > innerRadius)) return null
+  return {
+    innerRadius,
+    outerRadius,
+    midRadius: (innerRadius + outerRadius) / 2,
+    width: outerRadius - innerRadius,
+  }
+}
+
 export interface RampStep {
   azimuthDeg: number
   treadY: number
   midRadius: number
+  /**
+   * Half the walking band at THIS step, when the band is not the same all the
+   * way up. Optional: without it every box takes the chain's single width, which
+   * is what every masonry flight in the tower wants.
+   */
+  halfWidth?: number
 }
+
 
 /**
  * The stair's walking surface as a chain of inclined boxes.
@@ -1067,10 +1416,28 @@ export function stairRampBoxes(
     const a = steps[i]
     const b = steps[Math.min(i + stepsPerBox, steps.length - 1)]
 
+    /*
+     * A box spans the INTERSECTION of the two ends' bands, not a chord between
+     * their middles. Where the band tapers — the modern spiral, whose outer
+     * limit closes as the walker's head comes up under storey 2's slab — a box
+     * built on the wider end would stand out over nothing at the narrower one,
+     * and one built on the narrower end's centre line would leave the inner
+     * edge of the flight uncarried for the rest of the span. Taking the overlap
+     * keeps every box inside both bands and flush with the chain either side.
+     */
+    const halfA = a.halfWidth ?? width / 2
+    const halfB = b.halfWidth ?? width / 2
+    const inner = Math.max(a.midRadius - halfA, b.midRadius - halfB)
+    const outer = Math.min(a.midRadius + halfA, b.midRadius + halfB)
+    const boxWidth = a.halfWidth === undefined && b.halfWidth === undefined ? width : outer - inner
+    if (boxWidth <= 0) continue
+    const radiusA = a.halfWidth === undefined ? a.midRadius : (inner + outer) / 2
+    const radiusB = b.halfWidth === undefined ? b.midRadius : (inner + outer) / 2
+
     const ra = a.azimuthDeg * DEG
     const rb = b.azimuthDeg * DEG
-    const pa: [number, number, number] = [Math.sin(ra) * a.midRadius, a.treadY, -Math.cos(ra) * a.midRadius]
-    const pb: [number, number, number] = [Math.sin(rb) * b.midRadius, b.treadY, -Math.cos(rb) * b.midRadius]
+    const pa: [number, number, number] = [Math.sin(ra) * radiusA, a.treadY, -Math.cos(ra) * radiusA]
+    const pb: [number, number, number] = [Math.sin(rb) * radiusB, b.treadY, -Math.cos(rb) * radiusB]
 
     const run = Math.hypot(pb[0] - pa[0], pb[2] - pa[2])
     const rise = pb[1] - pa[1]
@@ -1097,7 +1464,7 @@ export function stairRampBoxes(
 
     out.push({
       // slight length overlap so consecutive boxes leave no seam at the joint
-      halfExtents: [width / 2, thickness / 2, length / 2 + 0.05],
+      halfExtents: [boxWidth / 2, thickness / 2, length / 2 + 0.05],
       position: [mid[0] + down[0], mid[1] + down[1], mid[2] + down[2]],
       quaternion: q,
       kind: 'ramp',

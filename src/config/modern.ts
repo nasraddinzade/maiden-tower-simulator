@@ -12,9 +12,10 @@
  * figure carries a tolerance and most of them are wide.
  */
 
-import { FLOORS, LIFTS } from './tower'
+import { FLOORS, LIFTS, TOWER } from './tower'
 import { PLAYER } from './player'
-import { throughOpeningWalkBand } from '../lib/collision'
+import { throughOpeningWalkBand, walkBandAtFeet, type WalkBand } from '../lib/collision'
+import { stepAngleDeg } from '../lib/staircase'
 
 /**
  * The free-standing steel spiral that carries visitors from the entry chamber to
@@ -93,6 +94,18 @@ export const MODERN_SPIRAL = {
   rodsPerTread: 3,
   /** m — radius of the balustrade tubes. [ASSUMPTION] a normal 40 mm handrail. */
   rodRadius: 0.02,
+  /**
+   * m — radius of the infill rods between the posts. [ASSUMPTION] a normal
+   * 20 mm bar, half the post.
+   *
+   * The COUNT above is measured and the gauge is not: the frames resolve how
+   * many uprights there are between two posts, which needs no scale, but not
+   * how thick a 20 mm bar is at that distance. It is here because the count
+   * could not be drawn without it, and because rodsPerTread's own note says the
+   * infill is thinner than the post — a fact with no number attached, which is
+   * exactly what [ASSUMPTION] is for.
+   */
+  infillRodRadius: 0.01,
   /**
    * Which way it turns, climbing. [VIDEO] — this one is not in doubt the way the
    * masonry stair's winding is: the newel spiral is plainly visible in several
@@ -198,6 +211,154 @@ export const MODERN_SPIRAL_WALK_BAND = throughOpeningWalkBand({
   walkerRadius: PLAYER.radius,
   skin: PLAYER.characterOffset,
 })
+
+/**
+ * The drawn walking line and the angle each tread turns through.
+ *
+ * Both belong here rather than being read back off a planned flight, because
+ * the ramp chain, the balustrade and the subdivision below all have to agree
+ * with the flight without any of them being able to see it. planFlight derives
+ * the same angle from the same two figures — MODERN_SPIRAL.going over the drawn
+ * line — and modern.test.ts holds the two answers against each other, so this
+ * cannot quietly drift away from the stair it describes.
+ */
+export const MODERN_SPIRAL_DRAWN_LINE =
+  MODERN_SPIRAL.columnRadius + (MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius) / 2
+
+/** Degrees of turn per tread, held constant because the going is. */
+export const MODERN_SPIRAL_STEP_ANGLE_DEG = stepAngleDeg(
+  MODERN_SPIRAL.going,
+  MODERN_SPIRAL_DRAWN_LINE,
+)
+
+/** m — the riser the flight actually gets, once the count is rounded. */
+export const MODERN_SPIRAL_RISER =
+  MODERN_SPIRAL_TREADS > 0 ? MODERN_SPIRAL_RISE / MODERN_SPIRAL_TREADS : 0
+
+/**
+ * The balustrade, as two radii rather than one.
+ *
+ * `postRadius` is the axis of the tubes — where ModernSpiralStair has always
+ * drawn them, and it was a bare expression inside that component until the day
+ * the guard needed a collider (CLAUDE.md rule 2: the number lives in the config
+ * and the component reads it). `faceRadius` is the surface a shoulder actually
+ * meets, half a tube further in, and that is the one the physics is built on.
+ */
+export const MODERN_SPIRAL_RAIL = {
+  postRadius: MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.rodRadius * 2,
+  get faceRadius() {
+    return this.postRadius - MODERN_SPIRAL.rodRadius
+  },
+}
+
+/**
+ * The hole this flight rises through, with the two heights the rim exists
+ * between: the soffit of storey 2's slab and its floor surface.
+ *
+ * Written as a solid rather than as a radius because that is what it is, and
+ * because the walker's clearance through it depends on where their body is
+ * relative to those two levels — see MODERN_SPIRAL_BAND_AT.
+ */
+export const MODERN_SPIRAL_WELL = MODERN_SPIRAL_LIFT
+  ? {
+      radius: MODERN_SPIRAL_WELL_RADIUS,
+      bottomY: MODERN_SPIRAL_LIFT.toY - TOWER.floorSlab,
+      topY: MODERN_SPIRAL_LIFT.toY,
+    }
+  : null
+
+/**
+ * WHERE A BODY MAY BE AT EACH HEIGHT OF THE CLIMB — the band above, opened out
+ * everywhere the rim is not actually in the way.
+ *
+ * MODERN_SPIRAL_WALK_BAND is right and stays: 0.3575 to 0.5800 is the corridor
+ * through the well, and nothing here widens it by a millimetre where the well
+ * is what bounds it. What it left out is that the well is 0.3 m of stone at the
+ * TOP of a 3.78 m climb, and a walker eleven treads below it is nowhere near
+ * it. Applying the tightest section of the journey to the whole of it cost
+ * 0.14 m of standing room on two thirds of the flight, and the owner reported
+ * the consequence three times.
+ *
+ * Below the slab the outer limit is the BALUSTRADE, which is the answer to the
+ * other half of the same complaint. The band now ends exactly where a shoulder
+ * meets the rail — faceRadius − walkerRadius − skin — so the drawn steel is the
+ * thing that stops you and there is collider under your feet the whole way out
+ * to it. A rail you cannot lean on invites the walker to an edge the flight
+ * cannot support; a rail with the floor reaching it does not.
+ *
+ * NEITHER SURVEY FIGURE MOVES. MODERN_SPIRAL_VS_OPENING still records Ø 2.2
+ * ±0.4 of stair against Ø 1.8 ±0.3 of hole and still refuses to reconcile them.
+ * This is a statement about a 1.6 m capsule, not about the building.
+ */
+export const MODERN_SPIRAL_BAND_AT = (feetY: number): WalkBand | null =>
+  walkBandAtFeet(
+    {
+      newelRadius: MODERN_SPIRAL.columnRadius,
+      railRadius: MODERN_SPIRAL_RAIL.faceRadius,
+      treadOuterRadius: MODERN_SPIRAL.outerRadius,
+      walkerRadius: PLAYER.radius,
+      walkerHeight: PLAYER.height,
+      skin: PLAYER.characterOffset,
+      opening: MODERN_SPIRAL_WELL,
+    },
+    feetY,
+  )
+
+/**
+ * THE OUTER WALL OF THE STAIR AT EACH HEIGHT — which is not the balustrade all
+ * the way up, and the difference is measured rather than assumed.
+ *
+ * CLIMBING DEFLECTS THE WALKER OUTWARD. Held on a fixed heading along the
+ * tangent, feet on the flight, 14 frames at 1/60 s: the displacement comes out
+ * 0.284 of its length to the OUTSIDE at r 0.462, 0.192 at 0.542, 0.098 at
+ * 0.666 and 0.045 at 0.703 — and 0.000 walking DOWN the same treads, and 0.000
+ * on the flat floor of storey 1. It is the pitch: the flight is steeper the
+ * nearer the axis the collided line runs, and a capsule 0.600 m across cannot
+ * follow a going of 0.259 m without riding the surface ahead of it. Five
+ * ascents started at radii from 0.40 to 0.69 all converged on the same place —
+ * the outer edge of whatever was holding them.
+ *
+ * SO THE OUTER EDGE HAS TO BE SOMEWHERE IT IS SAFE TO BE PRESSED. Below the
+ * slab it already is, and by construction: the band ends where a shoulder meets
+ * the rail, so leaning on the balustrade is standing on the flight. Above, the
+ * rail is inside storey 2's floor and what is beside the walker is the rim of
+ * the hole — 24 cuboids whose inner faces are chords, 0.900 m at each sector's
+ * middle and 1.024 m at every corner. Walked, the capsule grazed the inscribed
+ * circle and jammed in a corner at r 0.5825, feet 2.221, grounded, not moving
+ * in any direction including inward.
+ *
+ * So over that stretch the guard stands at the WALKER's own limit instead —
+ * band.outerRadius + walkerRadius + skin, which is the same 1.040 m as the rail
+ * wherever the rail governs, and 0.880 m where the rim does: a smooth face two
+ * centimetres inside the stone, so the polygon behind it is never reached. It
+ * is capped at the floor level there, because below the floor it stands for the
+ * stone and above it there is nothing for it to be.
+ */
+export const MODERN_SPIRAL_GUARD_AT = (
+  feetY: number,
+): { faceRadius: number; topY: number } | null => {
+  const band = MODERN_SPIRAL_BAND_AT(feetY)
+  if (!band) return null
+  const faceRadius = Math.min(
+    MODERN_SPIRAL_RAIL.faceRadius,
+    band.outerRadius + PLAYER.radius + PLAYER.characterOffset,
+  )
+  const head = feetY + MODERN_SPIRAL.guardHeight
+  /*
+   * A guard on a tread below the floor stops AT the floor, whatever radius it
+   * came out at. Below that line it stands for the stone the flight is passing
+   * through; above it there is nothing for it to be — the drawn rail is at
+   * 1.060 and this face is at 0.880, so carrying it up would put an invisible
+   * wall 0.83 m tall in the middle of storey 2's floor, which is what the walk
+   * that found this ran into on the last chord before the landing.
+   */
+  const belowTheFloor = MODERN_SPIRAL_WELL !== null && feetY < MODERN_SPIRAL_WELL.topY
+  return {
+    faceRadius,
+    topY: belowTheFloor ? Math.min(head, MODERN_SPIRAL_WELL!.topY) : head,
+  }
+}
+
 
 // ————————————————— the glass guards round the openings —————————————————
 

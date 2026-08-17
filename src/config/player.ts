@@ -92,6 +92,36 @@ export const PLAYER = {
   snapToGroundDistance: 0.4,
   /** Small gap the controller keeps from surfaces, avoids jitter against walls. */
   characterOffset: 0.02,
+  /**
+   * How far the controller pushes itself off a contact normal before trying to
+   * move again. Rapier's default is 1.0e-4 and that default is why nobody could
+   * walk the steel spiral.
+   *
+   * WHAT IT LOOKED LIKE, and it looked like a geometry fault every time: the
+   * walker climbing the spiral was carried outward — measured on a fixed
+   * heading, the displacement comes out 0.28 of its own length to the OUTSIDE at
+   * r 0.46 and 0.19 at r 0.54, going to 0.07 by r 0.70, and to ZERO walking down
+   * the same treads and zero on the flat floor of storey 1. It is the pitch: a
+   * 0.6 m capsule cannot follow a going of 0.26 m without riding the surface
+   * ahead of it, and on a helix that ride has a sideways component. So every
+   * ascent ends up against whatever bounds the flight — five starts from r 0.40
+   * to 0.69 all converged on the same edge.
+   *
+   * AND THERE IT STOPPED DEAD. Pressed against the rail, on a slope, the
+   * controller lost every millimetre of movement: 0.01 treads in 120 frames,
+   * grounded, with the wall parallel to the way it was trying to go. On the FLAT
+   * floor the same walker slides along the drum happily — 34.8° of arc out of
+   * 45° at a 45° incidence — so it was never the wall and never the heading. It
+   * was that a contact resolved with a 0.1 mm nudge is a contact again on the
+   * next frame, and on a slope there are two of them arguing.
+   *
+   * 0.01 m is 1.4 mm under a walking frame at 1/60 s and half the character
+   * offset, so it cannot push the walker through anything. With it, the same
+   * three stalls became 5.87, 5.87 and 5.94 treads and two of them ended on
+   * storey 2. It is a solver parameter, not a dimension: nothing in the building
+   * moves.
+   */
+  normalNudgeFactor: 0.01,
   /** Mouse/touch look sensitivity, radians per pixel. */
   lookSensitivity: 0.0025,
   /** Pitch is clamped so the view cannot roll over the top. */

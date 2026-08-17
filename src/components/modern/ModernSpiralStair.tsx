@@ -1,13 +1,24 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import { CuboidCollider, RigidBody } from '@react-three/rapier'
-import { planFlight, stairTreadVertices } from '../../lib/staircase'
-import { stairRampBoxes } from '../../lib/collision'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
+import { TREAD_OVERLAP_FRACTION, planFlight, stairTreadVertices } from '../../lib/staircase'
+import {
+  helicalGuardBoxes,
+  radialGuardBox,
+  sectorSlabBoxes,
+  stairRampBoxes,
+  type BoxSpec,
+} from '../../lib/collision'
 import {
   MODERN_SPIRAL,
+  MODERN_SPIRAL_BAND_AT,
+  MODERN_SPIRAL_GUARD_AT,
   MODERN_SPIRAL_LIFT,
+  MODERN_SPIRAL_RAIL,
   MODERN_SPIRAL_TREADS,
   MODERN_SPIRAL_WALK_BAND,
+  MODERN_SPIRAL_WELL_RADIUS,
 } from '../../config/modern'
 
 /** m — chequer plate is thin; this is a plate, not a stone block. */
@@ -79,20 +90,49 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
 
   useEffect(() => () => treadGeometry?.dispose(), [treadGeometry])
 
+  /**
+   * The flight with the band and the guard read off at every nosing.
+   *
+   * ONE LIST, used by the walking surface AND by the wall beside it, so the two
+   * can never disagree about where the edge of the stair is at a given height —
+   * which is the whole design: the walker who is carried outward should arrive
+   * at a rail with floor still under their feet, not at an edge.
+   */
+  const flight = useMemo(() => {
+    if (steps.length < 2) return []
+    const narrowest = MODERN_SPIRAL_WALK_BAND
+    if (!narrowest) return []
+    return steps.map((s) => {
+      const band = MODERN_SPIRAL_BAND_AT(s.treadY) ?? narrowest
+      const g = MODERN_SPIRAL_GUARD_AT(s.treadY)
+      return {
+        azimuthDeg: s.azimuthDeg,
+        treadY: s.treadY,
+        midRadius: band.midRadius,
+        halfWidth: band.width / 2,
+        ...(g ?? {}),
+      }
+    })
+  }, [steps])
+
   const ramp = useMemo(() => {
     if (steps.length < 2) return []
     /*
-     * THE WALKING LINE IS THE WELL'S, NOT THE TREAD'S.
+     * THE WALKING LINE IS THE WELL'S, NOT THE TREAD'S — AND IT IS NO LONGER
+     * THE SAME LINE ALL THE WAY UP.
      *
-     * MODERN_SPIRAL_WALK_BAND is where a body fits between the newel and the rim
-     * of the hole this flight rises through, and the whole argument — with the
-     * walk that measured it — is written out there. Null means the survey says a
-     * walker does not fit through the well at all, and the honest collider for
-     * that is none: a band clamped to a hair wide would be a stair you can stand
-     * on and not walk, which is exactly the fault this replaced.
+     * MODERN_SPIRAL_WALK_BAND is where a body fits between the newel and the
+     * rim of the hole this flight rises through, and it still bounds the top of
+     * the climb exactly as it did. MODERN_SPIRAL_BAND_AT adds the term that
+     * argument left out: the rim is 0.3 m of stone at the head of a 3.78 m
+     * flight, and a walker whose head is two metres below the soffit is not
+     * near it. Below that the band ends at the BALUSTRADE instead, so there is
+     * collider under the walker's feet the whole way out to the rail they can
+     * lean on. Null means the survey says a walker does not fit through the
+     * well at all, and the honest collider for that is none.
      */
-    const band = MODERN_SPIRAL_WALK_BAND
-    if (!band) return []
+    const narrowest = MODERN_SPIRAL_WALK_BAND
+    if (!narrowest) return []
     const width = MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius
     const first = steps[0]
     /*
@@ -122,6 +162,7 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
      */
     const floorY = MODERN_SPIRAL_LIFT ? MODERN_SPIRAL_LIFT.fromY : 0
     const stepAngle = steps.length > 1 ? steps[1].azimuthDeg - steps[0].azimuthDeg : 30
+    const footBand = MODERN_SPIRAL_BAND_AT(first.treadY) ?? narrowest
     const approaches = [-1, -0.5, 0, 0.5, 1].map((k) => [
       {
         azimuthDeg: first.azimuthDeg + stepAngle * k,
@@ -131,74 +172,225 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
       {
         azimuthDeg: first.azimuthDeg + stepAngle * k,
         treadY: first.treadY,
-        // onto the WALKING LINE, not onto the tread's middle: the approach
-        // exists to put the walker where the flight is collided, and delivering
-        // them to 0.579 put them on the outer edge of a band that now ends at
-        // 0.580 — one step off it and they are in the well's wall for the rest
-        // of the climb
-        midRadius: band.midRadius,
+        // onto the WALKING LINE AT THE FOOT, not onto the tread's middle and no
+        // longer onto the whole flight's narrowest line either: the approach
+        // exists to put the walker where the flight is collided, and down here
+        // that band runs out to the balustrade
+        midRadius: footBand.midRadius,
       },
     ])
     /*
-     * ONE box per step, and the collider NARROWER than the treads.
+     * STILL ONE BOX PER TREAD, and that was checked rather than assumed.
      *
-     * A chain of yawed boxes cannot represent a tight helix without leaving
-     * lips. Each box's top is the plane through two nosings; the next box's
-     * plane is yawed from it, so away from the walking line the two diverge, and
-     * the step between them grows with distance from that line. On the masonry
-     * flights the yaw is 4° a step at 4.3 m radius and the lip is ~15 mm — below
-     * notice. This newel spiral turns 27.7° a step, and across the full 1.04 m
-     * tread the lip works out at ~0.11 m. This controller will not climb a lip of
-     * any height: measured, the walker took three treads and stopped dead.
-     *
-     * So the walking surface is a band about the walking line rather than the
-     * whole tread. WHICH band is no longer a choice — it is the walker's own
-     * clearance through the well, MODERN_SPIRAL_WALK_BAND, and both terms of the
-     * lip fall with it: the half-width goes 0.275 → 0.111 and the walking line
-     * comes in to 0.469, which steepens the flight from 31.8° to 37.4° and still
-     * leaves the lip at 0.040 m against 0.079 m. The pitch stays well inside the
-     * controller's 60° climb limit. The treads are drawn full width throughout,
-     * which is what anyone actually sees.
-     *
-     * Halving the span from two steps to one halves the chord error as well.
+     * A chain of yawed boxes cannot follow a helix without leaving a ridge at
+     * every joint — the tops meet on the walking line and diverge away from it,
+     * a shallow V measured at 0.020 m deep at the band's edge — and the obvious
+     * reading of the owner's «обваливаешься» is that the ridge sheds the
+     * capsule sideways. It does not. Cut four ways per tread the outward
+     * deflection was unchanged to three decimal places, and widening the boxes
+     * to the full drawn tread left it unchanged too: 0.278 against 0.284 of
+     * their own length at r 0.46. The deflection is the pitch and the capsule,
+     * not the chain, and the thing that actually made it fatal was the
+     * controller welding itself to whatever it met — see PLAYER.normalNudgeFactor.
+     * So the chain stays as coarse as it was, and 84 colliders were not spent on
+     * a theory the walk refused.
      */
-    const collided = steps.map((s) => ({ ...s, midRadius: band.midRadius }))
     return [
-      ...stairRampBoxes(collided, band.width, 1, COLLIDER_THICKNESS),
+      ...stairRampBoxes(flight, narrowest.width, 1, COLLIDER_THICKNESS),
       ...approaches.flatMap((a) => stairRampBoxes(a, width, 1, COLLIDER_THICKNESS)),
+    ]
+  }, [steps, flight])
+
+  /**
+   * THE HEAD OF THE FLIGHT: a landing that is a floor, and a stop past it.
+   *
+   * The owner: «последние ступени неудобно на ярус выходят.» Walked before it
+   * was touched: the ramp chain ends AT the last nosing while the drawn tread
+   * runs half a wedge further, so the walker overran the end of the collider by
+   * 0.09 m onto drawn steel with nothing under it, lost the ground and fell back
+   * into the flight's own well — seven treads down, four times over, the stair
+   * feeding him back into itself. Outward there was a 0.32 m annulus of nothing
+   * between the band's edge at 0.580 and the storey's slab at 0.900, and getting
+   * out meant turning inside a single tread: 0.17 seconds of walking.
+   *
+   * The top tread is the ONE tread in this flight that lands on a floor level,
+   * and therefore the one tread whose full drawn width a body may occupy: its
+   * feet are on storey 2's floor, so its shoulders are above the slab and the
+   * rim it has been dodging the whole way up is behind it. So that wedge is
+   * collided as it is DRAWN — newel to 1.1 m, out past the well's edge at 0.9,
+   * flush at floorY with the storey's own slab. Nothing new is drawn: this is
+   * the chequer-plate landing MODERN_SPIRAL has described since the survey
+   * landed, meeting the stone in one level, exactly as up/036 shows it.
+   *
+   * And the run is closed at its head, on approachGuardBoxes' argument: past the
+   * landing the model has a well it should not have — the flight is wider than
+   * its own hole — and a walker who does not turn should meet a rail, not 3.78 m
+   * of air. It stops at the well's edge so the room beyond stays open.
+   */
+  const head = useMemo<BoxSpec[]>(() => {
+    if (steps.length < 2 || !MODERN_SPIRAL_LIFT) return []
+    const last = steps[steps.length - 1]
+    const sign = Math.sign(steps[1].azimuthDeg - steps[0].azimuthDeg) || 1
+    // the drawn tread's forward half-wedge: stairTreadVertices centres each
+    // plate on its own nosing and stretches it by TREAD_OVERLAP_FRACTION
+    const halfSpanDeg = (last.angularWidthDeg / 2) * (1 + TREAD_OVERLAP_FRACTION)
+    const endDeg = last.azimuthDeg + sign * halfSpanDeg
+    const band = MODERN_SPIRAL_BAND_AT(last.treadY)
+    return [
+      ...sectorSlabBoxes({
+        centreAzimuthDeg: last.azimuthDeg + (sign * halfSpanDeg) / 2,
+        widthDeg: halfSpanDeg,
+        innerRadius: MODERN_SPIRAL.columnRadius,
+        outerRadius: MODERN_SPIRAL.outerRadius,
+        surfaceY: last.treadY,
+        thickness: COLLIDER_THICKNESS,
+        sectors: 3,
+      }),
+      /*
+       * And the plate BEHIND the last nosing, outboard of the ramp chain only.
+       *
+       * The drawn tread is a level plate centred on its own nosing, so half of
+       * it lies back over the arriving flight, where the ramp is still climbing
+       * the last 0.086 m to the floor. Collided at full width it would put a
+       * step up in the walker's path; left out altogether it was a 0.32 m
+       * annulus of drawn steel with nothing under it, and the walk that found
+       * this ended there — feet on the floor's level at r 0.817, resting on the
+       * slab's inner corner, unable to go on. So it is carried from the band's
+       * outer edge outward: past where a body walks, up to the drawn edge, and
+       * flush with the storey's slab at 0.900.
+       */
+      ...sectorSlabBoxes({
+        centreAzimuthDeg: last.azimuthDeg - (sign * halfSpanDeg) / 2,
+        widthDeg: halfSpanDeg,
+        innerRadius: band ? band.outerRadius : MODERN_SPIRAL_WELL_RADIUS,
+        outerRadius: MODERN_SPIRAL.outerRadius,
+        surfaceY: last.treadY,
+        thickness: COLLIDER_THICKNESS,
+        sectors: 3,
+      }),
+      ...radialGuardBox({
+        azimuthDeg: endDeg,
+        innerRadius: MODERN_SPIRAL.columnRadius,
+        // stops at the well's edge: outboard of that is storey 2's own floor,
+        // which a visitor must be able to walk along
+        outerRadius: MODERN_SPIRAL_WELL_RADIUS,
+        floorY: last.treadY,
+        height: MODERN_SPIRAL.guardHeight,
+      }),
     ]
   }, [steps])
 
-  /** One post per tread on the outer arc, plus the rail linking their heads. */
-  const balustrade = useMemo(() => {
-    const posts: Array<[number, number, number]> = []
-    const rails: Array<{ position: [number, number, number]; quaternion: THREE.Quaternion; length: number }> = []
-    const head = (s: (typeof steps)[number]): THREE.Vector3 => {
-      const a = s.azimuthDeg * (Math.PI / 180)
-      const r = MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.rodRadius * 2
-      return new THREE.Vector3(
-        Math.sin(a) * r,
-        s.treadY + MODERN_SPIRAL.guardHeight,
-        -Math.cos(a) * r,
-      )
+  /**
+   * THE BALUSTRADE'S COLLIDERS — and which chords get one.
+   *
+   * The first is skipped: that is where the approach ramps deliver a visitor
+   * onto the flight, and a guard across it would seal the only way on.
+   *
+   * The last is skipped too, and for the conflict this whole stair is built
+   * over. The flight is Ø 2.2 m and its well Ø 1.8 m, so at the top the drawn
+   * rail stands OUTSIDE the floor the flight arrives on — 1.06 m against a slab
+   * that begins at 0.90. A collider there is not a handrail, it is a fence
+   * between the landing and the room, which is exactly the objection
+   * GUARDED_OPENINGS raises against ringing this well. Nothing is lost by
+   * leaving it out: on those treads the walker's shoulders are inside the slab
+   * band, so the rim already stops them at 0.580, well short of the rail.
+   *
+   * The upper chords that DO get one are the incidental gain. Their posts stand
+   * through storey 2's floor — drawn that way, because the stair is wider than
+   * the hole — so from the storey they are a guard round two fifths of the well
+   * head, built from what the model already draws rather than invented for the
+   * purpose.
+   */
+  const guard = useMemo<BoxSpec[]>(
+    () =>
+      flight.length < 3
+        ? []
+        : helicalGuardBoxes({
+            steps: flight,
+            innerRadius: MODERN_SPIRAL_RAIL.faceRadius,
+            height: MODERN_SPIRAL.guardHeight,
+            fromChord: 1,
+            toChord: flight.length - 3,
+          }),
+    [flight],
+  )
+
+  /**
+   * The balustrade as one mesh: a post on every tread's outer corner, the infill
+   * between them, and the rail linking their heads.
+   *
+   * MODERN_SPIRAL.rodsPerTread has recorded three since the survey landed — «one
+   * thicker post on each tread's outer corner, with two thinner infill rods
+   * between consecutive posts», a direct count off four frames needing no scale
+   * — and nothing read it. What got built was one post per tread and a single
+   * tube over the top, leaving a 0.468 m gap between uprights: «кажется там
+   * перила просто фасад прозрачный». It was, in both senses.
+   *
+   * Merged rather than drawn as 66 cylinders, which is not tidiness: the draw
+   * budget is 120 for the whole interior (config/perf.ts) and the balustrade
+   * alone was spending 43 of it.
+   */
+  const balustradeGeometry = useMemo(() => {
+    if (steps.length === 0) return null
+    const parts: THREE.BufferGeometry[] = []
+    const D = Math.PI / 180
+    const at = (azimuthDeg: number, y: number, radius: number) => {
+      const a = azimuthDeg * D
+      return new THREE.Vector3(Math.sin(a) * radius, y, -Math.cos(a) * radius)
     }
-    for (const s of steps) {
-      const h = head(s)
-      posts.push([h.x, s.treadY + MODERN_SPIRAL.guardHeight / 2, h.z])
+    /** An upright tube standing on `bottom` and reaching `top`. */
+    const upright = (azimuthDeg: number, bottom: number, top: number, radius: number) => {
+      const h = top - bottom
+      if (h <= 0) return
+      const g = new THREE.CylinderGeometry(radius, radius, h, 8)
+      const p = at(azimuthDeg, (bottom + top) / 2, MODERN_SPIRAL_RAIL.postRadius)
+      g.translate(p.x, p.y, p.z)
+      parts.push(g)
     }
+
+    const railY = (s: (typeof steps)[number]) => s.treadY + MODERN_SPIRAL.guardHeight
+    for (const s of steps) upright(s.azimuthDeg, s.treadY, railY(s), MODERN_SPIRAL.rodRadius)
+
     for (let i = 0; i < steps.length - 1; i++) {
-      const a = head(steps[i])
-      const b = head(steps[i + 1])
-      const mid = a.clone().add(b).multiplyScalar(0.5)
-      const dir = b.clone().sub(a)
+      const a = steps[i]
+      const b = steps[i + 1]
+      // the infill: rodsPerTread counts the post and the rods between it and the
+      // next, so the gaps are that many and the rods one fewer
+      for (let k = 1; k < MODERN_SPIRAL.rodsPerTread; k++) {
+        const t = k / MODERN_SPIRAL.rodsPerTread
+        const az = a.azimuthDeg + (b.azimuthDeg - a.azimuthDeg) * t
+        // the treads are level plates centred on their own nosings, so an infill
+        // rod stands on whichever plate it is over, not on the sloping mean
+        const foot = t < 0.5 ? a.treadY : b.treadY
+        upright(az, foot, railY(a) + (railY(b) - railY(a)) * t, MODERN_SPIRAL.infillRodRadius)
+      }
+
+      const ha = at(a.azimuthDeg, railY(a), MODERN_SPIRAL_RAIL.postRadius)
+      const hb = at(b.azimuthDeg, railY(b), MODERN_SPIRAL_RAIL.postRadius)
+      const dir = hb.clone().sub(ha)
+      const g = new THREE.CylinderGeometry(
+        MODERN_SPIRAL.rodRadius,
+        MODERN_SPIRAL.rodRadius,
+        dir.length(),
+        8,
+      )
       const q = new THREE.Quaternion().setFromUnitVectors(
         new THREE.Vector3(0, 1, 0),
         dir.clone().normalize(),
       )
-      rails.push({ position: [mid.x, mid.y, mid.z], quaternion: q, length: dir.length() })
+      g.applyQuaternion(q)
+      const mid = ha.clone().add(hb).multiplyScalar(0.5)
+      g.translate(mid.x, mid.y, mid.z)
+      parts.push(g)
     }
-    return { posts, rails }
+
+    if (parts.length === 0) return null
+    const merged = mergeGeometries(parts, false)
+    for (const g of parts) g.dispose()
+    return merged
   }, [steps])
+
+  useEffect(() => () => balustradeGeometry?.dispose(), [balustradeGeometry])
 
   const steel = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#3a3a3e', roughness: 0.55, metalness: 0.75 }),
@@ -220,6 +412,7 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
   if (!visible && !withColliders) return null
 
   const rise = MODERN_SPIRAL_LIFT.toY - MODERN_SPIRAL_LIFT.fromY
+  const newelHeight = rise + 0.3
 
   return (
     <group>
@@ -233,22 +426,12 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
             position={[0, MODERN_SPIRAL_LIFT.fromY + rise / 2, 0]}
             castShadow
           >
-            <cylinderGeometry args={[MODERN_SPIRAL.columnRadius, MODERN_SPIRAL.columnRadius, rise + 0.3, 16]} />
+            <cylinderGeometry
+              args={[MODERN_SPIRAL.columnRadius, MODERN_SPIRAL.columnRadius, newelHeight, 16]}
+            />
           </mesh>
 
-          {balustrade.posts.map((p, i) => (
-            <mesh key={`post-${i}`} material={bright} position={p}>
-              <cylinderGeometry
-                args={[MODERN_SPIRAL.rodRadius, MODERN_SPIRAL.rodRadius, MODERN_SPIRAL.guardHeight, 8]}
-              />
-            </mesh>
-          ))}
-
-          {balustrade.rails.map((r, i) => (
-            <mesh key={`rail-${i}`} material={bright} position={r.position} quaternion={r.quaternion}>
-              <cylinderGeometry args={[MODERN_SPIRAL.rodRadius, MODERN_SPIRAL.rodRadius, r.length, 8]} />
-            </mesh>
-          ))}
+          {balustradeGeometry && <mesh geometry={balustradeGeometry} material={bright} castShadow />}
         </>
       )}
 
@@ -257,7 +440,7 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
         character controller will not climb a vertical face, so a box per tread
         makes the stair unclimbable however correct it looks.
       */}
-      {withColliders && ramp.length > 0 && (
+      {withColliders && (ramp.length > 0 || guard.length > 0 || head.length > 0) && (
         <RigidBody type="fixed" colliders={false}>
           {ramp.map((b, i) => (
             <CuboidCollider
@@ -267,6 +450,34 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
               quaternion={b.quaternion}
             />
           ))}
+          {guard.map((b, i) => (
+            <CuboidCollider
+              key={`mguard-${i}`}
+              args={b.halfExtents}
+              position={b.position}
+              quaternion={b.quaternion}
+            />
+          ))}
+          {head.map((b, i) => (
+            <CuboidCollider
+              key={`mhead-${i}`}
+              args={b.halfExtents}
+              position={b.position}
+              quaternion={b.quaternion}
+            />
+          ))}
+          {/*
+            THE NEWEL, which was drawn and carried nothing.
+            throughOpeningWalkBand says so in as many words, and the walk proved
+            what it costs: aimed inward off the band a capsule passed clean
+            through the 115 mm tube — measured at r 0.061 against a column of
+            0.0575 — and fell down the middle of the stair. It is a steel
+            column; you can put a hand on it.
+          */}
+          <CylinderCollider
+            args={[newelHeight / 2, MODERN_SPIRAL.columnRadius]}
+            position={[0, MODERN_SPIRAL_LIFT.fromY + rise / 2, 0]}
+          />
         </RigidBody>
       )}
     </group>
