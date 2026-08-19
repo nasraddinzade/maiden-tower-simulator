@@ -70,9 +70,14 @@ export function TowerShell({ onStats, withCollider, material, xray, ...params }:
   )
 
   useEffect(() => {
-    console.info(
-      `[TowerShell] triangles=${stats.triangleCount} vertices=${stats.vertexCount} degenerate=${stats.degenerateCount}`,
-    )
+    // Dev only. Every other diagnostic in this project is gated and this one was
+    // not, so the public build's console opened on a CSG triangle count — the
+    // one line in it that came from us.
+    if (import.meta.env.DEV) {
+      console.info(
+        `[TowerShell] triangles=${stats.triangleCount} vertices=${stats.vertexCount} degenerate=${stats.degenerateCount}`,
+      )
+    }
     onStats?.(stats)
   }, [stats, onStats])
 

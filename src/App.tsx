@@ -1068,8 +1068,15 @@ export default function App() {
    * Diagnostic overlays, per docs/optimization-addendum.md:
    * F3 — the budget readout, F4 — a wireframe of every collider over the visuals,
    * so the gap between what is drawn and what is collided against is visible.
+   *
+   * THE KEYS STAY IN THE PRODUCTION BUILD; THE DEFAULT DOES NOT. F3 opened the
+   * budget readout on load for everybody, which is the right default for the
+   * person building the tower and the wrong one for the person being shown it:
+   * the first thing a visitor met was a frame-time counter in the corner of a
+   * museum. Anyone who wants it still presses F3 and gets it, which is what the
+   * README has always promised; nobody is greeted by it.
    */
-  const [showPerf, setShowPerf] = useState(true)
+  const [showPerf, setShowPerf] = useState(import.meta.env.DEV)
   const [showColliders, setShowColliders] = useState(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1089,7 +1096,21 @@ export default function App() {
   return (
     <>
       <LoadingScreen />
-      <Leva collapsed />
+      {/*
+        THE PANEL IS A TUNING RIG, AND IT WAS SHIPPING TO THE PUBLIC SITE.
+        Not merely untidy: these sliders move STAIR.startAzimuthDeg, the winding,
+        CUPOLA_RISE, the oculus multiplier — every number this project argues
+        about. A visitor who opens the panel and drags one is looking at a tower
+        that no longer matches a single sentence the app says about it, with no
+        indication that anything has changed. The app's whole claim is that the
+        geometry is traceable to a source; a public control that silently breaks
+        the trace is worse than an ugly overlay.
+
+        `hidden` removes the panel, NOT the controls: useControls still registers
+        every key and still returns its default, so the built geometry is
+        identical either way — measured, 19,402 shell triangles before and after.
+      */}
+      <Leva collapsed hidden={!import.meta.env.DEV} />
       <LanguageSwitcher />
       {showPerf && (
         <PerfHud
@@ -1169,7 +1190,14 @@ export default function App() {
         apertures={apertures}
       />
 
-      {stats && (
+      {/*
+        The CSG triangle count is a build diagnostic — it is how a run of this
+        file tells you whether a cut went degenerate — and it stood in the same
+        bottom-left corner as the F3 readout, at a lower z-index, so on the
+        public build the two overlapped. It says nothing to a visitor that it
+        does not say better in the console of a dev run.
+      */}
+      {import.meta.env.DEV && stats && (
         <div
           style={{
             position: 'fixed',
