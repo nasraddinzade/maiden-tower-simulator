@@ -127,6 +127,18 @@ export interface RevealFacet {
   faceY: number
   /** Half the facet's run along its own face. */
   halfLength: number
+  /**
+   * How far the stone behind this facet has to reach along its normal.
+   *
+   * Per facet, because the two families answer to different boundaries. A jamb
+   * has to cross the hole the WALL RING leaves beside the doorway, which is the
+   * caller's `depth` and is most of a metre. The head only has to fill what the
+   * square cutter took and the arch gave back — see revealFacets — and that is a
+   * quarter of it. They shared the jamb's figure until 2026-08-19, which was
+   * harmless while the reveal was one slab per facet and expensive once it was
+   * coursed: three quarters of the boxes were stone above the crown.
+   */
+  depth: number
 }
 
 /**
@@ -230,13 +242,30 @@ export function revealFacets(s: RevealSection): RevealFacet[] {
       faceT: side * half,
       faceY: s.clearHeight / 2 + rake * side * half,
       halfLength: s.clearHeight / 2 + slide,
+      depth: s.depth,
     })
   }
 
+  /*
+   * HOW DEEP THE HEAD GOES, which is not how deep the jambs go.
+   *
+   * What the head has to put back is the difference between the square hole the
+   * collider ring cuts and the arched one the shell draws: the region above the
+   * arc, under the square's top — which is the crown's own level — and inside
+   * `|t| ≤ half`, because past that the jambs already run the whole height. The
+   * furthest that boundary lies from the arc along a normal is over the 45°
+   * haunch, at `half·(√2 − 1)`; the tolerance is added because a facet stands
+   * that far off the curve to begin with, and the rake because a shear carries
+   * the corner sideways.
+   */
+  const headDepth = Math.min(
+    s.depth,
+    half * (Math.SQRT2 - 1) + s.tolerance + Math.abs(rake) * half,
+  )
   const n = archFacetCount(half, s.tolerance)
   const step = Math.PI / n
   // long enough that neighbouring slabs still meet at the far edge of the stone
-  const halfLength = (half + s.depth) * Math.tan(step / 2) * 1.08
+  const halfLength = (half + headDepth) * Math.tan(step / 2) * 1.08
   for (let i = 0; i < n; i += 1) {
     const theta = (i + 0.5) * step // 0 at the +t springing, π at the −t one
     const faceT = half * Math.cos(theta)
@@ -250,6 +279,7 @@ export function revealFacets(s: RevealSection): RevealFacet[] {
       faceT,
       faceY: faceY + rake * faceT,
       halfLength: halfLength * Math.sqrt(1 + rake * rake),
+      depth: headDepth,
     })
   }
   return out

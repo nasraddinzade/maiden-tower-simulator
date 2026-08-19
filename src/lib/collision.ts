@@ -589,6 +589,14 @@ export interface DoorwayRevealParams {
  * spans height is cut into courses short enough that the room face does not run
  * away from it by more than the same tolerance — the wall leans out 0.044 m per
  * metre, so a course is about a third of a metre and a jamb is five of them.
+ *
+ * AND SO IS THE CURVE, which for eleven days it was not. The wall is round as
+ * well as coned, and the same box that cannot tilt to follow the cone cannot
+ * bend to follow the drum: a jamb reaching round to meet the sector boxes beside
+ * the doorway ran as a straight chord and came out 0.45 m outside the arc at its
+ * far end, in the stair passage, where it stopped the walker on the fourth tread
+ * of every flight. Courses on that axis too, seated on the arc across their own
+ * span, and hard-capped at the passage cheek read as the radius it is.
  */
 export function doorwayRevealBoxes(p: DoorwayRevealParams): BoxSpec[] {
   const height = p.headY - p.sillY
@@ -609,14 +617,54 @@ export function doorwayRevealBoxes(p: DoorwayRevealParams): BoxSpec[] {
   const outward: [number, number] = [Math.sin(rad), -Math.cos(rad)]
   const along: [number, number] = [Math.cos(rad), Math.sin(rad)]
 
+  const halfWidth = p.clearWidth / 2
+  const sectorRad = (2 * Math.PI) / Math.max(3, p.sectors)
+
   /*
-   * How far the stone reaches away from the opening. It has to cross the hole
-   * wallColliders() leaves, which is the doorway's own arc widened by one sector
-   * each side — comfortably less than the opening's width — and it must not
-   * reach so far that a head facet climbs out of the storey it belongs to. The
-   * clear width answers both.
+   * How far the stone reaches away from the opening: TO THE EDGE OF THE HOLE
+   * AND NO FURTHER, and the hole is wallColliders()' own.
+   *
+   * That ring drops a sector whenever an opening touches it, so the wall is
+   * missing from the opening's edge out to the first sector box that survives.
+   * The last dropped sector is centred within `widthDeg/2 + sectorDeg/2` of the
+   * doorway, the next centre lies one sector beyond that, and every box overhangs
+   * its own sector by 1.2 chords — so surviving stone starts within one whole
+   * sector of the opening's own edge, whatever the doorway's phase against the
+   * sector grid happens to be. Read at the face the reveal stands on, that is
+   * `asin(half/face)` of opening plus one sector of arc, and its tangent is the
+   * reach. Measured against the shipped tower the widest hole any doorway leaves
+   * is 18.1° where this allows 19.3–21.6°.
+   *
+   * IT USED TO BE `max(0.5, clearWidth)`, which reaches 1.5 clear widths from
+   * the doorway's axis where the paragraph above asks for about one — twice the
+   * arc this same comment claimed to be crossing. That would have been merely
+   * wasteful if the stone followed the drum. It did not: see the coursing below.
    */
-  const depth = Math.max(0.5, p.clearWidth)
+  const openingHalfAngle = Math.asin(Math.min(0.95, halfWidth / faceAtSill))
+  const reach = faceAtSill * Math.tan(Math.min(1.3, openingHalfAngle + sectorRad))
+  const depth = Math.max(halfWidth, reach - halfWidth)
+
+  /**
+   * How far a course may run ROUND the drum before its flat face parts company
+   * with the arc by more than `tolerance` — the tangential twin of
+   * `courseHeight`, and the whole reason this function was rewritten.
+   *
+   * A reveal box is turned to lay its face on the opening, so its radial axis is
+   * the doorway's own bearing and its faces are CHORDS: a face held at
+   * perpendicular distance `rho` from the tower's axis stands at radius
+   * `hypot(rho, t)` a tangential distance `t` away, which runs out as `t²/2rho`.
+   * With the old reach the far end of a jamb slab stood 0.45 m further out than
+   * its near end while the drum had not moved at all — so the slab crossed the
+   * passage's inner cheek and stood in the stair: 0.45 m of invisible stone
+   * across a passage 1.03 m wide, on both jambs of every doorway, and the walker
+   * could not climb past the fourth tread of any flight in the tower. The taper
+   * was already taken in courses for exactly this reason on the other axis; the
+   * curve had been left to one slab.
+   *
+   * A course seated to split the difference is out by `(tHi² − tLo²)/4·face` at
+   * each end, so this is that solved for the tolerance.
+   */
+  const spanFrom = (t: number) => Math.sqrt(t * t + 4 * faceAtSill * tolerance) - Math.abs(t)
 
   const out: BoxSpec[] = []
 
@@ -627,36 +675,86 @@ export function doorwayRevealBoxes(p: DoorwayRevealParams): BoxSpec[] {
     tolerance,
     rake: p.bottomRake,
   })) {
-    // how much of the facet's run is vertical: only that part meets the taper
+    // how much of the facet's run rises and how much of it goes round: the cone
+    // sizes the first, the drum the second
     const rise = Math.abs(f.normalT) * f.halfLength * 2
-    const courses = Math.max(1, Math.ceil(rise / Math.max(0.05, courseHeight)))
-    const halfLen = f.halfLength / courses
-    for (let c = 0; c < courses; c += 1) {
+    const sweep = Math.abs(f.normalY) * f.halfLength * 2
+    // the largest tangential offset any box on this facet reaches
+    const tReach = Math.abs(f.faceT + f.normalT * f.depth) + Math.abs(f.normalY) * f.halfLength
+    const runCourses = Math.max(
+      1,
+      Math.ceil(rise / Math.max(0.05, courseHeight)),
+      Math.ceil(sweep / Math.max(0.02, spanFrom(tReach))),
+    )
+    const halfLen = f.halfLength / runCourses
+
+    /*
+     * The courses INTO the stone, taken adaptively: a course may run further
+     * where the drum falls away more slowly, which is nearer the doorway's axis.
+     * Uniform courses cut at the far end's rate cost a third more boxes for the
+     * same fidelity.
+     */
+    const cuts = [0]
+    while (cuts[cuts.length - 1] < f.depth - 1e-6) {
+      const d0 = cuts[cuts.length - 1]
+      const tHere = Math.abs(f.faceT + f.normalT * d0) + Math.abs(f.normalY) * f.halfLength
+      let step = f.depth - d0
+      if (Math.abs(f.normalT) > 1e-9) step = Math.min(step, spanFrom(tHere) / Math.abs(f.normalT))
+      if (Math.abs(f.normalY) > 1e-9) step = Math.min(step, courseHeight / Math.abs(f.normalY))
+      cuts.push(Math.min(f.depth, d0 + Math.max(0.02, step)))
+    }
+    // a last course thinner than the solver's own skin is worse than none
+    if (cuts.length > 2 && cuts[cuts.length - 1] - cuts[cuts.length - 2] < 0.02) {
+      cuts.splice(cuts.length - 2, 1)
+    }
+
+    for (let c = 0; c < runCourses; c += 1) {
       const centre = -f.halfLength + (2 * c + 1) * halfLen
-      // step along the facet's own face: perpendicular to its normal
-      const t = f.faceT - f.normalY * centre
-      const y = p.sillY + f.faceY + f.normalT * centre
-      /*
-       * Radially the course starts at the LOWEST room face it spans, so it can
-       * never stand proud of the wall into the room; the price is the tolerance
-       * above, paid at the top of the course, which is what sizes a course.
-       */
-      const lo = y - Math.abs(f.normalT) * halfLen
-      const inner = Math.min(p.innerRadiusAt(lo), p.outerRadius - 0.02)
-      const thickness = Math.max(0.05, Math.min(p.outerRadius - inner, WALL_BOX_THICKNESS))
-      const px = t * along[0] + (inner + thickness / 2) * outward[0]
-      const pz = t * along[1] + (inner + thickness / 2) * outward[1]
-      out.push({
-        halfExtents: [thickness / 2, depth / 2, halfLen],
-        position: [
-          px + f.normalT * (depth / 2) * along[0],
-          y + f.normalY * (depth / 2),
-          pz + f.normalT * (depth / 2) * along[1],
-        ],
-        // local +Y onto the facet's normal: pitch about the radial axis
-        quaternion: yawThenPitch(yaw, Math.atan2(f.normalT, f.normalY)),
-        kind: 'wall',
-      })
+      for (let k = 0; k < cuts.length - 1; k += 1) {
+        const halfDepth = (cuts[k + 1] - cuts[k]) / 2
+        const dMid = cuts[k] + halfDepth
+        // along the facet's own face, then into the stone along its normal
+        const t = f.faceT - f.normalY * centre + f.normalT * dMid
+        const y = p.sillY + f.faceY + f.normalT * centre + f.normalY * dMid
+        // what the course spans in the world, from whichever of its own axes carry it
+        const tHalf = Math.abs(f.normalT) * halfDepth + Math.abs(f.normalY) * halfLen
+        const yHalf = Math.abs(f.normalY) * halfDepth + Math.abs(f.normalT) * halfLen
+        /*
+         * Vertically the course still starts at the LOWEST room face it spans, so
+         * the cone can never leave it standing proud of the wall into the room.
+         */
+        const face = Math.min(p.innerRadiusAt(y - yHalf), p.outerRadius - 0.02)
+        /*
+         * Tangentially it is SEATED ON THE ARC across its own span instead, with
+         * the error split between its two ends rather than paid at one, because
+         * here both ends are somewhere it matters: short of the arc is stone
+         * standing in the room, past it is stone standing in the stair.
+         */
+        const tLo = Math.max(0, Math.abs(t) - tHalf)
+        const tHi = Math.abs(t) + tHalf
+        const drop = Math.min(tolerance, (tHi * tHi - tLo * tLo) / (4 * face))
+        let rho = Math.sqrt(Math.max(0.01, (face - drop) ** 2 - tLo * tLo))
+        /*
+         * AND IT MAY NOT CROSS THE PASSAGE'S CHEEK AT ITS FAR CORNER, which turns
+         * the arithmetic above from a hope into a guarantee: the cheek is a
+         * RADIUS, so the perpendicular distance it allows shrinks as the course
+         * runs round. Read this way no reveal box can stand in the stair however
+         * the coursing is sized — and that property, not the fidelity, is what
+         * the shipped version was missing.
+         */
+        const outerHere = Math.sqrt(Math.max(0, p.outerRadius ** 2 - tHi * tHi))
+        if (outerHere - rho < 0.05) rho = outerHere - 0.05
+        if (rho <= 0.05) continue
+        const thickness = Math.min(WALL_BOX_THICKNESS, outerHere - rho)
+        const seat = rho + thickness / 2
+        out.push({
+          halfExtents: [thickness / 2, halfDepth, halfLen],
+          position: [t * along[0] + seat * outward[0], y, t * along[1] + seat * outward[1]],
+          // local +Y onto the facet's normal: pitch about the radial axis
+          quaternion: yawThenPitch(yaw, Math.atan2(f.normalT, f.normalY)),
+          kind: 'wall',
+        })
+      }
     }
   }
   return out

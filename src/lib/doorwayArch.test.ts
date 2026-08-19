@@ -153,12 +153,67 @@ function inBox(b: BoxSpec, p: [number, number, number]): boolean {
 }
 
 /**
+ * Is the world point inside ANY collider?
+ *
+ * With a bounding sphere in front of it, because coursing the reveal on two axes
+ * took the tower from 1100 boxes to 2000 and the sampling tests below are a
+ * linear scan per point: rejecting on a squared distance first is what keeps
+ * this file at four seconds rather than fifteen.
+ */
+const bounded = boxes.map((b) => ({
+  b,
+  r2: b.halfExtents[0] ** 2 + b.halfExtents[1] ** 2 + b.halfExtents[2] ** 2,
+}))
+function solid(p: [number, number, number]): boolean {
+  for (const s of bounded) {
+    const dx = p[0] - s.b.position[0]
+    const dy = p[1] - s.b.position[1]
+    const dz = p[2] - s.b.position[2]
+    if (dx * dx + dy * dy + dz * dz > s.r2) continue
+    if (inBox(s.b, p)) return true
+  }
+  return false
+}
+
+/** The box's eight corners in world space. */
+function corners(b: BoxSpec): Array<[number, number, number]> {
+  const out: Array<[number, number, number]> = []
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const w = rotate(b.quaternion, [
+          sx * b.halfExtents[0],
+          sy * b.halfExtents[1],
+          sz * b.halfExtents[2],
+        ])
+        out.push([b.position[0] + w[0], b.position[1] + w[1], b.position[2] + w[2]])
+      }
+    }
+  }
+  return out
+}
+
+/**
  * A point in a doorway's own plane, put back into the world.
  *
  * `t` is the tangential offset from the centre line and `y` the height above the
  * sill, exactly the coordinates doorwayCutter's section is drawn in. `depth` is
  * how far past the room face the point sits — the stone the walker's capsule
  * would be pressing on.
+ *
+ * DEPTH IS RADIAL, AND UNTIL 2026-08-19 IT WAS NOT. This function used to put
+ * the point at PERPENDICULAR distance `face + depth` from the tower's axis along
+ * the doorway's own bearing, which is only the same thing on the centre line.
+ * A metre round the wall it is 0.13 m further out, and the room face has not
+ * moved at all — so `pointAt(d, 1.15, y, 0.05)`, asking for stone «0.05 m behind
+ * the face», was asking for it at radius 3.71 in a jamb whose passage cheek is
+ * at 3.695. The test was demanding a collider ON THE STAIR, the reveal obliged,
+ * and the walker could not get past the fourth tread of any flight in the tower.
+ *
+ * The convention is the same one the shell is drawn in — the section is a
+ * straight prism, so `t` stays a perpendicular offset — but the point is now
+ * carried to its own azimuth before the depth is added, so `depth` means into
+ * the stone at the place the point actually is.
  */
 function pointAt(
   d: (typeof doorways)[number],
@@ -167,9 +222,9 @@ function pointAt(
   depth: number,
 ): [number, number, number] {
   const worldY = d.bottomY + y + d.bottomRake * t
-  const rad = (d.azimuthDeg * Math.PI) / 180
   const r = innerRadiusAt(worldY) + depth
-  return [Math.sin(rad) * r + Math.cos(rad) * t, worldY, -Math.cos(rad) * r + Math.sin(rad) * t]
+  const rad = (d.azimuthDeg * Math.PI) / 180 + Math.asin(Math.min(0.99, Math.abs(t) / r)) * Math.sign(t)
+  return [Math.sin(rad) * r, worldY, -Math.cos(rad) * r]
 }
 
 describe('the vault does not hang across a doorway onto the stair', () => {
@@ -345,7 +400,7 @@ describe('the walker is stopped by the stone he can see', () => {
           for (const side of [1, -1]) {
             const p = pointAt(d, side * t, y, 0.05)
             expect(
-              boxes.some((b) => inBox(b, p)),
+              solid(p),
               `stone at az ${d.azimuthDeg.toFixed(1)}, ${(side * t).toFixed(2)} m across, ${y.toFixed(2)} m up`,
             ).toBe(true)
           }
@@ -380,7 +435,7 @@ describe('the walker is stopped by the stone he can see', () => {
           const y = spring + rho * Math.sin(a)
           const p = pointAt(d, t, y, 0.05)
           expect(
-            boxes.some((b) => inBox(b, p)),
+            solid(p),
             `haunch at az ${d.azimuthDeg.toFixed(1)}, ${t.toFixed(2)} m across, ${y.toFixed(2)} m up`,
           ).toBe(true)
         }
@@ -416,9 +471,7 @@ describe('the walker is stopped by the stone he can see', () => {
         const half = archHalfWidthAt(w, h, y)
         for (const side of [1, -1]) {
           for (let t = half; t > 0; t -= 0.01) {
-            const hit = [0.02, 0.08, 0.15].some((depth) =>
-              boxes.some((b) => inBox(b, pointAt(d, side * t, y, depth))),
-            )
+            const hit = [0.02, 0.08, 0.15].some((depth) => solid(pointAt(d, side * t, y, depth)))
             if (!hit) break
             if (half - t > worst) {
               worst = half - t
@@ -431,14 +484,29 @@ describe('the walker is stopped by the stone he can see', () => {
     expect(worst, `worst intrusion ${where}`).toBeLessThan(0.05)
   })
 
-  it('does not put the reveal on the stair', () => {
+  it('does not put the reveal on the stair — at every corner, in RADIUS', () => {
     /*
-     * The reveal is stone in a jamb, and the jamb is 0.25 m thick with the
+     * The reveal is stone in a jamb, and the jamb is 0.19 m thick with the
      * passage behind it. A box that ran past the flight's inner cheek would
      * stand on the treads.
+     *
+     * THIS TEST EXISTED AND PASSED WHILE THE STAIR WAS BLOCKED, because it asked
+     * the wrong question: it took the box's centre, projected it onto the
+     * doorway's own outward bearing, added the half-thickness, and compared THAT
+     * to the cheek. A perpendicular distance is only a radius on the centre line.
+     * A jamb slab runs tangentially, and a face held 3.695 m from the axis along
+     * one bearing stands at 4.148 m of RADIUS 1.884 m round the wall — 0.45 m
+     * inside a passage 1.03 m wide, over 27° of arc, on both jambs of all twelve
+     * doorways. Measured on b2f4c82 as shipped: worst corner 0.4776 m past the
+     * cheek, and the walker stopped on the fourth tread of every flight.
+     *
+     * So it is asked of all eight corners and in the only unit the passage is
+     * described in.
      */
+    let worst = -Infinity
+    let where = ''
     for (const d of doorways) {
-      const cheek = cheekOf(d)
+      const cheek = Math.min(cheekOf(d), TOWER.outerRadius)
       const own = doorwayRevealBoxes({
         azimuthDeg: d.azimuthDeg,
         clearWidth: clearWidthOf(d),
@@ -446,25 +514,84 @@ describe('the walker is stopped by the stone he can see', () => {
         headY: d.topY,
         bottomRake: d.bottomRake,
         innerRadiusAt,
-        outerRadius: Math.min(cheek, TOWER.outerRadius),
+        outerRadius: cheek,
         sectors: SECTORS,
       })
       expect(own.length).toBeGreaterThan(0)
-      const rad = (d.azimuthDeg * Math.PI) / 180
       for (const b of own) {
-        // radially = along the doorway's own outward normal, which is the box's
-        // local X; the tangential offset is not depth into the wall
-        const out = b.position[0] * Math.sin(rad) - b.position[2] * Math.cos(rad)
-        expect(out + b.halfExtents[0], `reveal at az ${d.azimuthDeg.toFixed(1)}`).toBeLessThanOrEqual(
-          cheek + 1e-6,
-        )
+        for (const c of corners(b)) {
+          const over = Math.hypot(c[0], c[2]) - cheek
+          if (over > worst) {
+            worst = over
+            where = `az ${d.azimuthDeg.toFixed(1)} at ${c[1].toFixed(2)} m, cheek ${cheek.toFixed(3)}`
+          }
+        }
       }
     }
+    expect(worst, `worst corner past the cheek ${where}`).toBeLessThanOrEqual(1e-6)
+  })
+
+  it('stands on the room face all the way round, not on a chord across it', () => {
+    /*
+     * The other side of the same coin. A reveal box is a cuboid turned to lay
+     * its face on the opening, so its faces are chords of the drum, and a chord
+     * that is right at one end is wrong at the other. Both ends are somewhere it
+     * matters: outside the arc is stone in the stair, inside it is stone standing
+     * in the room where the visitor walks.
+     *
+     * The budget is the one the whole collider is built to — the wall ring's own
+     * chord dip, r(1 − cos(π/32)) — TWICE, because two axes each spend it: the
+     * cone, which seats a course at the lowest room face it spans, and the drum,
+     * which splits its error between a course's two ends. 0.040 m at the worst
+     * corner in the tower, against a 32-gon that is already 0.021 m off the
+     * drawn face at that radius.
+     */
+    let proud = 0
+    let where = ''
+    for (const d of doorways) {
+      const cheek = Math.min(cheekOf(d), TOWER.outerRadius)
+      const own = doorwayRevealBoxes({
+        azimuthDeg: d.azimuthDeg,
+        clearWidth: clearWidthOf(d),
+        sillY: d.bottomY,
+        headY: d.topY,
+        bottomRake: d.bottomRake,
+        innerRadiusAt,
+        outerRadius: cheek,
+        sectors: SECTORS,
+      })
+      const tolerance = innerRadiusAt(d.bottomY) * (1 - Math.cos(Math.PI / SECTORS))
+      for (const b of own) {
+        for (const c of corners(b)) {
+          const into = innerRadiusAt(c[1]) - Math.hypot(c[0], c[2])
+          if (into > proud) {
+            proud = into
+            where = `az ${d.azimuthDeg.toFixed(1)} at ${c[1].toFixed(2)} m, tolerance ${tolerance.toFixed(4)}`
+          }
+        }
+      }
+    }
+    expect(proud, `worst corner standing into the room ${where}`).toBeLessThan(0.045)
   })
 
   it('costs a bounded number of boxes', () => {
-    // seven facets over the head and a jamb in courses each side: the whole
-    // tower's reveals are a small fraction of the ring they stand in
-    expect(reveals.length).toBeLessThan(walls.length / 2)
+    /*
+     * WHAT THE COURSING COSTS, stated rather than hidden.
+     *
+     * Nine facets — seven over the head and a jamb each side — cut into courses
+     * on BOTH of the box's free axes: about five up the jamb for the cone and
+     * seven into the stone for the drum. That is 995 boxes over twelve doorways
+     * where the single-slab version spent 307, and the tower's whole collider set
+     * goes from about 1100 to about 2000.
+     *
+     * It is not free and it is not open-ended: the head is held to the depth the
+     * SQUARE hole actually needs filling to rather than the jambs' reach (see
+     * revealFacets → headDepth, which halved this), and the courses into the
+     * stone are cut adaptively, longer near the doorway's axis where the drum
+     * falls away more slowly. Both were worth doing; a third box per course was
+     * not worth 900 more colliders.
+     */
+    expect(reveals.length / doorways.length).toBeLessThan(100)
+    expect(reveals.length).toBeLessThan(2 * walls.length)
   })
 })
