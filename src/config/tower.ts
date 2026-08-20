@@ -1095,15 +1095,12 @@ export const BALUSTRADE = {
  * Nothing moved: the deck, the parapet, the headroom and the top of the tower are
  * the same four numbers they were.
  *
- * THE HEAD-HOUSE IS BUILT (2026-08-20) and this paragraph is what it used to
- * say: "STILL UNBUILT, and it is the only thing on the terrace that is". It was
- * right that the wedge needed no measurement that was not already here — its
- * plan is the deck opening and its rake is PLAYER.stairHeadroom — and it was
- * right that this was scope rather than evidence. Two small things did have to be
- * read off the frames after all, the lantern's frame and the threshold profile,
- * and both are measured against the well's own width; see STAIRHEAD below and
- * lib/stairhead.ts. The way out of the stair is a door under a glazed light now
- * rather than an open hole in the paving.
+ * STILL UNBUILT, and it is the only thing on the terrace that is: the HEAD-HOUSE
+ * over the stairwell — the wedge of sawn ashlar raked to the pitch of the stair
+ * under an inclined glazed light (up/250, roof/007, roof/008). Its plan follows
+ * the deck opening and its rake follows the stair, so it needs no measurement
+ * that is not already here; it is simply not modelled yet, and until it is, the
+ * way out of the stair is an open hole in the paving instead of a door.
  *
  * STILL UNKNOWN, as opposed to merely unbuilt: the coping's own profile (whether
  * the capping slab overhangs the rubble below it, which is the most likely
@@ -1145,17 +1142,10 @@ export const ROOF_QUESTION = [
   'one of those is a ratio against the 0.751 m parapet, so they all carry its',
   '±0.06. If you can measure a post, that is the number to send.',
   '',
-  'THE HEAD-HOUSE IS BUILT (2026-08-20) — the raked ashlar wedge with the glazed',
-  'light (up/241, up/242, up/250, roof/007, roof/008). Plan = the deck opening,',
-  'rake = the chord from PLAYER.stairHeadroom at the way out down to the paving.',
-  'ONE NUMBER IN IT IS WORTH ARGUING WITH: the apex. Built at 2.30 m because that',
-  'is the clear height the stair keeps everywhere else; your frames measure it at',
-  '2.1 ± 0.2 m against the man in up/242 and against six 0.35 m courses. If you',
-  'can put a tape on the wedge at the door, that is the number to send.',
-  '',
-  'STILL UNBUILT there, and both on purpose: the barred glass gate across the way',
-  'out (operable, and drawn shut it walls the stair up — roof/007, up/240), and',
-  'the metal capping on the ashlar arris (no frame sizes its section).',
+  'STILL UNBUILT: the HEAD-HOUSE over the stairwell — the raked ashlar wedge with',
+  'the glazed light (up/250, roof/008). Plan and rake both follow things already',
+  'in this file; it is scope, not evidence. Until it is built you come out of the',
+  'stair through an open hole in the deck rather than through a door.',
   '',
   'STILL UNMEASURED: the coping slab’s own profile and overhang; where in plan the',
   'stair head stands relative to the beak; the glass thickness.',
@@ -1971,140 +1961,6 @@ export const LIFTS: StairLift[] = buildLifts()
 
 /** Just the flights cut in the masonry — the modern spiral is not one of them. */
 export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair')
-
-// ——————————————————————— the head-house on the terrace ———————————————————————
-/**
- * THE WEDGE OVER THE ROOF STAIRWELL, which 5a648b0 left as the one unbuilt thing
- * on the terrace and which is built now (2026-08-20).
- *
- * WHAT THE FOOTAGE SHOWS. A structure of sawn ashlar standing on the paving
- * either side of the stair's opening, raked to a single straight arris from an
- * apex at the way out down to the slabs at the far end, with an inclined glazed
- * light lying on the rake and a stainless threshold profile set flush in the
- * paving where you step out. up/241 and up/242 have the whole wedge in profile —
- * 242 with a man standing against its vertical end, which is the only scale in
- * any of these frames; up/250, roof/008 and roof/009 are close on the ashlar and
- * its capping; up/243 and the tail of up/241 show the lantern's foot landing ON
- * the paving; roof/007 and down/001 stand on the threshold; down/003 looks back
- * from inside at the point where the glass runs out and the paving takes over as
- * the lintel over the passage.
- *
- * ALMOST NOTHING HERE IS A NEW NUMBER, and that is what 5a648b0 promised: the
- * PLAN is the opening already cut in the deck (App's `stairwells[FLOORS.length]`,
- * 69.97° of arc from r 4.767 to 5.767 on the shipped configuration) and the RAKE
- * is the clear height the stair already keeps (PLAYER.stairHeadroom). Two things
- * had to be read off the frames and they are tagged [VIDEO] below; one is derived
- * and checked against the frames; one is borrowed from the balustrade.
- *
- * ═════════════════════════════════════════════════════════════════════════
- * THE APEX IS DERIVED AND THE FRAMES ARE THE CHECK. 2.30 m [DERIVED].
- * ═════════════════════════════════════════════════════════════════════════
- *
- * The soffit at the way out is `ROOF.deckY + PLAYER.stairHeadroom` — the same
- * clear height the passage is vaulted to under the paving, carried on above it.
- * It is not stored here because it is not a choice; lib/stairhead.ts takes the
- * headroom as an argument for the same reason stairwellSpanDeg() does.
- *
- * THE FRAMES MEASURE 2.1 ± 0.2 m and the two agree inside that. up/242 has a man
- * standing against the wedge's vertical end. For any two verticals standing on
- * one ground plane, H/h_camera = (row_foot − row_head)/(row_foot − row_horizon),
- * which needs neither the focal length nor either distance — the same
- * focal-free ratio PARAPET is measured by. Reading the man at rows 1374/916 and
- * the wall's near corner at 1415/831, with the horizon off the far shore of the
- * bay at row 962, the wall comes out at 1.16 × the man's own height: 2.09 m for
- * a 1.80 m man, 2.20 for a 1.90 m one. The RATIO is what is robust — moving the
- * horizon ±40 px moves it by less than 0.01 — and the man's stature is what is
- * not. A second reading agrees: the near corner carries six regular courses of
- * 90.4 px in 583 px of wall, and six courses of the 0.35 m these read as is
- * 2.10 m.
- *
- * SO WHY BUILD 2.30 RATHER THAN 2.10. Because 2.10 is a reading against an
- * unknown man and 2.30 is the number the rest of the stair is already built to,
- * and because of what the difference costs the walker: the rake is a chord (see
- * lib/stairhead.ts), so the clear height under it is least over the last riser,
- * and at an apex of 2.30 that minimum is 1.86 m against a 1.60 m walker. At 2.10
- * it is 1.70. Ten centimetres over a capsule's head is the margin this model has
- * been caught by before. If the owner measures the wedge, this is the one number
- * to send and it is one line in App.tsx away from the built model.
- *
- * WHAT WAS NOT BUILT AND WHY, because both are conspicuous in the frames:
- *
- *   · THE GLASS SCREEN AND ITS BARRED GATE across the way out — roof/007 and
- *     down/001 from inside, up/240 from the terrace, where it reads as a
- *     frameless glass box with a flat glass lid standing on the paving. It is
- *     operable: drawn shut it walls the stair up, and nothing in the corpus
- *     shows the hinge side, the leaf's swing or where the box's fourth face is.
- *     A gate is also the part of this that is fit-out rather than fabric — it is
- *     what closes the tower at six o'clock. Left out on both grounds.
- *   · THE RAKING METAL CAPPING on the ashlar's arris (roof/009 most plainly, and
- *     the white line down every profile view). Its section is a few pixels
- *     against nothing of known size in every frame. The lantern's own frame is
- *     drawn because it can be measured against the light it frames; this cannot.
- *   · THE COURSING. It is read — regular courses about 0.35 m deep, stretchers
- *     about 0.70 m, laid half-lap, joints FLUSH and hairline (up/242 at the near
- *     corner; roof/008) — and deliberately not carved. The drum's courses are
- *     drawn as relief by CourseBands because the drum's courses ARE relief, with
- *     a shadow under every bed. These are sawn flush, so relief here would be a
- *     fabrication with a shadow in it, and a joint depth is exactly the kind of
- *     plausible small number rule 1 is about.
- */
-export const STAIRHEAD = {
-  /**
-   * m — thickness of each cheek wall. [DERIVED], and on the inner side there is
-   * no other answer available.
-   *
-   * The opening's inner edge is `innerRadiusAt(ROOF.deckY) + STAIR.wallClearance`
-   * and the paving's inner rim is `innerRadiusAt(ROOF.deckY)`, so the strip of
-   * stone between the hole and the storey-8 room face is STAIR.wallClearance
-   * wide and the inner cheek is exactly what stands on it. Thinner and a ledge
-   * of paving hangs over the room; thicker and the wall oversails the room face
-   * with nothing under it.
-   *
-   * THE OUTER CHEEK IS THE SAME WALL BUILT TWICE, and the frames say so rather
-   * than symmetry. In up/243 and the tail of up/241 the ashlar band beside the
-   * lantern measures 0.24 ± 0.07 of the lantern's own width, and the lantern
-   * spans the well — 1.00 m — so the band is 0.24 m against this 0.25. That is
-   * the whole of the measurement and it is quoted because it agrees, not because
-   * anything was fitted to it.
-   */
-  cheekThickness: 0.25, // = STAIR.wallClearance; see above
-  /**
-   * m — the lantern's sheet. [ASSUMPTION], borrowed from BALUSTRADE.glassThickness
-   * rather than invented afresh: nothing in the corpus resolves a pane edge
-   * against anything of known size, on the roof or here, and the terrace should
-   * not acquire a second unmeasured glass thickness. Same borrow, same reason, as
-   * ROOF.pavingDepth taking FLOOR_SLAB.
-   */
-  glazingThickness: 0.015,
-  /**
-   * m — the metal profile along the lantern's two rakes and its eaves. [VIDEO]
-   * 0.08, bracket 0.05…0.13.
-   *
-   * It is the most conspicuous thing on the wedge — the white line that reads
-   * from anywhere on the terrace — and it is measured against the one ruler in
-   * the same plane as it: the light it frames, which spans the well and is
-   * therefore 1.00 m across plus its bearings. At the lantern's foot in up/241
-   * the eaves profile is about 40 px where the sheet is about 700 px across;
-   * halfway up the rake in up/243 the flank profile is about 55 px against about
-   * 450 px, which is wider because that band is seen edge-on and includes the
-   * upstand. The bracket is the spread of the two, and it is wide because the
-   * profile is a folded metal section read at an angle, not a flat face.
-   */
-  frameWidth: 0.08,
-  /**
-   * m — the stainless threshold profile set flush in the paving at the way out.
-   * [VIDEO] 0.04, bracket 0.03…0.06.
-   *
-   * roof/007 and down/001 both show it as a bright strip lying IN the slabs with
-   * the treads starting straight behind it. Measured against the well's own
-   * width the same way the frame is: in down/001 the visible run of the profile
-   * is about 754 px for something under the well's 1.00 m of radial band, and its
-   * own width is about 27 px, so 0.03…0.04 m. It is drawn flush — its top face
-   * is ROOF.deckY — and gets no collider, for the reason the drainage channel
-   * gets none: it is below anything the capsule can feel.
-   */
-  thresholdWidth: 0.04,
-} as const
 
 // ———————————————————— openings at the ends of the passages ————————————————————
 /**
