@@ -313,7 +313,7 @@ export function FirstPersonPlayer({
       {lamp && (
         <pointLight
           position={[0, PLAYER.eyeHeight - PLAYER.height / 2, 0]}
-          color="#ffd9a8"
+          color={LAMP.colour}
           intensity={lampIntensity}
           distance={LAMP.cutoffDistance}
           decay={LAMP.decay}

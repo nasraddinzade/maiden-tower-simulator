@@ -1,6 +1,15 @@
 import { deriveLampFalloff } from '../lib/lamp'
-import { LIMESTONE_INTERIOR, linearLuminance } from '../lib/masonry'
+import { peakChannelResponse } from '../lib/exposure'
+import { LIMESTONE_INTERIOR, LIMESTONE_LIGHT } from '../lib/masonry'
 import { FLOORS, STAIR } from './tower'
+
+/**
+ * Colour of the carried lamp. It lived as a literal in FirstPersonPlayer until
+ * 2026-08-20, which was a magic number in a component (rule 2) and, worse, a
+ * number the arithmetic below needed and could not see: the lamp is warm, and
+ * how warm decides which channel clips.
+ */
+const LAMP_COLOUR = '#ffd9a8'
 
 /**
  * First-person player parameters (Phase 6).
@@ -138,10 +147,16 @@ export const PLAYER = {
  *
  * The two brightnesses are [ESTIMATE] and they are about the TONE CURVE, not
  * about the tower: 0.35 linear sits in the middle of ACES at exposure 1 (byte
- * ~185), where a change of angle still changes the pixel; 0.03 is the low end
- * that still separates from black (byte ~40). They are the only numbers in this
+ * ~175), where a change of angle still changes the pixel; 0.03 is the low end
+ * that still separates from black (byte ~30). They are the only numbers in this
  * block chosen by judgement, which is why they are written out rather than
  * folded into a magic intensity.
+ *
+ * [2026-08-20] AND THEY ARE NOW ABOUT THE RIGHT CHANNEL. Until today they were
+ * applied to the stone's LUMINANCE, and the picture clips per channel: the wall
+ * at the head landing of the climb 2→3 measured R 226 — the shoulder byte —
+ * flat across the frame, while this note claimed byte 185 and mid-curve. Both
+ * bytes above are the corrected ones; nothing about the intent changed.
  *
  * WHAT THIS IS NOT: it is not an answer to how the tower is lit today.
  *
@@ -186,12 +201,35 @@ export const PLAYER = {
  * lamp goes back to being what it says it is — something the viewer carries.
  */
 export const LAMP = {
+  /** The lamp's own colour, and an input to the solve rather than a decoration. */
+  colour: LAMP_COLOUR,
   ...deriveLampFalloff({
     nearDistance: STAIR.width / 2,
     farDistance: Math.max(...FLOORS.map((f) => f.innerRadiusAtLevel)),
     nearTarget: 0.35,
     farTarget: 0.03,
-    albedoLuminance: linearLuminance(LIMESTONE_INTERIOR),
+    /*
+     * THE STONE THE PASSAGE CHEEK IS ACTUALLY MADE OF, in the channel that
+     * clips. This used to be LIMESTONE_INTERIOR read as a luminance, and both
+     * halves of that were wrong.
+     *
+     * The drum — inside face as well as out, every cheek and vault of every
+     * stair passage, every reveal — is drawn with `shellMat`, the EXTERIOR
+     * palette (App.tsx). LIMESTONE_INTERIOR reaches the floors, the cupolas and
+     * the treads and nothing else. In red the two run 0.402 against 0.153, a
+     * factor of 2.63, so the lamp was solved against a stone it does not light.
+     * Add the luminance-for-peak-channel error and the near wall came out at
+     * R 226, the shoulder byte, σ 9.6 across the frame.
+     */
+    nearResponse: peakChannelResponse(LAMP_COLOUR, LIMESTONE_LIGHT),
+    /*
+     * And the far condition is about the other stone, because the far condition
+     * is about what DISAPPEARS rather than what clips: the floor across the
+     * widest chamber is LIMESTONE_INTERIOR at the full farDistance. Solved
+     * against the bright stone alone it lands on byte 13, which is a floor you
+     * cannot see you are standing on.
+     */
+    farResponse: peakChannelResponse(LAMP_COLOUR, LIMESTONE_INTERIOR),
   }),
   /**
    * Cutoff, metres. Unchanged from the hand-tuned lamp: the widest chamber is
