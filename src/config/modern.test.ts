@@ -172,8 +172,24 @@ describe('the band the steel spiral is collided on', () => {
      * yawed boxes cannot follow a helix: consecutive top planes meet on the
      * walking line and diverge away from it, by half-width × sin(step angle) ×
      * tan(pitch). Narrowing the band beats steepening it — 0.079 m before,
-     * 0.040 m now — and the whole point is that this number falls rather than
+     * 0.0396 m now — and the whole point is that this number falls rather than
      * rises when the stair is made walkable.
+     *
+     * THIS IS THE LIP OF THE BAND. IT IS NOT THE LIP OF THE BUILT STAIR, and
+     * the difference was found on 2026-08-20 while looking for the shake the
+     * owner reported. ModernSpiralStair does not build its chain on
+     * MODERN_SPIRAL_WALK_BAND: it takes MODERN_SPIRAL_BAND_AT(y) tread by
+     * tread, which below the well's rim opens out to the balustrade, so the
+     * boxes run 0.10125…0.18125 m of half-width against this band's 0.1113 and
+     * the lip that actually gets built is 57.8 mm down the wide run, 73.9 mm at
+     * the worst joint. Asserting 0.040 against the built chain fails at 0.0578,
+     * which is how it was caught.
+     *
+     * Both quantities are real; only one of them is a stair. The narrow one is
+     * still the right thing to bound HERE, because this test is about the band
+     * — about whether making the flight walkable made its ridges worse. The
+     * built figure is asserted where the chain is, in lib/rampJoints.test.ts,
+     * so that it can no longer go stale in a comment.
      */
     const lip = (band.width / 2) * Math.sin(stepAngleRad) * Math.tan(pitchDeg * (Math.PI / 180))
     const drawnLine = MODERN_SPIRAL.columnRadius + (MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius) / 2

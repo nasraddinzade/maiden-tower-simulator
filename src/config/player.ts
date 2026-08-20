@@ -124,13 +124,63 @@ export const PLAYER = {
    * was that a contact resolved with a 0.1 mm nudge is a contact again on the
    * next frame, and on a slope there are two of them arguing.
    *
-   * 0.01 m is 1.4 mm under a walking frame at 1/60 s and half the character
-   * offset, so it cannot push the walker through anything. With it, the same
-   * three stalls became 5.87, 5.87 and 5.94 treads and two of them ended on
-   * storey 2. It is a solver parameter, not a dimension: nothing in the building
-   * moves.
+   * 0.01 m unstuck it: the same three stalls became 5.87, 5.87 and 5.94 treads
+   * and two of them ended on storey 2. It is a solver parameter, not a
+   * dimension: nothing in the building moves.
+   *
+   * ═════════════════════════════════════════════════════════════════════════
+   * AND 0.01 IS THE SHAKE. 2026-08-20.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * The owner: «камеру трясёт когда сам ходишь.» It is this number, and the
+   * sentence this paragraph replaced is why nobody found it: "0.01 m is 1.4 mm
+   * under a walking frame at 1/60 s and half the character offset, so it cannot
+   * push the walker through anything." That arithmetic treats the nudge as a
+   * SPEED. Rapier applies it as an absolute displacement along the contact
+   * normal every time a contact is resolved — 10 mm per step, not 1.4.
+   *
+   * Instrumented on the controller itself, standing on the flat floor of storey
+   * 1, one line per physics step:
+   *
+   *   desired.y  −1.667 mm      (applyGravity's grounded bias, −0.1 m/s × 1/60)
+   *   computed.y +10.000 / −10.000 mm, alternating
+   *   body.y     820.002 / 830.000 mm, alternating
+   *
+   * A LIMIT CYCLE, and it closes on itself: in contact, the downward bias is
+   * refused by the floor and the nudge lifts the capsule a full 10 mm clear;
+   * one step later it is airborne, so snapToGroundDistance drops it the same
+   * 10 mm back onto the contact; and being in contact, it is nudged again. A
+   * 30 Hz square wave of exactly this parameter's amplitude, on every surface
+   * whose normal is near vertical — every chamber floor, every landing, the
+   * roof deck, the paving outside — standing still as much as walking.
+   *
+   * SWEPT IN THE LIVE WORLD, peak-to-peak of the camera's own trace against a
+   * straight line through its neighbouring frames, flat floor of storey 1:
+   *
+   *   0.01 (old)  10.2 mm      0.002   2.8 mm
+   *   0.001       1.0 mm       0.0001  0.17 mm   (rapier's default)
+   *
+   * At 1e-4 the cycle stops dead rather than shrinking — computed.y reads
+   * 0.000 every step and the body sits at 820.100 mm and does not move.
+   *
+   * SO WHY NOT 1e-4. Because the wall margin is real even though the stall is
+   * not: climbing the masonry flight while pressed into its outer cheek the
+   * walker covers 0.965 m at 0.001 against 0.814 m at 1e-4, and 1e-4 is the
+   * value the passage used to weld him to. 0.001 is the knee — a tenth of the
+   * shake, none of the stickiness, and one millimetre at the eye is a fifth of
+   * a pixel at the distances anything in this building is seen from.
+   *
+   * AND THE STALL ITSELF IS GONE, which is the part that has to be said out
+   * loud rather than assumed from the number still working. Re-walked at 1e-4,
+   * 0.001, 0.002 and 0.01: sliding along the drum on the flat floor covers
+   * 1.485–1.489 m in 200 frames at ALL FOUR — no value stalls. On the modern
+   * spiral 0.01 is now the WORST of the four, 0.217 m of climb in 600 frames
+   * against 0.354 m at 0.001. The stair that justified 0.01 was re-cut after it
+   * was measured — 9c97c79 narrowed the walk band, stairApproaches() put five
+   * ramps at the foot — so the walk above was taken against geometry that no
+   * longer exists. Everything above 0.001 is now paying for nothing.
    */
-  normalNudgeFactor: 0.01,
+  normalNudgeFactor: 0.001,
   /** Mouse/touch look sensitivity, radians per pixel. */
   lookSensitivity: 0.0025,
   /** Pitch is clamped so the view cannot roll over the top. */

@@ -1343,7 +1343,42 @@ export default function App() {
         <Suspense fallback={null}>
         <MaybeXR session={xr.session}>
         {/* debug draws rapier's own collider wireframes — the actual shapes, not a guess */}
-        <Physics paused={!firstPerson} debug={showColliders}>
+        {/*
+          `timeStep="vary"` — one physics step per rendered frame, at that
+          frame's own delta, instead of rapier's default 1/60 accumulator.
+
+          THE DEFAULT WAS COSTING THE WALKER HIS SPEED, and the arithmetic is
+          exact. FirstPersonPlayer integrates against the RENDER delta and hands
+          rapier a POSITION through setNextKinematicTranslation, not an
+          increment. Under the accumulator, a frame that arrives before the
+          accumulator has reached 1/60 computes a target and then has it
+          overwritten by the next frame's, computed from the same unchanged
+          body: that movement is not deferred, it is deleted. Measured on the
+          flat floor of storey 1, 2 s of model time, nominal 1.4 m/s:
+
+            render Hz   30     60     90     120    144    240
+            covered     2.66   2.78   1.87   1.40   1.17   0.70  m
+            actual      1.33   1.39   0.93   0.70   0.58   0.35  m/s
+            frames that moved nothing at all — 0%, 0%, 33%, 50%, 58%, 75%
+
+          That is 1.4 × min(1, 60/renderHz). ON A 144 Hz SCREEN THE TOWER IS
+          CROSSED 2.4 TIMES SLOWER THAN IT WAS BUILT TO BE, and three frames in
+          five show a camera that has not moved since the last one — which is
+          the second half of what «трясёт» describes: not a wobble, a stutter.
+          Even at a nominal 60 Hz the jitter in rAF makes the accumulator skip
+          and double at random, so the stutter is there too, just sparser.
+
+          NOTHING IS GIVEN UP. A fixed step exists to keep DYNAMICS stable, and
+          this world has no dynamics: every rigid body in the model is `fixed`
+          except the walker's own capsule, which is kinematicPosition and is
+          therefore not simulated at all — it is placed. A character controller
+          is a variable-timestep integrator already; the accumulator underneath
+          it was only ever a beat frequency. A stalled frame still cannot
+          teleport anyone: the controller clamps its own delta to 1/30 before
+          asking for anything (FirstPersonPlayer), so the request is bounded
+          whatever the step is.
+        */}
+        <Physics paused={!firstPerson} debug={showColliders} timeStep="vary">
           <Scene
             onStats={setStats}
             onApertures={setApertures}
