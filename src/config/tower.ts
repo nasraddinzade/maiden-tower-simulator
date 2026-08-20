@@ -2396,7 +2396,6 @@ export const WINDOW_GRILLE = {
  * agreed was the COUNT of branches, not the number of steps, and it was not
  * right to tune the steps to a recollection of frames before and it is not right
  * now. See PASSAGE_OPENING.branchAtEnds.
- * now. See PASSAGE_OPENING.branchAtEnds.
  *
  * [2026-08-20] TWO OF THESE NUMBERS ARE SPENT AFTER ALL, and it is worth being
  * exact about which. The branch at a passage end is built now — planSillBranch()
