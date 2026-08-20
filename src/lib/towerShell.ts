@@ -13,7 +13,7 @@
 import * as THREE from 'three'
 import { ADDITION, Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg'
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
-import { azimuthToVector } from './geometry'
+import { azimuthToVector, clamp } from './geometry'
 import { archSpringHeight, drawnClearWidth } from './doorwayArch'
 import type { PassageSection, StairDoorway } from './staircase'
 import { countDegenerateTriangles, filterDegenerateTriangles } from './mesh'
@@ -230,6 +230,30 @@ export interface WindowCut {
    * and what would make it start to matter, are on stairBearingClip().
    */
   clipAgainstStairBearing?: boolean
+  /**
+   * The steps up from the landing into this embrasure, where there are any.
+   *
+   * CARRIED ON THE OPENING RATHER THAN LISTED BESIDE IT, and that is the whole
+   * reason it is here and not in ShellParams. The flight's width is the reveal's
+   * width, its bearing is the reveal's bearing, and its top tread is the reveal's
+   * floor. Given its own list it could be handed a different azimuth, a different
+   * cheek or an unscaled width while the leva panel moved the hole — two features
+   * from two arithmetics, which is the fault this model has paid for twice. On
+   * the cut, they cannot disagree.
+   */
+  branch?: BranchCut
+}
+
+/** The flight planned by lib/embrasure.ts → planSillBranch(), as the shell needs it. */
+export interface BranchCut {
+  /** World Y of the landing the flight starts from. */
+  landingY: number
+  /** Risers between the landing and the embrasure floor. [VIDEO], counted. */
+  stepCount: number
+  /** The climb divided by that count — the branch invents no height of its own. */
+  riser: number
+  /** Tread depth, fitted to the stone outboard of the cheek. */
+  going: number
 }
 
 /**
@@ -567,6 +591,150 @@ export function chaseCutter(c: WallChase): THREE.BufferGeometry {
   return mergeVertices(geom)
 }
 
+
+/**
+ * How far the branch's tools overshoot, and why each one has to.
+ *
+ * Tolerances, not dimensions — the same class of number as
+ * WINDOW_CUT_OVERSHOOT and PASSAGE_SKY_OVERSHOOT, and named for what they do.
+ *
+ *   LID — how far the void over a tread is carried up PAST the embrasure floor.
+ *     Without it the tool's lid and the reveal's floor are the same plane, which
+ *     is the exact fault WallChase.outerWidth's note records paying for: "the
+ *     flat lid sat exactly at the reveal's inner sill … Two coincident CSG
+ *     surfaces at eye level, which is where the owner was looking when they
+ *     called the surfaces holey." It ends in void the window tool has already
+ *     removed, so it takes no stone.
+ *   MOUTH — how far the first tool reaches back INTO the passage, so its inner
+ *     face is not coplanar with the outer cheek the passage was just swept from.
+ *   SIDE — how much wider than the reveal each tool is cut, so their side faces
+ *     never meet the splay's. Wider and not narrower, on the same file's own
+ *     remedy: "Tapered a fixed margin wider than the reveal at every depth, the
+ *     two never come near each other." What it costs is a 2 cm undercut at the
+ *     sill line, below the splay, where the steps are anyway.
+ *   LAP — how far each tool after the first reaches back over its predecessor,
+ *     so consecutive risers overlap in already-emptied stone instead of abutting
+ *     along a shared plane. It moves a nosing outward by a centimetre.
+ */
+const BRANCH_LID_OVERSHOOT = 0.05 // m
+const BRANCH_MOUTH_OVERSHOOT = 0.1 // m
+const BRANCH_SIDE_MARGIN = 0.02 // m
+const BRANCH_STEP_LAP = 0.01 // m
+
+/** Clear width of a reveal at radius r, from the widths its own cutter honours. */
+export function revealWidthAt(w: WindowCut, r: number): number {
+  const R = TOWER.outerRadius
+  const span = R - w.revealEndRadius
+  const t = span > 1e-9 ? clamp((R - r) / span, 0, 1) : 1
+  return w.outerWidth + (w.innerWidth - w.outerWidth) * t
+}
+
+/**
+ * The tools that turn a reveal's flat floor into a short flight of steps.
+ *
+ * WHAT IS BEING CUT, because it is not the flight — it is the air over it. The
+ * window tool has already left this reveal with a level floor at the embrasure
+ * sill, running the whole depth of the wall. The building does not: its floor
+ * climbs from the landing to that sill in two or three courses and then runs
+ * level to the slit (up/218, down/124, up/168). So the stone to take away is the
+ * wedge standing OVER each lower tread and UNDER the level floor — one tool per
+ * tread except the last, whose surface is that floor already and needs nothing.
+ * The steps are left as the drum's own masonry, with the drum's own material and
+ * shadows; no tread is drawn as a separate block, so there is no seam to
+ * z-fight and no second geometry that could describe a different stair.
+ *
+ * A ONE-STEP BRANCH THEREFORE CUTS NOTHING and returns an empty list rather than
+ * a degenerate tool. That is the model as it stood before this existed: a single
+ * lip up into every embrasure, which is the one riser count the footage never
+ * shows.
+ *
+ * SEPARATE TOOLS, NOT ONE LOFTED SOLID. A single solid with the staircase as its
+ * section needs two rings at each riser radius, and the quads between them have
+ * zero area — degenerate faces in a CUTTING tool, which is the state this
+ * evaluator is least reliable in. Subtracted one after another with LAP of
+ * overlap, each tool after the first opens inside stone the one before it has
+ * already removed, and nothing ever has to resolve two coincident planes.
+ */
+export function branchCutters(w: WindowCut): THREE.BufferGeometry[] {
+  const b = w.branch
+  if (!b || b.stepCount < 2 || b.going <= 0 || b.riser <= 0) return []
+
+  const face = w.revealEndRadius
+  // the level floor of the reveal, taken at BOTH its ends so the lid clears it
+  // wherever the splay puts it: inner mouth centreY − innerHeight/2, outer sill
+  // centreY − outerHeight/2, and the floor between them is never outside the two
+  const topY =
+    Math.max(w.centreY - w.innerHeight / 2, w.centreY - w.outerHeight / 2) + BRANCH_LID_OVERSHOOT
+
+  const out: THREE.BufferGeometry[] = []
+  for (let i = 0; i < b.stepCount - 1; i += 1) {
+    const bottomY = b.landingY + (i + 1) * b.riser
+    if (bottomY >= topY) continue
+    const rIn = face + i * b.going - (i === 0 ? BRANCH_MOUTH_OVERSHOOT : BRANCH_STEP_LAP)
+    const rOut = face + (i + 1) * b.going
+    out.push(taperedRadialBox(w.azimuthDeg, rIn, rOut, bottomY, topY, [
+      revealWidthAt(w, Math.max(rIn, face)) / 2 + BRANCH_SIDE_MARGIN,
+      revealWidthAt(w, rOut) / 2 + BRANCH_SIDE_MARGIN,
+    ]))
+  }
+  return out
+}
+
+/**
+ * A closed box swept radially outward on one bearing, its width tapering.
+ *
+ * Wound the same way round as chaseCutter's loft and for the same reason: ring 0
+ * is the INNER end and the sweep runs outward, and a tool whose faces face
+ * inward stops being a solid to three-bvh-csg and quietly cuts nothing at all.
+ */
+function taperedRadialBox(
+  azimuthDeg: number,
+  innerRadius: number,
+  outerRadius: number,
+  bottomY: number,
+  topY: number,
+  halfWidths: [number, number],
+): THREE.BufferGeometry {
+  const dir = azimuthToVector(azimuthDeg)
+  // unit tangential vector, perpendicular to `dir` in the ground plane
+  const tx = Math.cos(azimuthDeg * DEG)
+  const tz = Math.sin(azimuthDeg * DEG)
+  const positions: number[] = []
+  const rings: Array<[number, number]> = [
+    [innerRadius, halfWidths[0]],
+    [outerRadius, halfWidths[1]],
+  ]
+  for (const [r, h] of rings) {
+    // counter-clockwise in the (tangential, up) plane, matching windowProfile()
+    for (const [x, y] of [
+      [-h, bottomY],
+      [h, bottomY],
+      [h, topY],
+      [-h, topY],
+    ] as Array<[number, number]>) {
+      positions.push(dir.x * r + tx * x, y, dir.z * r + tz * x)
+    }
+  }
+  const K = 4
+  const indices: number[] = []
+  for (let k = 0; k < K; k += 1) {
+    const k2 = (k + 1) % K
+    indices.push(k, K + k, K + k2)
+    indices.push(k, K + k2, k2)
+  }
+  for (let k = 1; k < K - 1; k += 1) {
+    indices.push(0, k, k + 1)
+    indices.push(K, K + k + 1, K + k)
+  }
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geom.setIndex(indices)
+  geom.computeVertexNormals()
+  const uv: number[] = []
+  for (let i = 0; i < positions.length / 3; i += 1) uv.push(0, 0)
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  return mergeVertices(geom)
+}
 
 /**
  * A tunnel with a round-arched section, built about the origin: sill at y = 0,
@@ -1200,6 +1368,24 @@ export function buildShellGeometry(p: ShellParams): {
       }
     }
     result = evaluator.evaluate(result, tool, SUBTRACTION)
+  }
+
+  /*
+   * The steps up into each embrasure — cut AFTER the reveal, and the order is
+   * load-bearing in the same way the passage's is.
+   *
+   * These tools take the air over the lower treads, which stands directly under
+   * the reveal's floor. Cut first, that lid would meet a face the window tool
+   * had not made yet and the two would have to be resolved along a shared plane —
+   * the coincident-surface case this file has lost stone to before. Cut second,
+   * the lid's overshoot ends in a void that is already empty.
+   */
+  for (const w of p.windows ?? []) {
+    for (const g of branchCutters(w)) {
+      const tool = new Brush(prep(g))
+      tool.updateMatrixWorld(true)
+      result = evaluator.evaluate(result, tool, SUBTRACTION)
+    }
   }
 
   /**

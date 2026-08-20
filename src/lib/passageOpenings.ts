@@ -45,6 +45,7 @@
  */
 
 import type { PassageSection, StepPlacement } from './staircase'
+import { planSillBranch, sillBranchTreads, type EmbrasureTread } from './embrasure'
 
 const DEG = Math.PI / 180
 
@@ -1337,4 +1338,115 @@ export function validatePassageOpening(o: PassageOpening): string[] {
     errs.push(`${o.id}: head above the passage vault`)
   }
   return errs
+}
+
+// ————————————————— the steps up to the slit —————————————————
+
+/**
+ * One branch: the short flight from a landing up into the slit's embrasure.
+ *
+ * PLACED BY THE OPENING AND BY NOTHING ELSE, which is the same law that governs
+ * the openings themselves. The flight runs out along the opening's own radius,
+ * starts at the passage's outer cheek — where the reveal starts — and its top
+ * tread is the reveal's floor. So it cannot end up on a bearing the reveal is
+ * not on, at a height the reveal is not at, or in a wall the reveal is not in;
+ * this model has lost a floor twice to a pair of features placed from two
+ * arithmetics and the branch is not going to be the third.
+ */
+export interface PassageBranch {
+  /** The opening's id — the branch has no identity of its own. */
+  id: string
+  azimuthDeg: number
+  /** Where the flight starts: the passage's outer cheek, the reveal's own start. */
+  faceRadius: number
+  landingY: number
+  /** World Y of the top tread = the floor of the reveal, as the shell cut it. */
+  platformY: number
+  stepCount: number
+  riser: number
+  going: number
+  depth: number
+  coverBeyond: number
+  depthLimitedByWall: boolean
+  treads: EmbrasureTread[]
+}
+
+export interface PlanPassageBranchesInput {
+  /** Only ends that are actually cut get one; an uncut end has nothing to climb to. */
+  openings: PassageOpening[]
+  /** Ends the record says carry a branch. See PASSAGE_OPENING.branchAtEnds. */
+  atEnds: readonly string[]
+  /** Risers between the landing and the embrasure floor. [VIDEO], counted. */
+  stepCount: number
+  /** m — tread depth going into the wall. [ESTIMATE], borrowed from WINDOW_EMBRASURE. */
+  going: number
+  /** m of stone that must survive under the slit, beyond the back of the flight. */
+  outerLeaf: number
+  /** The drum's outer radius, so the stone outboard of each cheek can be measured. */
+  outerRadius: number
+}
+
+/**
+ * A branch at every end that carries a slit and is named in the record.
+ *
+ * THE STONE EACH ONE MAY EAT INTO is the wall outboard of that end's OWN cheek,
+ * `outerRadius − cheekRadius`, and not wallThicknessAt(y). The distinction is
+ * the one embrasure.ts spells out and it is not pedantry: a recess off a chamber
+ * floor starts at the room face and has the whole wall; a branch off a landing
+ * starts where the passage has already been driven and has only what is left
+ * beyond it. That is 3.535 m at the foot of 2→3 and 2.668 m at the top, against
+ * a wall of 4.855 and 3.820 — so using the wall would let a flight take stone
+ * the stair has already taken.
+ */
+export function planPassageBranches(input: PlanPassageBranchesInput): PassageBranch[] {
+  const named = new Set(input.atEnds)
+  const out: PassageBranch[] = []
+  for (const o of input.openings) {
+    if (!o.built || !named.has(o.id)) continue
+    // the floor of the reveal AS FITTED — the same number the shell is cut with
+    const embrasureFloorY = o.centreY - o.innerHeight / 2
+    const plan = planSillBranch(
+      o.landingY,
+      embrasureFloorY,
+      input.stepCount,
+      input.going,
+      input.outerRadius - o.cheekRadius,
+      input.outerLeaf,
+    )
+    if (!plan) continue
+    out.push({
+      id: o.id,
+      azimuthDeg: o.azimuthDeg,
+      faceRadius: o.cheekRadius,
+      landingY: plan.landingY,
+      platformY: plan.platformY,
+      stepCount: plan.stepCount,
+      riser: plan.riser,
+      going: plan.going,
+      depth: plan.depth,
+      coverBeyond: plan.coverBeyond,
+      depthLimitedByWall: plan.depthLimitedByWall,
+      treads: sillBranchTreads(plan, o.cheekRadius),
+    })
+  }
+  return out
+}
+
+/**
+ * Ends that carry a slit, are named in the record, and got no branch anyway.
+ *
+ * Reported rather than swallowed, for the reason every other check in this file
+ * exists: planSillBranch() returns null when the landing is already at the
+ * embrasure floor or when the wall outboard of the cheek cannot take a flight,
+ * and a branch that quietly fails to appear is indistinguishable from one nobody
+ * asked for.
+ */
+export function branchesDeclined(
+  openings: PassageOpening[],
+  atEnds: readonly string[],
+  built: PassageBranch[],
+): string[] {
+  const named = new Set(atEnds)
+  const have = new Set(built.map((b) => b.id))
+  return openings.filter((o) => o.built && named.has(o.id) && !have.has(o.id)).map((o) => o.id)
 }

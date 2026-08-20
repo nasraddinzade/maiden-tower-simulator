@@ -23,6 +23,7 @@ import {
   STAIR,
   TOWER,
   WALL_LIFTS,
+  WINDOW_EMBRASURE,
   innerRadiusAt,
   stairSettings,
 } from '../config/tower'
@@ -30,8 +31,10 @@ import { PLAYER } from '../config/player'
 import { planAllFlights, stairDoorways, stairPassageSections } from './staircase'
 import {
   passageEndAnchors,
+  planPassageBranches,
   planPassageOpenings,
   type OpeningFitting,
+  type PassageBranch,
   type PassageOpening,
 } from './passageOpenings'
 import type { WindowCut } from './towerShell'
@@ -96,16 +99,37 @@ export const SHIPPED_ENDS: PassageOpening[] = planPassageOpenings({
  * src/data/windows.json → chamberOpeningsHistory — so this list and SHIPPED_ENDS
  * differ only by the ends that are not cut.
  */
-export const SHIPPED_CUTS: WindowCut[] = SHIPPED_ENDS.filter((o) => o.built).map((o) => ({
-  id: o.id,
-  azimuthDeg: o.azimuthDeg,
-  centreY: o.centreY,
-  outerWidth: o.outerWidth,
-  outerHeight: o.outerHeight,
-  innerWidth: o.innerWidth,
-  innerHeight: o.innerHeight,
-  revealEndRadius: o.revealEndRadius,
-  head: o.head,
-  barrierAt: o.barrierAt,
-  clipAgainstStairBearing: false,
-}))
+/** The steps up into each embrasure, planned exactly as App.tsx plans them. */
+export const SHIPPED_BRANCHES: PassageBranch[] = planPassageBranches({
+  openings: SHIPPED_ENDS,
+  atEnds: PASSAGE_OPENING.branchAtEnds,
+  stepCount: PASSAGE_OPENING.branchSteps,
+  going: WINDOW_EMBRASURE.going,
+  outerLeaf: WINDOW_EMBRASURE.outerLeaf,
+  outerRadius: TOWER.outerRadius,
+})
+
+const BRANCH_OF = new Map(SHIPPED_BRANCHES.map((b) => [b.id, b]))
+
+export const SHIPPED_CUTS: WindowCut[] = SHIPPED_ENDS.filter((o) => o.built).map((o) => {
+  const b = BRANCH_OF.get(o.id)
+  return {
+    id: o.id,
+    azimuthDeg: o.azimuthDeg,
+    centreY: o.centreY,
+    outerWidth: o.outerWidth,
+    outerHeight: o.outerHeight,
+    innerWidth: o.innerWidth,
+    innerHeight: o.innerHeight,
+    revealEndRadius: o.revealEndRadius,
+    head: o.head,
+    barrierAt: o.barrierAt,
+    clipAgainstStairBearing: false,
+    branch: b && {
+      landingY: b.landingY,
+      stepCount: b.stepCount,
+      riser: b.riser,
+      going: b.going,
+    },
+  }
+})

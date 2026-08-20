@@ -27,9 +27,10 @@
  * also said steps lead up to some of the tower's windows, and the surviving
  * candidate is a short branch off a stair LANDING — which [VIDEO] shows behind a
  * barred gate on the roof climb, at 429–449 s, with two more like it counted
- * elsewhere. No source gives that branch a length, a bearing or a gradient, so
- * PASSAGE_OPENING.branchAtEnds ships empty (CLAUDE.md rule 1) and the maths waits
- * here with its tests. Deleting it would erase the only trace of the statement.
+ * elsewhere. That branch is BUILT now, by planSillBranch() at the foot of this
+ * file; PASSAGE_OPENING.branchAtEnds no longer ships empty. planEmbrasure() and
+ * its chamber recess stay dormant and tested for the reason above — the layer
+ * has no receivers, not the arithmetic has no worth.
  *
  * ————————————————————————————————————————————————————————————————————————
  * [2026-08-14] THE WAITING IS NO LONGER HYPOTHETICAL, and that is why the depth
@@ -155,22 +156,169 @@ export function planEmbrasure(
   const platformY = floorY + climb
 
   const stone = stoneBeyondFace(platformY)
-  const room = stone - outerLeaf
-  if (room <= platformDepth) return null
-
-  const wanted = stepCount * going + platformDepth
-  const depth = Math.min(wanted, room)
+  const fit = fitDepthToStone(stepCount * going + platformDepth, stone, outerLeaf, platformDepth)
+  if (!fit) return null
 
   return {
     stepCount,
     riser,
     platformY,
-    depth,
-    going: (depth - platformDepth) / stepCount,
+    depth: fit.depth,
+    going: (fit.depth - platformDepth) / stepCount,
     platformDepth,
-    coverBeyond: stone - depth,
-    depthLimitedByWall: depth < wanted - 1e-12,
+    coverBeyond: fit.coverBeyond,
+    depthLimitedByWall: fit.limited,
   }
+}
+
+/**
+ * How deep a recess may actually be cut, given the stone standing outboard of
+ * the face it is cut in.
+ *
+ * Lifted out of planEmbrasure() unchanged so the branch below can be fitted by
+ * the SAME arithmetic rather than by a second copy of it. That is the whole
+ * point: b36496b measured a recess leaving the drum through its own outer face —
+ * by 0.09 m at storey 6 and 0.38 m at storey 8, as the wall thins from 4.855 m to
+ * 3.820 m — and a second carrier fitted by its own private clamp is how a
+ * measured fault comes back wearing different clothes.
+ *
+ * `floor` is the part of the depth that may not give. For a chamber recess it is
+ * the standing platform; for a branch there is no platform to protect (see
+ * planSillBranch) and it is zero. Below it there is no recess at all — null, not
+ * a recess with a negative tread.
+ */
+function fitDepthToStone(
+  wanted: number,
+  stoneBeyondFace: number,
+  outerLeaf: number,
+  floor: number,
+): { depth: number; coverBeyond: number; limited: boolean } | null {
+  const room = stoneBeyondFace - outerLeaf
+  if (room <= floor) return null
+  const depth = Math.min(wanted, room)
+  return { depth, coverBeyond: stoneBeyondFace - depth, limited: depth < wanted - 1e-12 }
+}
+
+// ——————————————— the branch at the end of a stair passage ———————————————
+
+/**
+ * The short flight from a landing up to the floor of the slit's embrasure.
+ *
+ * THE OTHER CARRIER of "к некоторым окнам в настоящей башне ведут ступени"
+ * [OWNER], and since 2026-08-10 the only one: with no openings in the chamber
+ * walls, a stepped recess in a chamber wall has nothing to climb to. This one is
+ * at the END of a passage, and the owner's own walkthrough shows it repeatedly —
+ * up/218 (two shallow steps inside the embrasure to the sill, a barred gate
+ * across its mouth), down/124 (three courses of steps up to a glazed slit),
+ * up/168 (the sill block about two courses above the tread beneath it), up/143
+ * (the fork itself: the main flight bearing away, a short run continuing on).
+ */
+export interface SillBranchPlan {
+  /** Whole risers between the landing and the embrasure floor. OBSERVED, not derived. */
+  stepCount: number
+  /** Height of one riser. Derived — see planSillBranch(). */
+  riser: number
+  /** World Y of the landing the flight starts from. */
+  landingY: number
+  /** World Y of the top tread, which IS the floor of the embrasure. */
+  platformY: number
+  /** How far the flight runs outward from the passage's cheek into the wall. */
+  depth: number
+  /** The going the treads are ACTUALLY cut to; the nominal one until the wall is too thin. */
+  going: number
+  /** m of masonry left between the back of the flight and the outer face. */
+  coverBeyond: number
+  /** True where the wall, not the flight, is what set the depth. */
+  depthLimitedByWall: boolean
+}
+
+/**
+ * THE RISER IS THE CLIMB DIVIDED BY THE COUNT, and that is the whole argument
+ * for building this at all.
+ *
+ * An earlier pass declined the branch because "counting risers means assuming a
+ * riser" — a step count only becomes a height once you say how tall a step is,
+ * and no source in this project gives that. The objection was right about the
+ * arithmetic and wrong about which way it runs. What the frames give is the
+ * COUNT: two at up/218, three at down/124, about two courses at up/168. What
+ * nobody has is the riser HEIGHT. But the CLIMB is not an unknown of its own —
+ * it is PASSAGE_OPENING.sillAboveLanding, already carried as a [PLACEHOLDER],
+ * already shipped, already the thing the shell is cut with. So
+ *
+ *     riser = climb / stepCount
+ *
+ * introduces no number at all. It spends a placeholder that is already being
+ * spent, and when the owner finally answers with metres the treads move with the
+ * sill instead of having to be corrected separately. windows.json →
+ * sillHeightQuestion.ask already asks for exactly this pair — «СКОЛЬКО их от
+ * площадки … до подоконника?» and the height at the window — and says in as many
+ * words that the riser will be got from his own count.
+ *
+ * `embrasureFloorY` IS THE CLIMB'S TOP AND IT IS NOT sillAboveLanding VERBATIM.
+ * It is the floor of the reveal AS FITTED — centreY − innerHeight/2 — which is
+ * the sill after fitReveal() has clamped the opening under the passage vault.
+ * The two agree to 0.05 m at the shipped numbers and would part company at
+ * others, and it is the fitted one that matters: the stair a walker sees and the
+ * hole the shell is cut with have to come from one arithmetic. This model has
+ * been bitten twice by a pair of features placed from two.
+ *
+ * NO PLATFORM, and that is a subtraction rather than an omission. planEmbrasure
+ * protects a standing platform because a recess in a chamber wall has to make
+ * one; here the top tread is level with the embrasure floor, and the embrasure
+ * floor runs on to the slit by itself — that IS the standing place, so buying it
+ * a second time would put a 0.70 m [ESTIMATE] into a place that already has the
+ * stone. One fewer invented number in the branch than in the recess it replaces.
+ *
+ * Returns null where the landing is already at the embrasure floor (nothing to
+ * climb) or where the wall outboard of the cheek cannot take a flight at all.
+ */
+export function planSillBranch(
+  landingY: number,
+  embrasureFloorY: number,
+  /** OBSERVED in the footage. Never derived from a riser — see above. */
+  stepCount: number,
+  going: number,
+  /** m of masonry outboard of the passage's cheek, i.e. what the flight may eat into. */
+  stoneBeyondFace: number,
+  /** m of that stone that must survive under the slit. */
+  outerLeaf: number,
+): SillBranchPlan | null {
+  const climb = embrasureFloorY - landingY
+  if (!(climb > 0)) return null
+  const n = Math.max(1, Math.round(stepCount))
+  const fit = fitDepthToStone(n * going, stoneBeyondFace, outerLeaf, 0)
+  if (!fit) return null
+  return {
+    stepCount: n,
+    riser: climb / n,
+    landingY,
+    platformY: embrasureFloorY,
+    depth: fit.depth,
+    going: fit.depth / n,
+    coverBeyond: fit.coverBeyond,
+    depthLimitedByWall: fit.limited,
+  }
+}
+
+/**
+ * The treads of a branch, running outward from the passage's cheek.
+ *
+ * Straight blocks square to the opening, for embrasureTreads()' reason: the
+ * flight is a metre or so long and points at its slit, so annular sectors would
+ * be following the machinery rather than the building. The LAST tread's surface
+ * is exactly `plan.platformY` — the embrasure floor — so the flight lands on the
+ * stone the shell already carries and no step is left over.
+ */
+export function sillBranchTreads(plan: SillBranchPlan, faceRadius: number): EmbrasureTread[] {
+  const out: EmbrasureTread[] = []
+  for (let i = 0; i < plan.stepCount; i += 1) {
+    out.push({
+      innerRadius: faceRadius + i * plan.going,
+      outerRadius: faceRadius + (i + 1) * plan.going,
+      treadY: plan.platformY - (plan.stepCount - 1 - i) * plan.riser,
+    })
+  }
+  return out
 }
 
 /**

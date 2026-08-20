@@ -21,6 +21,7 @@ import {
   WATER,
   WELL,
   WELL_BEARING_CONFLICT,
+  WINDOW_EMBRASURE,
   innerRadiusAt,
 } from './config/tower'
 import { LAMP, PLAYER } from './config/player'
@@ -34,7 +35,9 @@ import {
 import {
   datumWarnings,
   openingsInsideDatumError,
+  branchesDeclined,
   passageEndAnchors,
+  planPassageBranches,
   planPassageOpenings,
   testimonyConflicts,
   type OpeningFitting,
@@ -441,31 +444,61 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
     })
   }, [flightPlan])
 
+  /**
+   * The steps up from each landing into its embrasure.
+   *
+   * Planned off `openings` — the same array the holes are cut from — so a branch
+   * cannot be given a bearing, a cheek or a height the reveal above it does not
+   * have. It rides ON the WindowCut for the same reason; see WindowCut.branch.
+   */
+  const branches = useMemo(
+    () =>
+      planPassageBranches({
+        openings,
+        atEnds: PASSAGE_OPENING.branchAtEnds,
+        stepCount: PASSAGE_OPENING.branchSteps,
+        going: WINDOW_EMBRASURE.going,
+        outerLeaf: WINDOW_EMBRASURE.outerLeaf,
+        outerRadius: TOWER.outerRadius,
+      }),
+    [openings],
+  )
+
   const windows = useMemo<WindowCut[] | undefined>(() => {
     if (!windowCtl.cutWindows) return undefined
     const scale = (outer: number, inner: number) => {
       const o = outer * windowCtl.widthScale
       return { outerWidth: o, innerWidth: o + (inner - outer) * windowCtl.flareScale }
     }
+    const branchOf = new Map(branches.map((b) => [b.id, b]))
     const cuts: WindowCut[] = openings
       .filter((o) => o.built)
-      .map((o) => ({
-        id: o.id,
-        azimuthDeg: o.azimuthDeg,
-        centreY: o.centreY,
-        ...scale(o.outerWidth, o.innerWidth),
-        outerHeight: o.outerHeight,
-        innerHeight: o.innerHeight,
-        revealEndRadius: o.revealEndRadius,
-        head: o.head,
-        barrierAt: o.barrierAt,
-        // it IS the passage, so the clash the clip arbitrates does not arise.
-        // At these numbers the clip would miss it by 0.27 m anyway — see the
-        // measurement on stairBearingClip().
-        clipAgainstStairBearing: false,
-      }))
+      .map((o) => {
+        const b = branchOf.get(o.id)
+        return {
+          id: o.id,
+          azimuthDeg: o.azimuthDeg,
+          centreY: o.centreY,
+          ...scale(o.outerWidth, o.innerWidth),
+          outerHeight: o.outerHeight,
+          innerHeight: o.innerHeight,
+          revealEndRadius: o.revealEndRadius,
+          head: o.head,
+          barrierAt: o.barrierAt,
+          // it IS the passage, so the clash the clip arbitrates does not arise.
+          // At these numbers the clip would miss it by 0.27 m anyway — see the
+          // measurement on stairBearingClip().
+          clipAgainstStairBearing: false,
+          branch: b && {
+            landingY: b.landingY,
+            stepCount: b.stepCount,
+            riser: b.riser,
+            going: b.going,
+          },
+        }
+      })
     return cuts
-  }, [openings, windowCtl.cutWindows, windowCtl.widthScale, windowCtl.flareScale])
+  }, [openings, branches, windowCtl.cutWindows, windowCtl.widthScale, windowCtl.flareScale])
 
   /*
    * THE FINDINGS NOBODY MAY WALK PAST, printed where the person editing the model
@@ -494,7 +527,22 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
     for (const line of testimonyConflicts(openings)) {
       console.warn(`[passage openings] ${line}`)
     }
-  }, [openings])
+    /*
+     * A branch the record asks for and the stone refuses. Nothing declines one
+     * at the shipped numbers, and printing it anyway is the point: the depth is
+     * fitted to the wall outboard of each cheek, so a change to the going, the
+     * step count or the stair's bearing can start taking branches away, and it
+     * must not do it in silence.
+     */
+    const declined = branchesDeclined(openings, PASSAGE_OPENING.branchAtEnds, branches)
+    if (declined.length > 0) {
+      console.warn(`[branch] no room for steps at: ${declined.join(', ')}`)
+    }
+    const cut = branches.filter((b) => b.depthLimitedByWall).map((b) => b.id)
+    if (cut.length > 0) {
+      console.warn(`[branch] the wall, not the flight, set the going at: ${cut.join(', ')}`)
+    }
+  }, [openings, branches])
 
   /**
    * HOW MANY ROOMS YOU CAN SEE DAYLIGHT FROM, swept rather than assumed.

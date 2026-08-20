@@ -1095,12 +1095,15 @@ export const BALUSTRADE = {
  * Nothing moved: the deck, the parapet, the headroom and the top of the tower are
  * the same four numbers they were.
  *
- * STILL UNBUILT, and it is the only thing on the terrace that is: the HEAD-HOUSE
- * over the stairwell — the wedge of sawn ashlar raked to the pitch of the stair
- * under an inclined glazed light (up/250, roof/007, roof/008). Its plan follows
- * the deck opening and its rake follows the stair, so it needs no measurement
- * that is not already here; it is simply not modelled yet, and until it is, the
- * way out of the stair is an open hole in the paving instead of a door.
+ * THE HEAD-HOUSE IS BUILT (2026-08-20) and this paragraph is what it used to
+ * say: "STILL UNBUILT, and it is the only thing on the terrace that is". It was
+ * right that the wedge needed no measurement that was not already here — its
+ * plan is the deck opening and its rake is PLAYER.stairHeadroom — and it was
+ * right that this was scope rather than evidence. Two small things did have to be
+ * read off the frames after all, the lantern's frame and the threshold profile,
+ * and both are measured against the well's own width; see STAIRHEAD below and
+ * lib/stairhead.ts. The way out of the stair is a door under a glazed light now
+ * rather than an open hole in the paving.
  *
  * STILL UNKNOWN, as opposed to merely unbuilt: the coping's own profile (whether
  * the capping slab overhangs the rubble below it, which is the most likely
@@ -1142,10 +1145,17 @@ export const ROOF_QUESTION = [
   'one of those is a ratio against the 0.751 m parapet, so they all carry its',
   '±0.06. If you can measure a post, that is the number to send.',
   '',
-  'STILL UNBUILT: the HEAD-HOUSE over the stairwell — the raked ashlar wedge with',
-  'the glazed light (up/250, roof/008). Plan and rake both follow things already',
-  'in this file; it is scope, not evidence. Until it is built you come out of the',
-  'stair through an open hole in the deck rather than through a door.',
+  'THE HEAD-HOUSE IS BUILT (2026-08-20) — the raked ashlar wedge with the glazed',
+  'light (up/241, up/242, up/250, roof/007, roof/008). Plan = the deck opening,',
+  'rake = the chord from PLAYER.stairHeadroom at the way out down to the paving.',
+  'ONE NUMBER IN IT IS WORTH ARGUING WITH: the apex. Built at 2.30 m because that',
+  'is the clear height the stair keeps everywhere else; your frames measure it at',
+  '2.1 ± 0.2 m against the man in up/242 and against six 0.35 m courses. If you',
+  'can put a tape on the wedge at the door, that is the number to send.',
+  '',
+  'STILL UNBUILT there, and both on purpose: the barred glass gate across the way',
+  'out (operable, and drawn shut it walls the stair up — roof/007, up/240), and',
+  'the metal capping on the ashlar arris (no frame sizes its section).',
   '',
   'STILL UNMEASURED: the coping slab’s own profile and overhang; where in plan the',
   'stair head stands relative to the beak; the glass thickness.',
@@ -1962,6 +1972,140 @@ export const LIFTS: StairLift[] = buildLifts()
 /** Just the flights cut in the masonry — the modern spiral is not one of them. */
 export const WALL_LIFTS: StairLift[] = LIFTS.filter((l) => l.kind === 'wallStair')
 
+// ——————————————————————— the head-house on the terrace ———————————————————————
+/**
+ * THE WEDGE OVER THE ROOF STAIRWELL, which 5a648b0 left as the one unbuilt thing
+ * on the terrace and which is built now (2026-08-20).
+ *
+ * WHAT THE FOOTAGE SHOWS. A structure of sawn ashlar standing on the paving
+ * either side of the stair's opening, raked to a single straight arris from an
+ * apex at the way out down to the slabs at the far end, with an inclined glazed
+ * light lying on the rake and a stainless threshold profile set flush in the
+ * paving where you step out. up/241 and up/242 have the whole wedge in profile —
+ * 242 with a man standing against its vertical end, which is the only scale in
+ * any of these frames; up/250, roof/008 and roof/009 are close on the ashlar and
+ * its capping; up/243 and the tail of up/241 show the lantern's foot landing ON
+ * the paving; roof/007 and down/001 stand on the threshold; down/003 looks back
+ * from inside at the point where the glass runs out and the paving takes over as
+ * the lintel over the passage.
+ *
+ * ALMOST NOTHING HERE IS A NEW NUMBER, and that is what 5a648b0 promised: the
+ * PLAN is the opening already cut in the deck (App's `stairwells[FLOORS.length]`,
+ * 69.97° of arc from r 4.767 to 5.767 on the shipped configuration) and the RAKE
+ * is the clear height the stair already keeps (PLAYER.stairHeadroom). Two things
+ * had to be read off the frames and they are tagged [VIDEO] below; one is derived
+ * and checked against the frames; one is borrowed from the balustrade.
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * THE APEX IS DERIVED AND THE FRAMES ARE THE CHECK. 2.30 m [DERIVED].
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * The soffit at the way out is `ROOF.deckY + PLAYER.stairHeadroom` — the same
+ * clear height the passage is vaulted to under the paving, carried on above it.
+ * It is not stored here because it is not a choice; lib/stairhead.ts takes the
+ * headroom as an argument for the same reason stairwellSpanDeg() does.
+ *
+ * THE FRAMES MEASURE 2.1 ± 0.2 m and the two agree inside that. up/242 has a man
+ * standing against the wedge's vertical end. For any two verticals standing on
+ * one ground plane, H/h_camera = (row_foot − row_head)/(row_foot − row_horizon),
+ * which needs neither the focal length nor either distance — the same
+ * focal-free ratio PARAPET is measured by. Reading the man at rows 1374/916 and
+ * the wall's near corner at 1415/831, with the horizon off the far shore of the
+ * bay at row 962, the wall comes out at 1.16 × the man's own height: 2.09 m for
+ * a 1.80 m man, 2.20 for a 1.90 m one. The RATIO is what is robust — moving the
+ * horizon ±40 px moves it by less than 0.01 — and the man's stature is what is
+ * not. A second reading agrees: the near corner carries six regular courses of
+ * 90.4 px in 583 px of wall, and six courses of the 0.35 m these read as is
+ * 2.10 m.
+ *
+ * SO WHY BUILD 2.30 RATHER THAN 2.10. Because 2.10 is a reading against an
+ * unknown man and 2.30 is the number the rest of the stair is already built to,
+ * and because of what the difference costs the walker: the rake is a chord (see
+ * lib/stairhead.ts), so the clear height under it is least over the last riser,
+ * and at an apex of 2.30 that minimum is 1.86 m against a 1.60 m walker. At 2.10
+ * it is 1.70. Ten centimetres over a capsule's head is the margin this model has
+ * been caught by before. If the owner measures the wedge, this is the one number
+ * to send and it is one line in App.tsx away from the built model.
+ *
+ * WHAT WAS NOT BUILT AND WHY, because both are conspicuous in the frames:
+ *
+ *   · THE GLASS SCREEN AND ITS BARRED GATE across the way out — roof/007 and
+ *     down/001 from inside, up/240 from the terrace, where it reads as a
+ *     frameless glass box with a flat glass lid standing on the paving. It is
+ *     operable: drawn shut it walls the stair up, and nothing in the corpus
+ *     shows the hinge side, the leaf's swing or where the box's fourth face is.
+ *     A gate is also the part of this that is fit-out rather than fabric — it is
+ *     what closes the tower at six o'clock. Left out on both grounds.
+ *   · THE RAKING METAL CAPPING on the ashlar's arris (roof/009 most plainly, and
+ *     the white line down every profile view). Its section is a few pixels
+ *     against nothing of known size in every frame. The lantern's own frame is
+ *     drawn because it can be measured against the light it frames; this cannot.
+ *   · THE COURSING. It is read — regular courses about 0.35 m deep, stretchers
+ *     about 0.70 m, laid half-lap, joints FLUSH and hairline (up/242 at the near
+ *     corner; roof/008) — and deliberately not carved. The drum's courses are
+ *     drawn as relief by CourseBands because the drum's courses ARE relief, with
+ *     a shadow under every bed. These are sawn flush, so relief here would be a
+ *     fabrication with a shadow in it, and a joint depth is exactly the kind of
+ *     plausible small number rule 1 is about.
+ */
+export const STAIRHEAD = {
+  /**
+   * m — thickness of each cheek wall. [DERIVED], and on the inner side there is
+   * no other answer available.
+   *
+   * The opening's inner edge is `innerRadiusAt(ROOF.deckY) + STAIR.wallClearance`
+   * and the paving's inner rim is `innerRadiusAt(ROOF.deckY)`, so the strip of
+   * stone between the hole and the storey-8 room face is STAIR.wallClearance
+   * wide and the inner cheek is exactly what stands on it. Thinner and a ledge
+   * of paving hangs over the room; thicker and the wall oversails the room face
+   * with nothing under it.
+   *
+   * THE OUTER CHEEK IS THE SAME WALL BUILT TWICE, and the frames say so rather
+   * than symmetry. In up/243 and the tail of up/241 the ashlar band beside the
+   * lantern measures 0.24 ± 0.07 of the lantern's own width, and the lantern
+   * spans the well — 1.00 m — so the band is 0.24 m against this 0.25. That is
+   * the whole of the measurement and it is quoted because it agrees, not because
+   * anything was fitted to it.
+   */
+  cheekThickness: 0.25, // = STAIR.wallClearance; see above
+  /**
+   * m — the lantern's sheet. [ASSUMPTION], borrowed from BALUSTRADE.glassThickness
+   * rather than invented afresh: nothing in the corpus resolves a pane edge
+   * against anything of known size, on the roof or here, and the terrace should
+   * not acquire a second unmeasured glass thickness. Same borrow, same reason, as
+   * ROOF.pavingDepth taking FLOOR_SLAB.
+   */
+  glazingThickness: 0.015,
+  /**
+   * m — the metal profile along the lantern's two rakes and its eaves. [VIDEO]
+   * 0.08, bracket 0.05…0.13.
+   *
+   * It is the most conspicuous thing on the wedge — the white line that reads
+   * from anywhere on the terrace — and it is measured against the one ruler in
+   * the same plane as it: the light it frames, which spans the well and is
+   * therefore 1.00 m across plus its bearings. At the lantern's foot in up/241
+   * the eaves profile is about 40 px where the sheet is about 700 px across;
+   * halfway up the rake in up/243 the flank profile is about 55 px against about
+   * 450 px, which is wider because that band is seen edge-on and includes the
+   * upstand. The bracket is the spread of the two, and it is wide because the
+   * profile is a folded metal section read at an angle, not a flat face.
+   */
+  frameWidth: 0.08,
+  /**
+   * m — the stainless threshold profile set flush in the paving at the way out.
+   * [VIDEO] 0.04, bracket 0.03…0.06.
+   *
+   * roof/007 and down/001 both show it as a bright strip lying IN the slabs with
+   * the treads starting straight behind it. Measured against the well's own
+   * width the same way the frame is: in down/001 the visible run of the profile
+   * is about 754 px for something under the well's 1.00 m of radial band, and its
+   * own width is about 27 px, so 0.03…0.04 m. It is drawn flush — its top face
+   * is ROOF.deckY — and gets no collider, for the reason the drainage channel
+   * gets none: it is below anything the capsule can feel.
+   */
+  thresholdWidth: 0.04,
+} as const
+
 // ———————————————————— openings at the ends of the passages ————————————————————
 /**
  * How a slit is fixed to the end of a stair passage.
@@ -2040,72 +2184,109 @@ export const PASSAGE_OPENING = {
   /** m kept between the reveal's inner head and the vault soffit. CSG hygiene. */
   crownMargin: 0.05,
   /**
-   * Ends carrying a stepped BRANCH up from the landing to the slit. [PLACEHOLDER],
-   * and shipped EMPTY — not one invented step.
+   * Ends carrying a stepped BRANCH up from the landing to the floor of the
+   * slit's embrasure. Was [PLACEHOLDER] and shipped EMPTY; ships FULL now, and
+   * the change is an argument rather than a decision.
    *
-   * [OWNER] said steps lead up to some of the tower's windows, and until this
-   * change the model read that as recesses in the chamber wall. Under his new
-   * statement there are no chamber openings for such a recess to serve, and the
-   * surviving candidate is a short flight off a passage LANDING — which is
-   * exactly what [VIDEO] shows on the roof climb: a barred gate at 429–449 s with
-   * a separate blocked stair rising behind it to a window slit, and the earlier
-   * reading counted three such branches at 6, 3 and 3 steps.
+   * WHAT WAS BUILT BEFORE. Nothing, and "nothing" was never the neutral option.
+   * The reveal's floor stands above the landing at every end the tower cuts, so
+   * the model has always claimed there is exactly ONE step up into every
+   * embrasure — a lip, chosen by nobody, tagged by nobody, and the one riser
+   * count the footage never shows. Filling this list does not add a claim to a
+   * blank; it replaces a silent claim with a sourced one.
    *
-   * It is not modelled, because a six-riser branch demonstrably cannot be the end
-   * of the main passage: 6 × 0.2 m of climb plus a 1.9 m slit puts the head at
-   * 3.1 m over a vault 2.30 m high. It is a separate tunnel, and no source gives
-   * its length, its bearing or its gradient. Rule 1.
+   * WHY EVERY END. Not "every end has a branch" as a survey result — nobody has
+   * walked the tower counting, and that is still recorded as open below. It is
+   * that the question this list answers is "what stands between the landing and
+   * the embrasure floor", and there is no end where the honest answer is
+   * "nothing". The list keeps its per-end shape precisely so an id can be struck
+   * out the day [OWNER] names an end that has none; an end that carries no slit
+   * gets no branch anyway, because planPassageBranches() only serves ends the
+   * shell was cut for.
    *
-   * [2026-08-14] THE ONE FRAME BECAME MANY AND THEY ALL AGREE — the reading above
-   * was made from a single passage of the roof climb and it generalises. up/087:
-   * a locked barred gate two steps up off a landing, with a deep embrasure behind
-   * it. up/218: two shallow stone steps climbing inside the embrasure to the sill,
-   * with a barred screen across its mouth. up/143: the fork itself at the foot of
-   * a flight — the main run bearing away and a short branch of two or three steps
-   * continuing straight on to a slit, with the handrail fixed to the wall between
-   * them. Still shipped EMPTY for the same reason as before: none of those frames
-   * gives a length, a bearing or a gradient, and counting risers in them means
-   * assuming the riser.
+   * WHAT THE FOOTAGE SETTLES, unchanged from the 2026-08-14 reading: that the
+   * branch exists, that it is at the END of a passage and not in a chamber wall,
+   * that it climbs OUTWARD into the embrasure toward the slit, and that the
+   * recess it climbs in is broad enough to stand in and narrows to a slot before
+   * the daylight (up/168, down/124). up/087: a locked barred gate two steps up
+   * off a landing. up/218: two shallow stone steps climbing inside the embrasure
+   * to the sill, a barred screen across its mouth. up/143: the fork at the foot
+   * of a flight, the main run bearing away and a short branch continuing on.
    *
-   * WHAT IS SETTLED AND WHAT IS NOT, now that the frames have been read properly,
-   * because "ships empty" is not the same claim as "nothing is known".
-   *
-   *   SETTLED — that the branch exists, that it is at the END of a passage and
-   *   not in a chamber wall, that it climbs OUTWARD into the embrasure toward the
-   *   slit, and that the recess it climbs in is broad enough to stand in and
-   *   narrows to a slot before the daylight (up/168, down/124).
-   *
-   *   NOT SETTLED, and none of it inferable from these frames:
-   *     · the riser count. up/218 reads as two steps, down/124 as three, and
-   *       up/168 puts the sill about two courses over the tread — three readings
-   *       that do not agree, and each of them is a COUNT, which only becomes a
-   *       height by assuming a riser. Assuming the riser is the thing forbidden.
-   *     · the going, the width and the depth. All three are [ESTIMATE] in
-   *       WINDOW_EMBRASURE and the footage cannot correct any of them: no object
-   *       of known size stands in any of the 492 frames.
+   * WHAT IS STILL NOT SETTLED, and none of it inferable from these frames:
+   *     · the going. [ESTIMATE], borrowed from WINDOW_EMBRASURE rather than
+   *       invented here; the footage cannot correct it, because no object of
+   *       known size stands in any of the 492 frames.
    *     · the bearing and the length of the branch tunnel, i.e. how far off the
-   *       landing's own line it runs before it reaches the reveal.
-   *     · whether every passage end has one. The 2026-08-14 reading found the
-   *       arrangement at the foot of every stone flight; the earlier reading
-   *       counted three. Nobody has walked it counting.
+   *       landing's own line it runs before it reaches the reveal. The model
+   *       runs it straight out along the opening's own radius, which is where
+   *       the reveal already goes.
+   *     · whether every passage end has one — see WHY EVERY END above for what
+   *       is being claimed instead.
+   *     · WHICH end each frame is. The climb is continuous and a frame number
+   *       could be walked back to a storey, but that is a chain of inferences
+   *       about a thing the frames do not label, so no end here carries a
+   *       per-end count. See branchSteps.
    *
-   * So the list stays empty. What has changed is that the maths waiting for it is
-   * no longer able to punch a hole in the tower when it is filled in:
-   * planEmbrasure() fits the recess to the stone at its own height. See
-   * WINDOW_EMBRASURE.outerLeaf.
-   *
-   * QUESTION FOR THE OWNER: do those steps climb from the stair landing up to the
-   * slit, or from the room into a recess in the wall?
+   * QUESTION FOR THE OWNER, and it is now the same question as the sill's — see
+   * windows.json → sillHeightQuestion.ask, which already asks for the step count
+   * and the height at the window and says the riser will be got from his count.
    */
-  branchAtEnds: [] as string[],
+  branchAtEnds: [
+    'foot-2-3',
+    'head-2-3',
+    'foot-3-4',
+    'head-3-4',
+    'foot-4-6',
+    'head-4-6',
+    'foot-6-7',
+    'head-6-7',
+    'foot-7-8',
+    'head-7-8',
+    'foot-8-9',
+    'head-8-9',
+  ] as string[],
   /**
-   * Deliberately NOT modelled, recorded so nobody assumes it was overlooked:
-   * three barred branches to slits, [VIDEO] 429–449 s, 6/3/3 steps. Geometry for
-   * them exists in no source, and the 2026-08-14 reading of the whole climb found
-   * the same arrangement at the foot of every stone flight rather than at three
-   * of them — see windows.json → footageReading.corroborated.
+   * Risers between the landing and the embrasure floor. [VIDEO], counted.
+   *
+   * A COUNT IS NOT A HEIGHT, and this is the one place that distinction stops
+   * being an obstacle. The old objection to modelling the branch was that
+   * "counting risers means assuming a riser" — true, if the climb were unknown.
+   * It is not: the climb is sillAboveLanding above, already a [PLACEHOLDER],
+   * already what the shell is cut with. So planSillBranch() takes riser =
+   * climb / branchSteps and the branch adds no number of its own. Give the sill
+   * its real metres and the treads follow without being touched.
+   *
+   * TWO, AND THE DISSENT IS RECORDED RATHER THAN AVERAGED. up/218 reads as two
+   * steps inside the embrasure; up/087 as two steps up off the landing; up/168
+   * puts the sill about two courses over the tread beneath it. down/124 reads as
+   * THREE courses, and the older [VIDEO] 429–449 s reading counted 6/3/3 on three
+   * branches. Nothing here reconciles them and nothing should: the frames are of
+   * different ends of different passages and the building may well do both.
+   *
+   * WHERE THEY DISAGREE THE MODEL TAKES THE SMALLER, and the tie-break is about
+   * the direction of the risk, not about the shape of the building. The count
+   * sets how far the flight runs into the wall (stepCount × going), and the only
+   * failure the wall constraint exists to prevent is a recess leaving the drum
+   * through its own outer face — measured at 0.09 m over at storey 6 and 0.38 m
+   * at storey 8 before b36496b. Two cannot cause it where three might. It is not
+   * a claim that two is the commoner arrangement.
    */
-  unmodelledBranches: 3,
+  branchSteps: 2,
+  /**
+   * The branches [VIDEO] 429–449 s counted at 6, 3 and 3 steps, kept as the
+   * dissenting reading of the count above rather than as a list of things left
+   * out. Until 2026-08-20 this field said those branches were "deliberately NOT
+   * modelled"; they are modelled now, at branchSteps risers rather than at 6, 3
+   * and 3, because no frame ties any of those counts to an end of this model.
+   *
+   * The old reason for leaving them out has expired with the riser it assumed:
+   * "6 × 0.2 m of climb plus a 1.9 m slit puts the head 3.1 m over a 2.30 m
+   * vault" is arithmetic on a 0.2 m riser nobody measured. Under riser =
+   * climb / stepCount six risers climb the same height two do, and the head goes
+   * nowhere.
+   */
+  branchStepsDissent: [6, 3, 3],
 } as const
 
 // ———————————————————————————————— well ————————————————————————————————
@@ -2214,7 +2395,17 @@ export const WINDOW_GRILLE = {
  * and it is the natural home for "steps lead up to some of the windows". What
  * agreed was the COUNT of branches, not the number of steps, and it was not
  * right to tune the steps to a recollection of frames before and it is not right
- * now. See PASSAGE_OPENING.branchAtEnds, which ships empty.
+ * now. See PASSAGE_OPENING.branchAtEnds.
+ * now. See PASSAGE_OPENING.branchAtEnds.
+ *
+ * [2026-08-20] TWO OF THESE NUMBERS ARE SPENT AFTER ALL, and it is worth being
+ * exact about which. The branch at a passage end is built now — planSillBranch()
+ * in lib/embrasure.ts — and it borrows `going` and `outerLeaf` from this block
+ * rather than opening estimates of its own. It does NOT use `riserTarget`, which
+ * is the whole point of it: the riser comes from the sill divided by the counted
+ * steps. It does not use `platformDepth` either, because the embrasure floor is
+ * the standing place and is already cut. `width` stays unspent: the branch is as
+ * wide as the reveal it climbs in, which is a dimension the model already has.
  */
 export const WINDOW_EMBRASURE = {
   /** m — target riser, matched to the stair's own so the two read as one mason's work. [ESTIMATE] */
