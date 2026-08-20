@@ -30,6 +30,22 @@ export const LIMESTONE_MORTAR = '#836846'
 /** Interior stone: [ref] calls it darker and more weathered than the outside. */
 export const LIMESTONE_INTERIOR = '#6d6152'
 
+/**
+ * The head-house's sawn ashlar — modern stone, and it does not match the drum.
+ *
+ * Read as a RATIO within single frames rather than as an absolute, because the
+ * walkthrough frames are darker than the reference photographs and an absolute
+ * code off them would be an exposure, not an albedo. In up/241 the wedge's face
+ * (#555349) against the terrace paving beside it (#616051) and the parapet's old
+ * rubble (#545146); in up/242 the wedge (#605e53) against the paving (#7d7763).
+ * The wedge is consistently a little COOLER and less warm than everything old
+ * around it — R ≈ G > B by a few codes, against the drum's LIMESTONE_LIGHT where
+ * R − B is 61 — which is what a sawn modern limestone looks like beside a
+ * weathered rubble one. So this is LIMESTONE_LIGHT's lightness with most of its
+ * warmth taken out, and nothing more precise is claimed.
+ */
+export const SAWN_ASHLAR = '#b5b0a0'
+
 /** Albedo contrast between course and joint, as measured in flat light. */
 export const MEASURED_ALBEDO_RATIO = 1.39
 

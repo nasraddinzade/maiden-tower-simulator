@@ -43,6 +43,7 @@ import {
   type OpeningFitting,
   type PassageOpening,
 } from './lib/passageOpenings'
+import { stairhead, stairheadClearance } from './lib/stairhead'
 import { chamberDaylight, daylightCensus } from './lib/chamberDaylight'
 import { Staircase } from './components/tower/Staircase'
 import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
@@ -331,6 +332,28 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
     })
     return cuts
   }, [stair.cutStairwells, flightPlan, stair.stairWidth, stair.wallClearance])
+
+  /**
+   * THE HEAD-HOUSE over the roof stairwell — the wedge you come out of.
+   *
+   * Planned here rather than inside RoofTerrace because it takes two things the
+   * terrace does not have: the opening in the paving (above) and the LAST
+   * FLIGHT'S STEPS, which are what say which end of that opening is the way out.
+   * Hard-coding the end would be right for one winding of the stair and would
+   * put the apex at the bottom of the flight for the other.
+   *
+   * Its rake is PLAYER.stairHeadroom — the same clear height the passage is
+   * vaulted to under the paving, carried on above it — so the wedge introduces
+   * no height of its own. See lib/stairhead.ts for why the soffit is the chord
+   * of that and not an offset of the treads, and STAIRHEAD in config/tower.ts
+   * for the two dimensions the frames had to supply.
+   */
+  const roofStairhead = useMemo(() => {
+    const flights = flightPlan.flights
+    const last = flights[flights.length - 1]
+    if (!last) return null
+    return stairhead(stairwells[FLOORS.length], last, ROOF.deckY, PLAYER.stairHeadroom)
+  }, [flightPlan, stairwells])
 
   /**
    * The void the stair needs through the masonry. Cutting it is what turns the
@@ -717,8 +740,26 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
    */
   useEffect(() => {
     if (!import.meta.env.DEV) return
-    console.warn(`[roof]\n${ROOF_QUESTION.join('\n')}`)
-  }, [])
+    /*
+     * THE HEAD-HOUSE'S TIGHTEST POINT, printed with the roof note and not left
+     * where only a test can see it. The wedge's rake is a chord, so the clear
+     * height under it is least over the last riser; that number is what decides
+     * whether a visitor can walk out, and it moves the moment anybody touches
+     * the riser, the headroom or the opening.
+     */
+    const tight =
+      roofStairhead && flightPlan.flights.length > 0
+        ? stairheadClearance(roofStairhead, flightPlan.flights[flightPlan.flights.length - 1])
+        : null
+    const head = tight
+      ? [
+          '',
+          `HEAD-HOUSE clear height: least ${tight.minimum.toFixed(3)} m over the tread at`,
+          `azimuth ${tight.azimuthDeg.toFixed(1)}, against a ${PLAYER.height.toFixed(2)} m walker.`,
+        ]
+      : []
+    console.warn(`[roof]\n${[...ROOF_QUESTION, ...head].join('\n')}`)
+  }, [roofStairhead, flightPlan])
 
   /*
    * AND THE ONE THAT MOVES EVERY AZIMUTH IN THE PROJECT, printed last so it is
@@ -957,6 +998,7 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
           stairPassage={stairPassage}
           stairwells={stairwells}
           doorways={doorways}
+          stairhead={roofStairhead}
         />
       )}
 
@@ -980,7 +1022,12 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
         so you can see the storeys, and a roof hanging over them is exactly what
         that view is for.
       */}
-      <RoofTerrace stairwells={stairwells} material={shellMat} showBalustrade={showShell} />
+      <RoofTerrace
+        stairwells={stairwells}
+        material={shellMat}
+        showBalustrade={showShell}
+        stairhead={roofStairhead}
+      />
 
       {/*
         The apertures are the SAME array that cuts the shell, not a second

@@ -1,6 +1,14 @@
 import { useMemo } from 'react'
 import { CuboidCollider, RigidBody } from '@react-three/rapier'
-import { BALUSTRADE, ENTRANCE, FLOORS, ROOF, TOWER, innerRadiusAt } from '../../config/tower'
+import {
+  BALUSTRADE,
+  ENTRANCE,
+  FLOORS,
+  ROOF,
+  STAIRHEAD,
+  TOWER,
+  innerRadiusAt,
+} from '../../config/tower'
 import { GUARDED_OPENINGS, OPENING_GUARD } from '../../config/modern'
 import {
   doorwayRevealBoxes,
@@ -12,6 +20,11 @@ import {
 } from '../../lib/collision'
 import { drawnClearWidth } from '../../lib/doorwayArch'
 import type { PassageSection, StairDoorway } from '../../lib/staircase'
+import {
+  STAIRHEAD_ARC_DEG,
+  stairheadColliders,
+  type Stairhead,
+} from '../../lib/stairhead'
 import type { StairwellCut } from './FloorStructures'
 
 export interface TowerCollidersProps {
@@ -21,6 +34,13 @@ export interface TowerCollidersProps {
   stairwells?: Array<StairwellCut | undefined>
   /** Arched doorways between the rooms and the stair passage. */
   doorways?: StairDoorway[]
+  /**
+   * The head-house over the roof stairwell. Two walls and a roof, and the roof
+   * is the one that matters: the deck's collider has a HOLE over the whole
+   * opening, so without it the far end of the wedge is a knife edge in the
+   * paving with nothing standing on it.
+   */
+  stairhead?: Stairhead | null
   /*
    * There used to be an `embrasures` prop here — the stepped recesses at the high
    * windows, which are cut out of the SHELL as chases and so needed the wall
@@ -55,6 +75,7 @@ export function TowerColliders({
   stairPassage,
   stairwells,
   doorways,
+  stairhead,
   sectors = 32,
   onCount,
 }: TowerCollidersProps) {
@@ -314,8 +335,22 @@ export function TowerColliders({
       )
     }
 
-    return [...walls, ...reveals, ...floors, ...guards]
-  }, [stairPassage, stairwells, doorways, sectors])
+    /*
+     * THE HEAD-HOUSE, and it is not decoration on the collider side.
+     *
+     * `sectors` is not offered to it. Every other ring here is described at the
+     * drum's own 32 because a chord that far out is short; this thing is a wedge
+     * 2.3 m tall over 70° of arc, and at 11.25° a piece the raking roof would
+     * step 0.37 m at every joint — a staircase of ledges over the stair. It gets
+     * the paving's own angular step, which is also the step the drawn wedge is
+     * swept at, so what you can touch and what you can see are one shape.
+     */
+    const head: BoxSpec[] = stairhead
+      ? stairheadColliders(stairhead, STAIRHEAD, STAIRHEAD_ARC_DEG)
+      : []
+
+    return [...walls, ...reveals, ...floors, ...guards, ...head]
+  }, [stairPassage, stairwells, doorways, stairhead, sectors])
 
   onCount?.(boxes.length)
 

@@ -8,7 +8,9 @@ import {
   yawForBearing,
   type PavingSpec,
 } from '../../lib/roofTerrace'
+import type { Stairhead as StairheadPlan } from '../../lib/stairhead'
 import { WALL_EMBED, cutStairwell, type StairwellCut } from './FloorStructures'
+import { Stairhead } from './Stairhead'
 
 /**
  * THE TERRACE — the paving that crosses the wall, and the glass standing on it.
@@ -138,9 +140,20 @@ export interface RoofTerraceProps {
   material?: THREE.Material
   /** Draw the balustrade. Off for the wireframe and cutaway views. */
   showBalustrade?: boolean
+  /**
+   * The head-house over the stair mouth, planned in App from the same opening
+   * the paving is cut by. It goes with the terrace and not with the stair: it
+   * stands ON these slabs, and without them there is nothing to bed it in.
+   */
+  stairhead?: StairheadPlan | null
 }
 
-export function RoofTerrace({ stairwells, material, showBalustrade = true }: RoofTerraceProps) {
+export function RoofTerrace({
+  stairwells,
+  material,
+  showBalustrade = true,
+  stairhead,
+}: RoofTerraceProps) {
   const paving = usePavingGeometry(stairwells?.[FLOORS.length])
   const { steel, glass } = useBalustradeGeometry()
 
@@ -149,6 +162,12 @@ export function RoofTerrace({ stairwells, material, showBalustrade = true }: Roo
       <mesh geometry={paving} material={material} receiveShadow castShadow>
         {!material && <meshStandardMaterial color="#b4ab97" roughness={0.95} />}
       </mesh>
+      {/*
+        Drawn whether or not the fence is, because it is architecture and the
+        fence is a fitting: the cutaway view exists to look down into the tower,
+        and the wedge over the stair mouth is part of what is up there.
+      */}
+      <Stairhead plan={stairhead} />
       {showBalustrade && (
         <>
           <mesh geometry={steel} castShadow>
