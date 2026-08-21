@@ -99,6 +99,27 @@ export const PLAYER = {
   minSlopeSlideAngleDeg: 70,
   /** Keeps the capsule glued to the treads instead of bouncing down a flight. */
   snapToGroundDistance: 0.4,
+  /**
+   * m/s toward the surface while grounded, instead of a fall. It is what keeps
+   * the character controller resolving a contact every step, and therefore what
+   * keeps `computedGrounded()` true; with nothing pressing down, a capsule that
+   * has just been nudged clear reports airborne and the walk turns into a
+   * stutter of one-frame falls.
+   *
+   * It lived as a literal −0.1 inside applyGravity until 2026-08-21 with the
+   * comment "slight downward bias keeps contact", and it belongs HERE for the
+   * same reason normalNudgeFactor does: the two are one mechanism. The nudge
+   * pushes the capsule off the stone and this brings it back, and until today
+   * they did not travel the same line — see lib/playerMovement.ts →
+   * contactCycleDrift, which is where the slide is worked out.
+   *
+   * The VALUE is unchanged and is not critical: at 60 Hz it asks for 1.67 mm
+   * against a nudge of 1.00, and anything that covers the nudge behaves
+   * identically because the stone stops the rest. What matters is that it is
+   * bounded below by the nudge, which desiredMovement() does rather than this
+   * number, so a 240 Hz frame does not come up short.
+   */
+  groundContactBias: 0.1,
   /** Small gap the controller keeps from surfaces, avoids jitter against walls. */
   characterOffset: 0.02,
   /**

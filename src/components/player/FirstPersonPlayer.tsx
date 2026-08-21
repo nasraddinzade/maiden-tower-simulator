@@ -5,7 +5,17 @@ import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from '@re
 import { Ray } from '@dimforge/rapier3d-compat'
 import { LAMP, PLAYER } from '../../config/player'
 import { FLOORS } from '../../config/tower'
-import { applyGravity, applyLook, moveVelocity, teleportTarget, type MoveInput } from '../../lib/playerMovement'
+import {
+  applyGravity,
+  applyLook,
+  desiredMovement,
+  groundNormalOf,
+  moveVelocity,
+  teleportTarget,
+  UP,
+  type MoveInput,
+  type Vec3,
+} from '../../lib/playerMovement'
 import { useKeyboard } from '../../hooks/useKeyboard'
 
 const DEG = Math.PI / 180
@@ -58,6 +68,16 @@ export function FirstPersonPlayer({
   const pitch = useRef(0)
   const vertical = useRef(0)
   const locked = useRef(false)
+  /**
+   * The surface under the walker, read back from the contacts the controller
+   * resolved LAST step — the solve is what discovers it, so this frame has to
+   * ask the previous one. A frame of lag costs nothing: it is the stone you are
+   * standing on, and it changes when you step off it, at which point the first
+   * frame on the new surface uses the old normal and every frame after it does
+   * not. Leaving the ground resets it to UP, because a fall is vertical; a
+   * grounded step that resolved no contact KEEPS it (see groundNormalOf).
+   */
+  const groundNormal = useRef<Vec3>(UP)
   /**
    * A requested jump to a spot. Consumed at the TOP of the frame, which then
    * returns early: letting the character controller run in the same frame would
@@ -152,6 +172,8 @@ export function FirstPersonPlayer({
       rb.setTranslation(pos, true)
       rb.setNextKinematicTranslation(pos)
       vertical.current = 0
+      // the surface under the old spot says nothing about the new one
+      groundNormal.current = UP
     }
 
     const placement = pendingPlacement.current
@@ -201,15 +223,45 @@ export function FirstPersonPlayer({
     const planar = moveVelocity(input, yaw.current, PLAYER.walkSpeed, PLAYER.runSpeed)
 
     const grounded = ctrl.computedGrounded()
-    vertical.current = applyGravity(vertical.current, dt, PLAYER.gravity, PLAYER.maxFallSpeed, grounded)
+    vertical.current = applyGravity(
+      vertical.current,
+      dt,
+      PLAYER.gravity,
+      PLAYER.maxFallSpeed,
+      grounded,
+      PLAYER.groundContactBias,
+    )
 
     const collider = rb.collider(0)
-    ctrl.computeColliderMovement(collider, {
-      x: planar.x * dt,
-      y: vertical.current * dt,
-      z: planar.z * dt,
-    })
+    ctrl.computeColliderMovement(
+      collider,
+      desiredMovement({
+        planar,
+        verticalVelocity: vertical.current,
+        dt,
+        grounded,
+        groundNormal: groundNormal.current,
+        nudge: PLAYER.normalNudgeFactor,
+      }),
+    )
     const corrected = ctrl.computedMovement()
+
+    /*
+     * Read the surface back out of the solve for the NEXT step's contact bias.
+     * `normal1` is the normal on the collider the capsule hit, so on a tread it
+     * points up out of the stone — which is the direction the solver's nudge
+     * shoves the walker, and therefore the direction the bias has to come back
+     * along. Copied out by value: rapier hands back a view over its own memory.
+     */
+    const contacts: Vec3[] = []
+    for (let i = 0; i < ctrl.numComputedCollisions(); i++) {
+      const c = ctrl.computedCollision(i)
+      if (c) contacts.push({ x: c.normal1.x, y: c.normal1.y, z: c.normal1.z })
+    }
+    groundNormal.current = grounded
+      ? (groundNormalOf(contacts, PLAYER.maxSlopeClimbAngleDeg * DEG) ?? groundNormal.current)
+      : UP
+
     const p = rb.translation()
     rb.setNextKinematicTranslation({
       x: p.x + corrected.x,
@@ -233,6 +285,14 @@ export function FirstPersonPlayer({
         y: camera.position.y,
         z: camera.position.z,
         grounded,
+        /**
+         * The surface the contact bias is being spent against. `grounded` alone
+         * cannot tell a chamber floor from a 34° flight, and the creep this
+         * controller used to have was a property of the ANGLE — so a walk that
+         * wants to say which surface it measured on reads it here rather than
+         * guessing from the height.
+         */
+        groundNormal: { ...groundNormal.current },
         yaw: yaw.current,
         setYaw: (v: number) => {
           yaw.current = v
