@@ -57,6 +57,7 @@ import {
 } from '../config/tower'
 import { PLAYER } from '../config/player'
 import { planAllFlights, stairDoorways, stairPassageSections } from './staircase'
+import { archSpringHeight } from './doorwayArch'
 import {
   passageEndAnchors,
   planPassageOpenings,
@@ -209,9 +210,16 @@ describe('the number, and it is seven chambers out of eight', () => {
      *
      * The door is 24% of the tower's daylight, which is the honest way round for
      * a building with twelve slits in it.
+     *
+     * 31.358 → 31.387 on 2026-08-21, and all 0.029° of it is storey 1's: the
+     * entrance head stopped being an invented 2.000 m and became a measured
+     * 2.035 (ENTRANCE_HEIGHT_RATIO), which lifts the springing of its arch by
+     * the same 35 mm and leaves the eye 0.015 m above it instead of 0.050. The
+     * other seven rooms are untouched to the last decimal — the entrance is the
+     * only opening in the census that is not a slit.
      */
     const total = CHAMBERS.reduce((s, c) => s + c.arcDeg, 0)
-    expect(total).toBeCloseTo(31.358, 2)
+    expect(total).toBeCloseTo(31.387, 2)
     expect(of(1).arcDeg / total).toBeGreaterThan(0.24)
     expect(of(1).arcDeg / total).toBeLessThan(0.25)
     expect(of(5).arcDeg).toBe(0)
@@ -455,13 +463,20 @@ describe('storey 1, the one chamber that owes the stair nothing', () => {
      * This is the ONE room in the tower that gained by the walker shrinking:
      * the eye came down from 1.65 to 1.50 m, so its rise above that springing
      * fell from 0.20 to 0.05 and the band opened from 7.121° to 7.613°. Nothing
-     * about the door moved — ENTRANCE is untouched by the chamber-section repair
-     * of 2026-08-16 — which is exactly why this test is worth keeping in the
-     * form of the formula rather than the number.
+     * about the door moved then — ENTRANCE was untouched by the chamber-section
+     * repair of 2026-08-16 — which is exactly why this test is worth keeping in
+     * the form of the formula rather than the number.
+     *
+     * It moved on 2026-08-21, and the formula is why this cost one line: the
+     * head went from an invented 2.000 m to a measured 2.035, the springing rose
+     * with it, the rise fell 0.050 → 0.015 and the band opened 7.613° → 7.642°.
+     * The half-span is written from ENTRANCE.width now rather than from a 0.55
+     * typed twice, so the next reading of the door carries itself in here.
      */
-    const half = Math.sqrt(0.55 ** 2 - (PLAYER.eyeHeight - (ENTRANCE.height - 0.55)) ** 2)
+    const rise = PLAYER.eyeHeight - archSpringHeight(ENTRANCE.width, ENTRANCE.height)
+    const half = Math.sqrt((ENTRANCE.width / 2) ** 2 - rise ** 2)
     expect(of(1).arcDeg).toBeCloseTo(2 * halfArcDeg(2 * half, TOWER.outerRadius), 3)
-    expect(of(1).arcDeg).toBeCloseTo(7.613, 3)
+    expect(of(1).arcDeg).toBeCloseTo(7.642, 3)
     expect(of(1).arcDeg).toBeLessThan(2 * halfArcDeg(ENTRANCE.width, TOWER.outerRadius))
   })
 })

@@ -1253,10 +1253,109 @@ export const BUTTRESS = {
 //
 // 270 is taken from the source (İçərişəhər's compass word) rather than from my own
 // photogrammetry (~287°), whose ±20° precision does not justify overriding a cited figure.
+/** m — the doorway's CLEAR WIDTH. [İçərişəhər]/az.Wikipedia, sourced. */
+const ENTRANCE_WIDTH = 1.1
+
+/**
+ * The entrance opening's height above its threshold, in units of that clear
+ * width. [VIDEO] 1.85, bracket 1.80…1.92.
+ *
+ * THIS REPLACES A [PLACEHOLDER] 2.0 THAT NOBODY HAD EVER MEASURED. It was the
+ * front door of the building — the first opening a visitor walks through — and
+ * its height was the one dimension in this block invented outright, standing
+ * beside a width and a sill height that are both cited. Two archives that show
+ * the door had never been read for it: the descent leaves the building through
+ * it (down/205–208), and reference-photos/exterior/ has 208 frames of the west
+ * face. The method is 827c26c's, applied where it works best.
+ *
+ * WHY A RATIO AND NOT A LENGTH, again. Nothing in the corpus gives a scale at
+ * the entrance. But the width IS sourced, so a ratio of two image lengths in one
+ * plane converts straight to metres, and for a plane square to the camera the
+ * focal length and the principal point cancel exactly.
+ *
+ * THE FRAME. down/206, taken inside the entrance passage looking out along its
+ * axis, with the whole opening — crown, both jambs and the threshold — in one
+ * view. Read by brightness profile across each row, nine-pixel boxcar, the edge
+ * taken at the half-height of the step rather than by eye:
+ *
+ *   the daylight aperture is bounded by the OUTER mouth of the doorway (looking
+ *   through a tunnel, the far mouth is the one that subtends less), and the dark
+ *   ring outside it is the reveal, not a frame. Proof that it is the reveal: two
+ *   seconds later, in down/207, the walker is nearer and the ring has grown from
+ *   22% of the aperture to 39%. A flat lining would hold its proportion; a depth
+ *   cannot.
+ *
+ *   OUTER mouth: circle fit to the arch over 178 edge points, centre
+ *   (521.04, 892.06), r 189.16 px, residual rms 2.55 px. Straight-jamb width
+ *   over rows 930…1000: 377.88 px. Threshold: a metal strip whose top edge fits
+ *   a line to 0.29 px of scatter across 330 px of the opening, at y 1386.6, its
+ *   near edge at 1402.3 — 8 cm of floor, and the door's own closing plane is
+ *   inside it.
+ *   crown→threshold / width = 691.5/377.9 = 1.830.
+ *
+ *   INNER mouth (the passage-side arris, the outer edge of that dark ring):
+ *   centre (520.40, 912.23), r 235.13 px, rms 2.04, jamb width 467.67 px. It is
+ *   the same opening 1.24× nearer.
+ *
+ * THE HEAD IS A TRUE SEMICIRCLE ON THE OPENING'S OWN WIDTH, which is the thing
+ * archTunnel() has always ASSUMED and which nothing had ever checked. At the
+ * outer mouth 2r = 378.33 px against a jamb width of 377.88 — 0.12%. At the
+ * inner mouth 470.27 against 467.67 — 0.6%. So the springing sits exactly at the
+ * top of the jambs and the rise is exactly half the span, at both faces, and
+ * lib/towerShell.ts's rule is a measurement at this door rather than a habit.
+ * The springing itself stands 1.33 clear-widths (1.46 m) above the threshold.
+ *
+ * THE CORRECTION, AND IT IS THE BIGGEST TERM. The camera is not square to the
+ * opening: the vanishing point of the passage axis — recovered from the two arch
+ * fits, since the two mouths are scaled copies of each other about it — sits at
+ * (523.7, 809.0), which is 101 px above the frame's centre. Sideways that is
+ * 0.6° and worth nothing; vertically it is 4.4°…6.4° of downward pitch, for a
+ * focal length of 900…2000 px. Rectifying the measured points through that
+ * rotation lifts the ratio from 1.830 to 1.843…1.897, the correction being
+ * larger the wider the lens.
+ *
+ * The phone's own field would put f near 1210 px on a 1820 px frame (the still
+ * calibration under OCULUS_RADIUS_DEFAULT gives f/long-axis = 0.6645), which
+ * asks for 1.87. But the semicircle above argues the pitch term is smaller than
+ * that: a true semicircle seen at 5° of pitch should read 2r − jamb width ≈
+ * +3.2 px and it reads +0.45. So the honest value is between the raw reading and
+ * the fully corrected one, and the bracket is the two ends of that plus the 8 cm
+ * threshold strip (±0.021 either way).
+ *
+ * ONE CORROBORATION THAT COSTS NOTHING, and it is about the WIDTH rather than
+ * the height. The same solution puts the camera 1.73…1.79 m above the threshold
+ * — a phone at eye height for the 1.85 m man [OWNER] who filmed it. Had the
+ * sourced 1.1 m been the masonry opening outside some lining rather than the
+ * clear opening, the width would be 1.34 m and the same arithmetic would have
+ * him holding the phone at 2.1 m. It does not, so the 1.1 m is the hole he
+ * walked through, which is the hole this model cuts.
+ *
+ * WHAT IS NOT SETTLED: lens distortion, which is not modelled at all here and
+ * which the rectification cannot separate from the pitch. WHAT WOULD SETTLE IT,
+ * in one observation: a photograph taken from outside, square to the west face,
+ * with the lens at the height of the opening's own middle and the whole opening
+ * plus its threshold in frame. That kills the pitch term outright and leaves a
+ * ratio of two spans in one fronto-parallel plane. A tape on the threshold-to-
+ * crown would of course end the argument entirely.
+ */
+const ENTRANCE_HEIGHT_RATIO = 1.85
+/** The bracket the ratio sits in. [VIDEO] — see the note above. */
+const ENTRANCE_HEIGHT_RATIO_BRACKET = [1.8, 1.92] as const
+
 export const ENTRANCE = {
   azimuthDeg: 270, // west — [İçərişəhər]/az.Wikipedia, corroborated photographically; NOT [ref]'s 135°
-  width: 1.1, // m — [İçərişəhər] doorway width (sourced)
-  height: 2.0, // m — [PLACEHOLDER] opening height not in sources
+  width: ENTRANCE_WIDTH, // m — [İçərişəhər] doorway width (sourced)
+  /**
+   * m — crown above the threshold. [VIDEO], measured off down/206 as a ratio of
+   * the sourced width; see ENTRANCE_HEIGHT_RATIO for the whole reading. NOT a
+   * number to be typed in: it is a measurement times a source, and the test in
+   * src/lib/entranceOpening.test.ts holds it to that.
+   */
+  height: ENTRANCE_WIDTH * ENTRANCE_HEIGHT_RATIO,
+  /** Height in units of the clear width — the thing that was measured. [VIDEO] */
+  heightRatio: ENTRANCE_HEIGHT_RATIO,
+  /** The bracket that ratio was read within. [VIDEO] */
+  heightRatioBracket: ENTRANCE_HEIGHT_RATIO_BRACKET,
   /**
    * m — how far the sill stands above the FORMER GROUND SURFACE, which is
    * outside the tower. [İçərişəhər], "2 m above former ground surface".
