@@ -31,7 +31,13 @@ import {
   stairSettings,
 } from '../config/tower'
 import { PLAYER } from '../config/player'
-import { approachAzimuthDeg, planAllFlights, stairDoorways, stairPassageSections } from './staircase'
+import {
+  approachAzimuthDeg,
+  planAllFlights,
+  stairDoorways,
+  stairPassageSections,
+  stairwellSpanDeg,
+} from './staircase'
 import {
   besideDoorwayBearing,
   betweenDoorways,
@@ -416,9 +422,10 @@ describe('the wellhead stands between the two ways onto the stair', () => {
      * the mouth's rim reaches 2.940 m. Nearly a metre of slab between them.
      *
      * It is asserted because it is the kind of clearance that stops being one
-     * when somebody corrects offsetFromAxis: at the 3.2 m up/081 suggests, the
-     * rim reaches 3.740 and the margin is 0.159 m. Still clear, and no longer
-     * comfortably.
+     * when somebody corrects offsetFromAxis — and on 2026-08-21 somebody
+     * measured the radius and it does. At WELL.offsetByRecess the rim reaches
+     * 4.729 and the margin is −0.830: the mouth is inside the opening, not
+     * beside it. The whole of that is priced in the block below.
      */
     const tube = tubes[DEPARTURE]
     const lo = Math.min(...tube.map((s) => s.azimuthDeg))
@@ -430,7 +437,119 @@ describe('the wellhead stands between the two ways onto the stair', () => {
     expect(openingInner).toBeCloseTo(3.899, 3)
     expect(WELL.offsetFromAxis + WELL.mouthDiameter / 2).toBeCloseTo(2.94, 3)
     expect(openingInner - (WELL.offsetFromAxis + WELL.mouthDiameter / 2)).toBeGreaterThan(0.9)
-    expect(openingInner - (3.2 + WELL.mouthDiameter / 2)).toBeCloseTo(0.159, 3)
+    expect(openingInner - (WELL.offsetByRecess + WELL.mouthDiameter / 2)).toBeCloseTo(-0.83, 3)
+  })
+})
+
+/**
+ * THE RADIUS THE FOOTAGE GIVES, AND THE WALL IT WOULD HAVE TO STAND IN.
+ *
+ * up/081 was quoted in this file for a year as saying the mouth is "nearer 3.1–3.2
+ * than 2.4", which read the recess as a mouth tangent to the face from INSIDE the
+ * room. Read properly with its neighbours — up/080 and down/163 for the recess as
+ * one of two openings in one wall, up/081 and down/164 for the glass plate
+ * spanning the recess from its opening line to its back, up/082 and up/083 for the
+ * shaft's far rim standing at the back wall — it says the opposite: the mouth is
+ * IN the wall, one mouth-radius beyond the face, and WELL.offsetByRecess is that
+ * sentence as arithmetic.
+ *
+ * Everything below is a radius, an arc or a difference of the two (rule 6). What
+ * it prices is why that number is not the one the model draws.
+ */
+describe('the wellhead measured into the wall, and the wall at 154 is the stair', () => {
+  /** Storey 3's own stairwell cut, planned exactly as App.tsx plans it. */
+  const CUT = (() => {
+    const lift = WALL_LIFTS[ARRIVAL]
+    const piercedY = FLOORS[lift.toFloorNumber - 1].floorY
+    const span = stairwellSpanDeg(
+      flights[ARRIVAL].filter((s) => s.treadY <= piercedY + 1e-9),
+      piercedY - TOWER.floorSlab,
+      PLAYER.stairHeadroom,
+    )
+    if (!span) throw new Error('storey 3 carries no stairwell cut')
+    const inner = innerRadiusAt(piercedY) + STAIR.wallClearance
+    return { ...span, innerRadius: inner, outerRadius: inner + STAIR.width + 0.1 }
+  })()
+
+  /** The arc flight 2→3 occupies in the wall, at the radii the measured mouth needs. */
+  const PASSAGE = (() => {
+    const rIn = WELL.offsetByRecess - WELL.mouthDiameter / 2
+    const rOut = WELL.offsetByRecess + WELL.mouthDiameter / 2
+    const hit = tubes[ARRIVAL].filter((s) => s.outerRadius >= rIn && s.innerRadius <= rOut)
+    return {
+      loDeg: Math.min(...hit.map((s) => s.azimuthDeg)),
+      hiDeg: Math.max(...hit.map((s) => s.azimuthDeg)),
+    }
+  })()
+
+  it('is one mouth-radius beyond the chamber face, which is the whole of the reading', () => {
+    /*
+     * The recess is one mouth deep and the plate spans it, so the near rim
+     * stands on the face and the centre is half a mouth past it. Two numbers,
+     * one sourced and one [PHOTO]; the frames supply only the relation between
+     * them, which is why this is expressed as a relation and not as 4.19.
+     */
+    expect(WELL.offsetByRecess).toBeCloseTo(FACE_R + WELL.mouthDiameter / 2, 12)
+    expect(WELL.offsetByRecess).toBeCloseTo(4.1894, 4)
+    expect(WELL.offsetByRecess - WELL.mouthDiameter / 2).toBeCloseTo(FACE_R, 12)
+
+    // and it is 1.79 m further out than the radius the model still draws, which
+    // stands the whole mouth 0.71 m clear of the wall in open floor
+    expect(WELL.offsetByRecess - WELL.offsetFromAxis).toBeCloseTo(1.7894, 4)
+    expect(FACE_R - (WELL.offsetFromAxis + WELL.mouthDiameter / 2)).toBeCloseTo(0.709, 3)
+  })
+
+  it('lands inside storey 3’s own stairwell cut, which the shipped radius clears by 0.96 m', () => {
+    /*
+     * THE FIRST HALF OF THE BILL, and it is at the wellhead's own level. The
+     * opening flight 2→3 breaks through the slab by is not a narrow slot: it is
+     * 68° of arc, and 154 is inside it. What kept the mouth out of it was never
+     * the bearing — it was the placeholder radius.
+     */
+    expect(CUT.centreAzimuthDeg).toBeCloseTo(142.259, 3)
+    expect(CUT.widthDeg).toBeCloseTo(68.038, 3)
+    expect(CUT.innerRadius).toBeCloseTo(3.899, 3)
+    expect(CUT.outerRadius).toBeCloseTo(4.899, 3)
+    expect(sep(WELL.azimuthDeg, CUT.centreAzimuthDeg)).toBeLessThan(CUT.widthDeg / 2)
+
+    expect(WELL.offsetByRecess + WELL.mouthDiameter / 2).toBeGreaterThan(CUT.innerRadius)
+    expect(WELL.offsetFromAxis + WELL.mouthDiameter / 2).toBeLessThan(CUT.innerRadius)
+  })
+
+  it('sends its shaft through flight 2→3, and the free wall is the other 235°', () => {
+    /*
+     * THE SECOND HALF, AND THE HEAVIER ONE. The mouth is only the top of a 21 m
+     * bore. Between storey 2's floor and storey 3's, the wall at these radii IS
+     * the 2→3 passage over 92.53° → 217.14°, so a vertical run of the mouth's
+     * width crosses it at any bearing inside that arc. 154 is in the middle of
+     * it — and so is 186.33, the tangent placement this file carried before the
+     * bisector, so this is not an argument for going back.
+     */
+    expect(PASSAGE.loDeg).toBeCloseTo(92.53, 2)
+    expect(PASSAGE.hiDeg).toBeCloseTo(217.14, 2)
+    const inside = (deg: number) => deg > PASSAGE.loDeg && deg < PASSAGE.hiDeg
+    expect(inside(WELL.azimuthDeg)).toBe(true)
+    expect(inside(BETWEEN.toDeg)).toBe(true) // the tangent placement, 186.33
+
+    // what is left of the drum, going the other way round through north
+    expect(360 - (PASSAGE.hiDeg - PASSAGE.loDeg)).toBeCloseTo(235.39, 2)
+  })
+
+  it('leaves no radius that is both inside the recess and clear of the stair', () => {
+    /*
+     * THE TWO CANNOT BE SPLIT THE DIFFERENCE. The widest the mouth may stand and
+     * still miss the floor opening puts five sixths of it back in the room —
+     * which is the arrangement the frames rule out. There is no compromise
+     * radius, only a decision about the bearing or about the stair.
+     */
+    const widestClear = CUT.innerRadius - WELL.mouthDiameter / 2
+    expect(widestClear).toBeCloseTo(3.359, 3)
+    expect(widestClear).toBeLessThan(WELL.offsetByRecess)
+    // of a 1.08 m mouth at that radius, this much is inboard of the room face
+    expect(FACE_R - (widestClear - WELL.mouthDiameter / 2)).toBeCloseTo(0.83, 2)
+    expect((FACE_R - (widestClear - WELL.mouthDiameter / 2)) / WELL.mouthDiameter).toBeGreaterThan(
+      0.76,
+    )
   })
 })
 

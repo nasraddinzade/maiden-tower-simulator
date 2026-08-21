@@ -2693,6 +2693,15 @@ export const COURSING = {
   copingDepth: 0.55,
 } as const
 
+/**
+ * 0-based index of the storey whose floor the wellhead opens in. Hoisted out of
+ * WELL so that `offsetByRecess` below can read the wall's own radius at that
+ * level; WELL.startsAtFloorIndex carries the argument for the value.
+ */
+const WELLHEAD_FLOOR_INDEX = 2
+/** m — the funnel collar at the mouth. WELL.mouthDiameter carries the measurement. */
+const WELLHEAD_MOUTH_DIAMETER = 1.08
+
 export const WELL = {
   diameter: 0.7, // m — [ref]; see the note above on bore vs mouth
   /**
@@ -2707,7 +2716,7 @@ export const WELL = {
    * It also settles a suspicion this file already recorded: [ref]'s 0.70 m is
    * the BORE, not the mouth. WELL.diameter stays at 0.70.
    */
-  mouthDiameter: 1.08,
+  mouthDiameter: WELLHEAD_MOUTH_DIAMETER,
   collarDepth: 1.0, // m — [ASSUMPTION] how far down the funnel narrows to the bore
   depth: 21, // m — [ref] to the aquifer; İçərişəhər says 13 m
   /**
@@ -2727,7 +2736,7 @@ export const WELL = {
    * evidence about the building's history, not about which floor a visitor sees
    * it in today — and if the two are genuinely different, both are right.
    */
-  startsAtFloorIndex: 2,
+  startsAtFloorIndex: WELLHEAD_FLOOR_INDEX,
   /**
    * Azimuth of the WELLHEAD. Of the wellhead alone — see WALL_SHAFT below.
    *
@@ -2778,6 +2787,14 @@ export const WELL = {
    * the wall and the freedom grows — at 3.2 m the mouth takes 9.71° and the band
    * opens to ±35.1° — but the bearing does not move at all. Contrast the old
    * tangent placement, which moved 8° for the same correction.
+   *
+   * THAT IS STILL TRUE AND IT IS NO LONGER ENOUGH, 2026-08-21. The radius has
+   * since been read off the frames — offsetByRecess, 4.189, the mouth in the
+   * floor of a wall recess — and at that radius this bearing does not move by a
+   * degree and stops being AVAILABLE: 154 is inside storey 3's stairwell cut and
+   * inside the arc the 2→3 passage occupies in the wall below. The insensitivity
+   * this paragraph claims is a property of betweenDoorways(), not of the tower.
+   * Nothing here is withdrawn; the whole of the argument is at offsetFromAxis.
    *
    * AND THE FIRST SENTENCE'S BEARING IS INSIDE THIS BAND, at its very clockwise
    * end: the tangent to the departure doorway's jamb, 186.332 with the doorway
@@ -2896,25 +2913,103 @@ export const WELL = {
    */
   azimuthDeg: 154,
   /**
-   * Distance of the wellhead from the tower axis. [PLACEHOLDER], and the
-   * footage now says it is too small — left alone anyway, because correcting it
-   * is a different change from the one that moved the bearing.
+   * m — WHERE THE FOOTAGE PUTS THE MOUTH'S CENTRE. [VIDEO] 4.189 ± 0.15.
    *
-   * 2.4 stands the mouth in open floor, 1.25 m clear of the room face. up/081
-   * shows it in the FLOOR OF A RECESS in the wall, its glass projecting a little
-   * into the room, and up/080 shows the recess as one of two openings in the
-   * same wall. A wellhead against the face would be somewhere near 3.1–3.2 with
-   * the room face at 3.649 — which is a reading, not a measurement, and the
-   * recess's depth is not in any source.
+   * NOT what the model draws. It is carried beside the shipped radius and read
+   * by nothing that renders, exactly as TOWER.doorwayWidthByProportion is: so a
+   * test can state a conflict in one line instead of re-deriving it, and so the
+   * day the conflict is decided the number is already here.
    *
-   * IT NO LONGER MOVES THE BEARING WHEN IT IS CORRECTED, and that is the second
-   * gain from «между входами». While the mouth was TANGENT to one jamb its own
-   * subtended width was part of the answer, so a mouth at 3.2 m — subtending
-   * 9.71° instead of 13.00° — would have dragged the bearing from 182 to 174.
-   * Between two jambs the width enters both ends of the band symmetrically and
-   * cancels out of the middle: correcting this radius changes only the FREEDOM,
-   * from ±27.88° to ±31.17°, and leaves azimuthDeg at 154.496 exactly. The one
-   * measurement most likely to arrive next can no longer move the wellhead.
+   * WHAT THE FRAMES SHOW IS A STRUCTURE, NOT A LENGTH. The wellhead is not a
+   * hole in open floor. It is the floor of an arched recess cut into the
+   * chamber wall, and five frames say so from two directions:
+   *   up/080   the recess and the stair's mouth — two openings in one wall with
+   *            a single pier between them, the glass lying in the recess floor;
+   *   up/081   close on it: the plate's near corner stands at the foot of the
+   *            pier's arris and its near edge runs along the opening line with
+   *            room floor beyond, so the plate lies INSIDE the recess and spans
+   *            it from the opening to the back;
+   *   down/163, down/164  the same pair on the way down, the plaque bolted to
+   *            the pier, room floor again beyond the plate's near edge;
+   *   up/082, up/083  looking down: the shaft's FAR rim stands at the recess's
+   *            back wall with a stone lip a hand wide between them.
+   *
+   * So the recess is ONE MOUTH DEEP, give or take its two margins, and the
+   * mouth's near rim stands on the chamber face. The arithmetic on that reading
+   * is the whole of this value:
+   *
+   *     centre = innerRadiusAt(floorY) + mouthDiameter / 2
+   *            = 3.649 + 0.540 = 4.189
+   *
+   * ± 0.15 for the two margins and for where a rubble arris really stands
+   * against a modelled face.
+   *
+   * IT IS NOT A METRIC MEASUREMENT AND MUST NOT BE QUOTED AS ONE. A single
+   * frame cannot give a DEPTH without a focal length or a known length along
+   * the depth direction, and the one length that would serve — the mouth's own
+   * 1.08 m read from near rim to far rim — is under glass and in shadow in every
+   * frame there is. What the frames give is the RELATION; the two numbers in it
+   * are this file's own, one sourced and one [PHOTO].
+   *
+   * IT REPLACES THE OLD READING OF 3.1–3.2, which had the mouth tangent to the
+   * face from inside the room. The frames put it the other way round: the mouth
+   * is IN the wall, not against it.
+   */
+  offsetByRecess:
+    innerRadiusAt(FLOORS[WELLHEAD_FLOOR_INDEX].floorY) + WELLHEAD_MOUTH_DIAMETER / 2,
+  /**
+   * Distance of the wellhead from the tower axis. 2.4, REFUTED AND UNCHANGED —
+   * and what keeps it is a conflict, not inertia. See offsetByRecess above for
+   * what the footage measures instead.
+   *
+   * IT IS REFUTED TWICE AND NEITHER REFUTATION NEEDS A PIXEL MEASURED.
+   *   · 2.4 stands the mouth in OPEN FLOOR, 1.249 m clear of the room face.
+   *     Walked in the live model on 2026-08-21: the wellhead's ring and its
+   *     glass sit at r 2.400, az 154.00 on storey 3's paving, in the middle of
+   *     the room. Every frame of the real chamber puts them in a wall recess.
+   *   · a bore 21 m deep sunk from storey 3's floor at r 2.4 crosses chambers 2
+   *     and 1 in mid-air, and WaterSystem has to carry it in an [ASSUMPTION]
+   *     masonry casing — a pier standing in two rooms, and the note there says
+   *     no source confirms one. The owner's own walkthrough of both chambers
+   *     (up/010–021 and up/036–048 going up, down/175–205 coming out) shows
+   *     them clear: cases, screens and the steel spiral, and no pier.
+   *
+   * AND IT CANNOT BE CORRECTED WITHOUT DECIDING THE BEARING. Put the mouth
+   * where offsetByRecess puts it and, at azimuth 154:
+   *   · its rim reaches 4.729, and storey 3's own stairwell cut — the opening
+   *     flight 2→3 breaks through the slab by — runs 108.24° → 176.28° at radii
+   *     3.899 → 4.899. The mouth lands inside it. At 2.4 the rim stops at 2.940
+   *     and that same hole is 0.959 m away, which is the clearance the suite has
+   *     been asserting all along.
+   *   · the shaft below it is worse. Between storey 2's floor and storey 3's,
+   *     the wall from 92.53° to 217.14° IS the 2→3 passage, so a vertical bore
+   *     of the mouth's width at 4.189 crosses it at ANY bearing in that arc. 154
+   *     is the middle of the arc, and so is the tangent placement 186.33 this
+   *     file carried before it. The wall is free from 217.14° round through
+   *     north to 92.53°, and nothing has ever put the wellhead there.
+   *
+   * SO THE NOTE THIS ONE REPLACES WAS WRONG ABOUT THE ONE THING IT PROMISED.
+   * It said "the one measurement most likely to arrive next can no longer move
+   * the wellhead", meaning betweenDoorways() is insensitive to this radius. The
+   * DERIVATION is; the BUILDING is not. Correcting the radius moves the bearing
+   * by not one degree and makes that bearing unavailable, which is the stronger
+   * statement of the two: at 154 the wellhead may stand anywhere except in the
+   * wall, and the wall is where the footage puts it.
+   *
+   * WHAT WOULD CLOSE IT, cheapest first:
+   *   1. ONE SENTENCE — beside WHICH of the two stair doorways the recess
+   *      stands. up/080 and down/163 both show a single narrow pier between the
+   *      recess and a stair mouth, which is the tangent placement rather than
+   *      the bisector; that is a frame against a sentence, and the sentence has
+   *      won this argument once already (see azimuthDeg), so nothing here
+   *      reopens it. But a tangent placement does not clear the passage either,
+   *      so the sentence has to say more than which side.
+   *   2. THE QUARTER TURN. STAIR_FROM_BUTTRESS_DEG is known short by at least
+   *      8°, and it moves the passage arc, the stairwell cut and the derived
+   *      bearing together. Whether that opens a gap is not something this file
+   *      can say in advance, and it is asserted rather than guessed in
+   *      wellClearance.test.ts.
+   * Neither is a thing arithmetic may decide, so the radius waits and says so.
    */
   offsetFromAxis: 2.4,
 }
@@ -3055,10 +3150,20 @@ export const WELL_BEARING_CONFLICT = [
   '  1. КАК ТРУБА ДОХОДИТ ДО КОЛОДЦА? Поверху через зал или под полом? Этот вопрос',
   '     здесь уже стоял 16.08 — и вы ответили на его первую половину. Осталась',
   '     вторая, и одна фраза её закрывает.',
-  '  2. РАДИУС УСТЬЯ. offsetFromAxis = 2.4 [PLACEHOLDER]; up/081 показывает устье',
-  '     в полу НИШИ, то есть ближе к стене, около 3.1–3.2. На азимут это больше не',
-  '     влияет вовсе (ширина устья сокращается в середине полосы) — сдвинется',
-  '     только свобода, с ±31.84° на ±35.12°.',
+  '  2. РАДИУС УСТЬЯ ИЗМЕРЕН — И НЕ ВСТАЁТ. up/080, up/081, down/163, down/164,',
+  '     up/082, up/083: устье лежит в полу АРКОВОЙ НИШИ в стене. Стекло идёт от',
+  '     линии проёма до задней стенки ниши, дальний край шахты — у самой стенки.',
+  '     Значит ближний край устья стоит на грани зала, а центр — на',
+  '     3.649 + 0.54 = 4.19 м (±0.15). Не 2.4 и не 3.1–3.2, как читалось раньше.',
+  '     НО 4.19 НЕ ПОСТАВИТЬ, пока не решён азимут. На 154°:',
+  '       · устье попадает ВНУТРЬ проёма в перекрытии яруса 3 — марш 2→3 пробивает',
+  '         плиту на 108.24°–176.28°, радиусы 3.899–4.899;',
+  '       · ствол под ним между ярусами 2 и 3 идёт СКВОЗЬ сам марш 2→3: стену там',
+  '         занимает проход от 92.53° до 217.14°. Прежний тангенс 186.33 — в том же',
+  '         секторе. Свободна стена от 217.14° через север до 92.53°.',
+  '     ЧТО ЗАКРОЕТ: у КАКОГО из двух входов стоит ниша (up/080 и down/163',
+  '     показывают между нишей и лестницей ОДИН узкий столб) — и четверть оборота,',
+  '     которая двигает проход, проём в плите и сам азимут разом.',
   '  3. ЛЕСТНИЦА. STAIR_FROM_BUTTRESS_DEG заведомо мал минимум на 8°; оба проёма',
   '     сдвинутся, а с ними — и устье, и штраба. Но устье теперь идёт за СРЕДНИМ',
   '     из двух проёмов, а не за одним, и потому вдвое менее чувствительно.',
