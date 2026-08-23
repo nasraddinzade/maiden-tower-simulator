@@ -2,7 +2,22 @@
 <html lang="az">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      `viewport-fit=cover` is what makes `env(safe-area-inset-*)` mean anything.
+      Without it the page is laid out inside the safe area and every inset reads
+      as 0, so the layout's careful arithmetic about notches and home indicators
+      is arithmetic about zero — and the browser leaves letterboxes down the
+      sides of a landscape phone instead of letting the tower fill the glass.
+      With it the page gets the whole screen and the insets become real numbers
+      the interface has to pay; src/lib/screenLayout.ts is where it pays them.
+
+      NOTE WHAT IS NOT HERE: `user-scalable=no` and `maximum-scale=1`. The usual
+      pair, and refused. Pinch-zoom is how a person reads small text, and this
+      page's small text is the source citations. The gesture is taken away only
+      where it collides with another one — `touch-action: none` on the canvas in
+      index.css — and nowhere else.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Qız Qalası — simulyator</title>
   </head>
   <body>

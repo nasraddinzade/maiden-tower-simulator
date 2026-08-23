@@ -1,12 +1,31 @@
-import { useTranslation } from 'react-i18next'
 import { HOTSPOTS, type HotspotId } from '../../data/hotspots'
 import attributionData from '../../data/attribution.json'
-import { isPlaceholder } from '../../i18n'
+import { UI } from '../../config/ui'
+import { useFallbackText } from '../../hooks/useFallbackText'
 
 export interface HotspotPanelProps {
   selected: HotspotId | null
   onClose: () => void
+  /**
+   * One column instead of two, and a 44 px close button.
+   *
+   * The photograph and the model's account of it are meant to be read side by
+   * side, and at 375 px they cannot be: two `minmax(0, 1fr)` columns of a 92vw
+   * dialog are 165 px each, which is a thumbnail beside a column of two-word
+   * lines. Stacked, the photograph keeps the width and the text keeps a
+   * readable measure — the comparison survives the fold better than it survives
+   * the squeeze.
+   */
+  compact?: boolean
 }
+
+/** Safe-area padding, as a CSS value. `env()` is zero wherever there is no cutout. */
+const SAFE = (extra: number) => ({
+  paddingTop: `calc(${extra}px + env(safe-area-inset-top))`,
+  paddingRight: `calc(${extra}px + env(safe-area-inset-right))`,
+  paddingBottom: `calc(${extra}px + env(safe-area-inset-bottom))`,
+  paddingLeft: `calc(${extra}px + env(safe-area-inset-left))`,
+})
 
 interface PhotoCredit {
   hotspotId: string
@@ -27,14 +46,8 @@ const CREDITS = (attributionData as { photos: PhotoCredit[] }).photos
  * matters: it says whether what you are looking at in the model is measured,
  * inferred or simply assumed.
  */
-export function HotspotPanel({ selected, onClose }: HotspotPanelProps) {
-  const { t, i18n } = useTranslation('hotspots')
-
-  const text = (key: string): string => {
-    const v = t(key, { defaultValue: '' })
-    if (typeof v === 'string' && v && !isPlaceholder(v)) return v
-    return i18n.getFixedT('ru', 'hotspots')(key, { defaultValue: '' }) as string
-  }
+export function HotspotPanel({ selected, onClose, compact = false }: HotspotPanelProps) {
+  const { text } = useFallbackText('hotspots')
 
   if (!selected) return null
   const hotspot = HOTSPOTS.find((h) => h.id === selected)
@@ -61,11 +74,12 @@ export function HotspotPanel({ selected, onClose }: HotspotPanelProps) {
         top: '50%',
         transform: 'translate(-50%, -50%)',
         zIndex: 40,
-        width: 'min(760px, 92vw)',
-        maxHeight: '86vh',
+        boxSizing: 'border-box',
+        width: compact ? `calc(100vw - ${2 * UI.gutter}px)` : 'min(760px, 92vw)',
+        maxHeight: '86dvh',
         overflowY: 'auto',
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+        gridTemplateColumns: compact ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) minmax(0, 1fr)',
         gap: 14,
         font: '12px/1.6 system-ui, sans-serif',
         color: '#e8e8e8',
@@ -80,13 +94,16 @@ export function HotspotPanel({ selected, onClose }: HotspotPanelProps) {
         <button
           onClick={onClose}
           style={{
-            font: '11px system-ui, sans-serif',
+            font: `${compact ? 12 : 11}px system-ui, sans-serif`,
             color: '#dfe6ee',
             background: 'rgba(255,255,255,.08)',
             border: '1px solid rgba(255,255,255,.18)',
             borderRadius: 5,
-            padding: '3px 9px',
+            padding: compact ? '0 14px' : '3px 9px',
+            minHeight: compact ? UI.minTouchTarget : undefined,
+            minWidth: compact ? UI.minTouchTarget : undefined,
             cursor: 'pointer',
+            flex: '0 0 auto',
           }}
         >
           {text('close')}
@@ -133,13 +150,16 @@ export function HotspotPanel({ selected, onClose }: HotspotPanelProps) {
  * Phase-12 credits screen. Required by CC BY / CC BY-SA, which is why it lists
  * every shipped photograph rather than a general acknowledgement.
  */
-export function AttributionScreen({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t, i18n } = useTranslation('hotspots')
-  const text = (key: string): string => {
-    const v = t(key, { defaultValue: '' })
-    if (typeof v === 'string' && v && !isPlaceholder(v)) return v
-    return i18n.getFixedT('ru', 'hotspots')(key, { defaultValue: '' }) as string
-  }
+export function AttributionScreen({
+  open,
+  onClose,
+  compact = false,
+}: {
+  open: boolean
+  onClose: () => void
+  compact?: boolean
+}) {
+  const { text } = useFallbackText('hotspots')
 
   if (!open) return null
 
@@ -150,10 +170,14 @@ export function AttributionScreen({ open, onClose }: { open: boolean; onClose: (
         inset: 0,
         zIndex: 45,
         overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
         background: 'rgba(8,10,13,.97)',
         color: '#e8e8e8',
         font: '12px/1.7 system-ui, sans-serif',
-        padding: '32px 24px',
+        // a full-bleed screen is the one place a notch and a home indicator both
+        // land on content, so both edges are paid for here rather than assumed away
+        ...SAFE(24),
+        paddingTop: 'calc(32px + env(safe-area-inset-top))',
       }}
     >
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
@@ -167,8 +191,10 @@ export function AttributionScreen({ open, onClose }: { open: boolean; onClose: (
               background: 'rgba(255,255,255,.08)',
               border: '1px solid rgba(255,255,255,.18)',
               borderRadius: 5,
-              padding: '4px 11px',
+              padding: compact ? '0 14px' : '4px 11px',
+              minHeight: compact ? UI.minTouchTarget : undefined,
               cursor: 'pointer',
+              flex: '0 0 auto',
             }}
           >
             {text('close')}

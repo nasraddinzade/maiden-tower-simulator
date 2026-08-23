@@ -77,6 +77,9 @@ import { HypothesisPanel } from './components/ui/HypothesisPanel'
 import { LanguageSwitcher } from './components/ui/LanguageSwitcher'
 import { HYPOTHESES, type HypothesisId } from './data/hypotheses'
 import { PerfHud, PerfProbe, type PerfSample } from './components/ui/PerfHud'
+import { CompactChrome } from './components/ui/CompactChrome'
+import { useScreenLayout } from './hooks/useViewport'
+import { describeLayout } from './lib/screenLayout'
 import { storeyAt } from './lib/visibility'
 import { LoadingScreen } from './components/ui/LoadingScreen'
 import { HotspotMarkers } from './components/hotspots/HotspotMarkers'
@@ -1121,6 +1124,26 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
 
 export default function App() {
   const { t } = useTranslation('ui')
+
+  /**
+   * WHICH LAYOUT THIS SCREEN GETS, and it is one decision made in one place.
+   *
+   * `docked` is the layout that has always shipped: the sun panel in one bottom
+   * corner, the versions in the other, the caveat between them, the controls in
+   * the top corners. It is unchanged and it is what a desktop still gets.
+   *
+   * `compact` is the same interface with one bar along the bottom and one panel
+   * raised at a time. It is not a second app and it does not have a component of
+   * its own for anything: the scrubber, the version switcher and the caveat in
+   * it are the very same bodies the docked panels render.
+   *
+   * The choice is lib/screenLayout.ts → layoutModeOf(), which decides on the
+   * panels' own widths and on whether the pointer is a finger. See the comment
+   * on DOCKED_MIN_WIDTH for why the threshold is 1278 and not a round number.
+   */
+  const screen = useScreenLayout()
+  const compact = screen.mode === 'compact'
+
   const [stats, setStats] = useState<ShellStats | null>(null)
   /** The openings the shell was actually cut with; see SceneProps.onApertures. */
   const [apertures, setApertures] = useState<OpeningAperture[]>([])
@@ -1182,6 +1205,30 @@ export default function App() {
    */
   const [showPerf, setShowPerf] = useState(import.meta.env.DEV)
   const [showColliders, setShowColliders] = useState(false)
+
+  /*
+   * WHAT THE CHROME COVERS, SAID OUT LOUD ON EVERY LOAD, in the same voice as
+   * every other finding in this file.
+   *
+   * The number this reports is the one the rework exists to move: 66.5% of a
+   * 375×812 phone before, in the state a visitor MEETS — the bar up, the caveat
+   * showing, nothing raised. It is computed from the constants the components
+   * lay out with, so it cannot drift away from the interface without the
+   * interface changing; and it prints on a resize as well as on load, which is
+   * how the threshold between the two layouts can be watched rather than
+   * believed. Dev only: it is addressed to whoever is editing the interface.
+   */
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    console.warn(
+      `[layout] ${describeLayout(screen.viewport, {
+        notice: datumCaveats.length > 0,
+        hint: false,
+        sheetOpen: false,
+      })}`,
+    )
+  }, [screen.viewport, datumCaveats.length])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'F3') {
@@ -1215,7 +1262,6 @@ export default function App() {
         identical either way — measured, 19,402 shell triangles before and after.
       */}
       <Leva collapsed hidden={!import.meta.env.DEV} />
-      <LanguageSwitcher />
       {showPerf && (
         <PerfHud
           sample={perf}
@@ -1224,75 +1270,117 @@ export default function App() {
           onClear={() => setPerfBaseline(null)}
         />
       )}
-      <HypothesisPanel selected={hypothesis} onSelect={setHypothesis} />
-      <HotspotPanel selected={hotspot} onClose={() => setHotspot(null)} />
-      <DatumCaveat openings={datumCaveats} />
-      <AttributionScreen open={creditsOpen} onClose={() => setCreditsOpen(false)} />
 
-      <button
-        onClick={() => setFirstPerson((v) => !v)}
-        style={{
-          position: 'fixed',
-          left: 12,
-          top: 12,
-          zIndex: 20,
-          font: '13px ui-monospace, monospace',
-          color: '#eee',
-          background: firstPerson ? '#2f6f4a' : 'rgba(0,0,0,.6)',
-          border: '1px solid rgba(255,255,255,.25)',
-          borderRadius: 6,
-          padding: '7px 12px',
-          cursor: 'pointer',
-        }}
-      >
-        {firstPerson ? t('walking') : t('walkInside')}
-      </button>
+      {/*
+        The two full-screen things are the same in both layouts — they already
+        take the whole screen, so there is no corner for them to be pinned to.
+        `compact` changes how they are laid out INSIDE, not where they are: the
+        photograph and the model's account of it stack instead of standing side
+        by side, and the close button grows to a thumb's size.
+      */}
+      <HotspotPanel selected={hotspot} onClose={() => setHotspot(null)} compact={compact} />
+      <AttributionScreen
+        open={creditsOpen}
+        onClose={() => setCreditsOpen(false)}
+        compact={compact}
+      />
 
-      {firstPerson && (
-        <div
-          style={{
-            position: 'fixed',
-            right: 12,
-            top: 12,
-            zIndex: 20,
-            font: '12px/1.5 ui-monospace, monospace',
-            color: '#cfc',
-            background: 'rgba(0,0,0,.6)',
-            padding: '8px 12px',
-            borderRadius: 6,
-            pointerEvents: 'none',
+      {compact ? (
+        <CompactChrome
+          viewport={screen.viewport}
+          orientation={screen.orientation}
+          firstPerson={firstPerson}
+          onToggleFirstPerson={() => setFirstPerson((v) => !v)}
+          date={date}
+          live={liveClock}
+          onDate={(d) => {
+            setLiveClock(false)
+            setDate(d)
           }}
-        >
-          {t('controlsHint')}
-          <br />
-          {t('speedHint', { speed: PLAYER.walkSpeed, eye: PLAYER.eyeHeight })}
-        </div>
+          onResumeLive={() => {
+            setLiveClock(true)
+            setDate(new Date())
+          }}
+          apertures={apertures}
+          hypothesis={hypothesis}
+          onHypothesis={setHypothesis}
+          datumCaveats={datumCaveats}
+          onCredits={() => setCreditsOpen(true)}
+          onEnterXR={xr.enter}
+          xrLoading={xr.loading}
+        />
+      ) : (
+        <>
+          <LanguageSwitcher />
+          <HypothesisPanel selected={hypothesis} onSelect={setHypothesis} />
+          <DatumCaveat openings={datumCaveats} />
+
+          <button
+            onClick={() => setFirstPerson((v) => !v)}
+            style={{
+              position: 'fixed',
+              left: 12,
+              top: 12,
+              zIndex: 20,
+              font: '13px ui-monospace, monospace',
+              color: '#eee',
+              background: firstPerson ? '#2f6f4a' : 'rgba(0,0,0,.6)',
+              border: '1px solid rgba(255,255,255,.25)',
+              borderRadius: 6,
+              padding: '7px 12px',
+              cursor: 'pointer',
+            }}
+          >
+            {firstPerson ? t('walking') : t('walkInside')}
+          </button>
+
+          {firstPerson && (
+            <div
+              style={{
+                position: 'fixed',
+                right: 12,
+                top: 12,
+                zIndex: 20,
+                font: '12px/1.5 ui-monospace, monospace',
+                color: '#cfc',
+                background: 'rgba(0,0,0,.6)',
+                padding: '8px 12px',
+                borderRadius: 6,
+                pointerEvents: 'none',
+              }}
+            >
+              {t('controlsHint')}
+              <br />
+              {t('speedHint', { speed: PLAYER.walkSpeed, eye: PLAYER.eyeHeight })}
+            </div>
+          )}
+
+          <div style={{ position: 'fixed', left: 12, top: 52, zIndex: 20, display: 'flex', gap: 6 }}>
+            <button onClick={() => setCreditsOpen(true)} style={secondaryButton}>
+              {t('credits')}
+            </button>
+            <button onClick={xr.enter} disabled={xr.loading} style={secondaryButton}>
+              {xr.loading ? '…' : t('vrMode')}
+            </button>
+          </div>
+
+          <SunControls
+            date={date}
+            live={liveClock}
+            onChange={(d) => {
+              setLiveClock(false)
+              setDate(d)
+            }}
+            onResumeLive={() => {
+              setLiveClock(true)
+              setDate(new Date())
+            }}
+            apertures={apertures}
+          />
+        </>
       )}
 
-      <div style={{ position: 'fixed', left: 12, top: 52, zIndex: 20, display: 'flex', gap: 6 }}>
-        <button onClick={() => setCreditsOpen(true)} style={secondaryButton}>
-          {t('credits')}
-        </button>
-        <button onClick={xr.enter} disabled={xr.loading} style={secondaryButton}>
-          {xr.loading ? '…' : t('vrMode')}
-        </button>
-      </div>
-
       {firstPerson && <TouchControls canvas={canvas} stickRef={touchInput} lookRef={touchLook} />}
-
-      <SunControls
-        date={date}
-        live={liveClock}
-        onChange={(d) => {
-          setLiveClock(false)
-          setDate(d)
-        }}
-        onResumeLive={() => {
-          setLiveClock(true)
-          setDate(new Date())
-        }}
-        apertures={apertures}
-      />
 
       {/*
         The CSG triangle count is a build diagnostic — it is how a run of this

@@ -1,10 +1,12 @@
-import { useTranslation } from 'react-i18next'
 import { HYPOTHESES, type HypothesisId } from '../../data/hypotheses'
-import { isPlaceholder } from '../../i18n'
+import { UI } from '../../config/ui'
+import { useFallbackText } from '../../hooks/useFallbackText'
 
 export interface HypothesisPanelProps {
   selected: HypothesisId
   onSelect: (id: HypothesisId) => void
+  /** 44 px version buttons instead of 20 px ones. See config/ui.ts. */
+  touch?: boolean
 }
 
 /**
@@ -14,49 +16,21 @@ export interface HypothesisPanelProps {
  * marks one as correct. Where this model has actually tested a claim (the
  * buttress bearing, the solstice beam), the result is written into the against
  * column as a finding, not as a verdict on the tower.
+ *
+ * Split into a body and a corner for the same reason as SunControls: on a phone
+ * this content is raised from the action bar instead of pinned to the
+ * bottom-right, and there must not be two copies of it.
  */
-export function HypothesisPanel({ selected, onSelect }: HypothesisPanelProps) {
-  const { t, i18n } = useTranslation('hypotheses')
-
-  /** Azerbaijani prose is still TODO_AZ; fall back rather than show the marker. */
-  const text = (key: string): string => {
-    const v = t(key, { defaultValue: '' })
-    if (typeof v === 'string' && v && !isPlaceholder(v)) return v
-    return i18n.getFixedT('ru', 'hypotheses')(key, { defaultValue: '' }) as string
-  }
-
-  const list = (key: string): string[] => {
-    const v = t(key, { returnObjects: true, defaultValue: [] })
-    const arr = Array.isArray(v) ? (v as string[]) : []
-    if (arr.length > 0 && !arr.every(isPlaceholder)) return arr.filter((x) => !isPlaceholder(x))
-    const ru = i18n.getFixedT('ru', 'hypotheses')(key, { returnObjects: true, defaultValue: [] })
-    return Array.isArray(ru) ? (ru as string[]) : []
-  }
-
+export function HypothesisPanelBody({ selected, onSelect, touch = false }: HypothesisPanelProps) {
+  const { text, list } = useFallbackText('hypotheses')
   const current = HYPOTHESES.find((h) => h.id === selected) ?? HYPOTHESES[0]
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        right: 12,
-        bottom: 12,
-        zIndex: 20,
-        width: 330,
-        maxHeight: '72vh',
-        overflowY: 'auto',
-        font: '11px/1.5 system-ui, sans-serif',
-        color: '#e8e8e8',
-        background: 'rgba(12,14,18,.9)',
-        border: '1px solid rgba(255,255,255,.14)',
-        borderRadius: 8,
-        padding: '10px 12px',
-      }}
-    >
+    <>
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 2 }}>{text('layerTitle')}</div>
       <div style={{ color: '#93a1b3', fontSize: 10, marginBottom: 8 }}>{text('disclaimer')}</div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: touch ? 6 : 4, marginBottom: 8 }}>
         {HYPOTHESES.map((h) => {
           const active = h.id === selected
           return (
@@ -64,12 +38,13 @@ export function HypothesisPanel({ selected, onSelect }: HypothesisPanelProps) {
               key={h.id}
               onClick={() => onSelect(h.id)}
               style={{
-                font: '10px system-ui, sans-serif',
+                font: `${touch ? 12 : 10}px system-ui, sans-serif`,
                 color: active ? '#0e1116' : '#dfe6ee',
                 background: active ? '#c8d6e5' : 'rgba(255,255,255,.07)',
                 border: '1px solid rgba(255,255,255,.18)',
                 borderRadius: 5,
-                padding: '3px 7px',
+                padding: touch ? '0 12px' : '3px 7px',
+                minHeight: touch ? UI.minTouchTarget : undefined,
                 cursor: 'pointer',
               }}
             >
@@ -109,14 +84,34 @@ export function HypothesisPanel({ selected, onSelect }: HypothesisPanelProps) {
           </ul>
         </div>
 
-        <div style={{ marginTop: 8, color: '#93a1b3', fontSize: 10 }}>
+        {/*
+          THE SOURCE LINK, WHICH ON A PHONE COULD NOT BE TAPPED AT ALL.
+          Measured: the UNESCO link sat at y 775–788 of an 812 px screen with the
+          datum caveat's own strip lying over it at a higher z-index. In a project
+          whose central claim is that every figure is traceable to a source, the
+          link to the source was the one thing on screen a finger could not
+          reach. It is reachable in both framings now because neither of them
+          puts a second panel on top of this one.
+        */}
+        <div style={{ marginTop: 8, color: '#93a1b3', fontSize: touch ? 12 : 10 }}>
           {text('source')}:{' '}
           {current.source.url ? (
             <a
               href={current.source.url}
               target="_blank"
               rel="noreferrer noopener"
-              style={{ color: '#8ab4f8' }}
+              style={{
+                color: '#8ab4f8',
+                // the target is the LINK's own box, not the line it sits on: a
+                // 13 px anchor inside a 44 px row is still a 13 px thing to hit
+                ...(touch
+                  ? {
+                      display: 'inline-block',
+                      minHeight: UI.minTouchTarget,
+                      lineHeight: `${UI.minTouchTarget}px`,
+                    }
+                  : null),
+              }}
             >
               {current.source.label}
             </a>
@@ -125,6 +120,32 @@ export function HypothesisPanel({ selected, onSelect }: HypothesisPanelProps) {
           )}
         </div>
       </div>
+    </>
+  )
+}
+
+/** The desktop framing: pinned to the bottom-right corner. Unchanged. */
+export function HypothesisPanel(props: HypothesisPanelProps) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        right: UI.gutter,
+        bottom: UI.gutter,
+        zIndex: 20,
+        boxSizing: 'border-box',
+        width: UI.docked.hypothesisWidth,
+        maxHeight: `${UI.docked.hypothesisMaxHeightFraction * 100}vh`,
+        overflowY: 'auto',
+        font: '11px/1.5 system-ui, sans-serif',
+        color: '#e8e8e8',
+        background: 'rgba(12,14,18,.9)',
+        border: '1px solid rgba(255,255,255,.14)',
+        borderRadius: 8,
+        padding: '10px 12px',
+      }}
+    >
+      <HypothesisPanelBody {...props} />
     </div>
   )
 }

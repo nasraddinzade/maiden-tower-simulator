@@ -28,5 +28,11 @@
   "datumMore": "ətraflı",
   "datumLess": "gizlət",
   "datumNumbers": "TODO_AZ",
-  "datumBody": "TODO_AZ"
+  "datumBody": "TODO_AZ",
+  "walkingShort": "gəzirsiniz",
+  "panelSun": "Günəş",
+  "panelVersions": "Versiyalar",
+  "panelMore": "Daha çox",
+  "close": "Bağla",
+  "touchHint": "solda çubuq — getmək · sağda barmağı sürüşdür — baxmaq"
 }

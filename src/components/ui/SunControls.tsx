@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { keyDates, openingsLit, sunPosition, sunriseAzimuth, type OpeningAperture } from '../../lib/sun'
 import { BUTTRESS, SITE } from '../../config/tower'
+import { UI } from '../../config/ui'
 import {
   SITE_TIMEZONE,
   formatZonedTime,
@@ -20,6 +21,12 @@ export interface SunControlsProps {
   live?: boolean
   /** Snap back to now and start following again. */
   onResumeLive?: () => void
+  /**
+   * Lay the controls out for a finger rather than a cursor: 44 px sliders and
+   * buttons instead of the 12–16 px ones a cursor can hit. It changes nothing
+   * the panel says — only what it can be operated with. See config/ui.ts.
+   */
+  touch?: boolean
 }
 
 /** Preset id → i18n key in the `ui` namespace. */
@@ -35,8 +42,22 @@ const PRESET_KEYS: Record<string, string> = {
  * Phase-8 scrubber: a day-of-year slider, a time-of-day slider, the key-day
  * presets, and — the part that matters — a readout of which openings the sun
  * actually reaches at this instant.
+ *
+ * THE PANEL AND ITS CORNER ARE TWO THINGS NOW. `SunControlsBody` is the content;
+ * `SunControls` is the content pinned to the bottom-left of a desktop. On a
+ * phone the same body is raised from the action bar instead
+ * (components/ui/CompactChrome.tsx), which is the whole of what "the same
+ * interface, laid out for a small screen" means here — one panel, two frames,
+ * no second copy of the scrubber to drift out of step with this one.
  */
-export function SunControls({ date, onChange, apertures, live, onResumeLive }: SunControlsProps) {
+export function SunControlsBody({
+  date,
+  onChange,
+  apertures,
+  live,
+  onResumeLive,
+  touch = false,
+}: SunControlsProps) {
   const { t, i18n } = useTranslation('ui')
   const sun = useMemo(() => sunPosition(date, SITE.latitude, SITE.longitude), [date])
   const lit = useMemo(() => openingsLit(sun, apertures), [sun, apertures])
@@ -52,24 +73,23 @@ export function SunControls({ date, onChange, apertures, live, onResumeLive }: S
   const clock = formatZonedTime(date)
   const wall = toZoned(date)
 
+  const slider: React.CSSProperties = touch
+    ? { width: '100%', height: UI.minTouchTarget, margin: 0 }
+    : { width: '100%' }
+
+  const chip: React.CSSProperties = {
+    font: `${touch ? 12 : 10}px ui-monospace, monospace`,
+    color: '#dfe6ee',
+    background: 'rgba(255,255,255,.08)',
+    border: '1px solid rgba(255,255,255,.18)',
+    borderRadius: 5,
+    padding: touch ? '0 12px' : '2px 6px',
+    minHeight: touch ? UI.minTouchTarget : undefined,
+    cursor: 'pointer',
+  }
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        left: 12,
-        bottom: 44,
-        zIndex: 20,
-        width: 268,
-        maxHeight: '52vh',
-        overflowY: 'auto',
-        font: '11px/1.45 ui-monospace, monospace',
-        color: '#e6e6e6',
-        background: 'rgba(12,14,18,.86)',
-        border: '1px solid rgba(255,255,255,.14)',
-        borderRadius: 8,
-        padding: '8px 10px',
-      }}
-    >
+    <>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>
         {t('sunTitle', { lat: SITE.latitude.toFixed(2) })}
       </div>
@@ -89,14 +109,13 @@ export function SunControls({ date, onChange, apertures, live, onResumeLive }: S
             <button
               onClick={onResumeLive}
               style={{
-                font: '10px ui-monospace, monospace',
-                color: '#dfe6ee',
-                background: 'rgba(255,255,255,.08)',
-                border: '1px solid rgba(255,255,255,.18)',
-                borderRadius: 4,
-                padding: '1px 6px',
+                ...chip,
+                // this one has always been a shade tighter than the preset
+                // chips beside it; kept to the pixel so the desktop panel is
+                // the panel it was
+                borderRadius: touch ? 5 : 4,
+                padding: touch ? '0 12px' : '1px 6px',
                 marginLeft: 6,
-                cursor: 'pointer',
               }}
             >
               {t('now')}
@@ -110,7 +129,7 @@ export function SunControls({ date, onChange, apertures, live, onResumeLive }: S
         max={365}
         value={zonedDayOfYear(date)}
         onChange={(e) => setDay(Number(e.target.value))}
-        style={{ width: '100%' }}
+        style={slider}
       />
       <input
         type="range"
@@ -118,24 +137,12 @@ export function SunControls({ date, onChange, apertures, live, onResumeLive }: S
         max={24 * 60 - 1}
         value={minutes}
         onChange={(e) => setMinutes(Number(e.target.value))}
-        style={{ width: '100%' }}
+        style={slider}
       />
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, margin: '6px 0' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: touch ? 6 : 4, margin: '6px 0' }}>
         {keyDates(date.getFullYear()).map((k) => (
-          <button
-            key={k.id}
-            onClick={() => onChange(new Date(k.date))}
-            style={{
-              font: '10px ui-monospace, monospace',
-              color: '#dfe6ee',
-              background: 'rgba(255,255,255,.08)',
-              border: '1px solid rgba(255,255,255,.18)',
-              borderRadius: 5,
-              padding: '2px 6px',
-              cursor: 'pointer',
-            }}
-          >
+          <button key={k.id} onClick={() => onChange(new Date(k.date))} style={chip}>
             {t(PRESET_KEYS[k.id] ?? k.id)}
           </button>
         ))}
@@ -165,6 +172,32 @@ export function SunControls({ date, onChange, apertures, live, onResumeLive }: S
       <div style={{ marginTop: 6, color: '#9fb0c2', fontSize: 11 }}>
         {t('buttress')} {BUTTRESS.azimuthDeg}° · {t('equinoxSunrise')} ≈90°
       </div>
+    </>
+  )
+}
+
+/** The desktop framing: pinned to the bottom-left corner. Unchanged. */
+export function SunControls(props: SunControlsProps) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: UI.gutter,
+        bottom: UI.docked.sunBottom,
+        zIndex: 20,
+        boxSizing: 'border-box',
+        width: UI.docked.sunWidth,
+        maxHeight: `${UI.docked.sunMaxHeightFraction * 100}vh`,
+        overflowY: 'auto',
+        font: '11px/1.45 ui-monospace, monospace',
+        color: '#e6e6e6',
+        background: 'rgba(12,14,18,.86)',
+        border: '1px solid rgba(255,255,255,.14)',
+        borderRadius: 8,
+        padding: '8px 10px',
+      }}
+    >
+      <SunControlsBody {...props} />
     </div>
   )
 }

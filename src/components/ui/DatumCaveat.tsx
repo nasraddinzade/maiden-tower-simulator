@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { isPlaceholder } from '../../i18n'
+import { UI } from '../../config/ui'
+import { useFallbackText } from '../../hooks/useFallbackText'
 import type { PassageOpening } from '../../lib/passageOpenings'
 
 export interface DatumCaveatProps {
@@ -30,30 +30,50 @@ export interface DatumCaveatProps {
  * knows — the record for this end is [PLACEHOLDER] and the geometry's answer is
  * inside its own noise — and a caveat that leaned either way would be making the
  * claim the model has just refused to make.
+ *
+ * IT CAN BE PUT AWAY ON A PHONE, AND THAT IS NOT A RETREAT FROM ANY OF THE ABOVE.
+ * On a 375 px screen this strip lay across the source link of the panel beneath
+ * it, at a higher z-index, so the caveat about a source was covering a source.
+ * A notice that cannot be dismissed on a screen this size is not more honest than
+ * one that can — it is just the last thing the visitor is able to read. Dismissing
+ * it takes it off the view and leaves it in the panel list, where it keeps its
+ * warning colour; nothing is lost and nothing is hidden.
  */
-export function DatumCaveat({ openings }: DatumCaveatProps) {
-  const { t, i18n } = useTranslation('ui')
-  const [open, setOpen] = useState(false)
 
-  /** Azerbaijani prose is still TODO_AZ; fall back rather than show the marker. */
-  const text = (key: string, opts?: Record<string, unknown>): string => {
-    const v = t(key, { defaultValue: '', ...opts })
-    if (typeof v === 'string' && v && !isPlaceholder(v)) return v
-    return i18n.getFixedT('ru', 'ui')(key, { defaultValue: '', ...opts }) as string
-  }
-
-  if (openings.length === 0) return null
+/** The numbers and the argument. Shared by both framings. */
+export function DatumCaveatBody({ openings }: DatumCaveatProps) {
+  const { text, language } = useFallbackText('ui')
 
   // CLAUDE.md: numbers through Intl, locale from i18next. Millimetres, whole,
   // because the comparison this panel exists to make — 19 against 30 — is
   // unreadable in degrees at the fourth decimal place, which is precisely how it
   // stayed invisible in the config for as long as it did.
-  const mm = new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 0 })
+  const mm = new Intl.NumberFormat(language, { maximumFractionDigits: 0 })
   const rows = openings.map((o) => ({
     id: o.id,
     clear: mm.format(Math.abs(o.pier.centreOffset) * 1000),
     tol: mm.format(o.pier.toleranceOffset * 1000),
   }))
+  if (rows.length === 0) return null
+
+  return (
+    <>
+      {rows.map((r) => (
+        <div key={r.id} style={{ color: '#ffd88f', font: '11px ui-monospace, monospace' }}>
+          {text('datumNumbers', r)}
+        </div>
+      ))}
+      <div style={{ marginTop: 4, color: '#c8d2de' }}>{text('datumBody', rows[0])}</div>
+    </>
+  )
+}
+
+/** The desktop framing: a strip along the bottom edge, expandable in place. */
+export function DatumCaveat({ openings }: DatumCaveatProps) {
+  const { text } = useFallbackText('ui')
+  const [open, setOpen] = useState(false)
+
+  if (openings.length === 0) return null
 
   return (
     <div
@@ -61,9 +81,10 @@ export function DatumCaveat({ openings }: DatumCaveatProps) {
         position: 'fixed',
         left: '50%',
         transform: 'translateX(-50%)',
-        bottom: 12,
+        bottom: UI.gutter,
         zIndex: 21,
-        width: 'min(520px, calc(100vw - 24px))',
+        boxSizing: 'border-box',
+        width: `min(${UI.docked.noticeWidth}px, calc(100vw - ${2 * UI.gutter}px))`,
         font: '11px/1.5 system-ui, sans-serif',
         color: '#e8e8e8',
         background: 'rgba(12,14,18,.9)',
@@ -94,12 +115,7 @@ export function DatumCaveat({ openings }: DatumCaveatProps) {
 
       {open && (
         <div style={{ marginTop: 6, borderTop: '1px solid rgba(255,255,255,.12)', paddingTop: 6 }}>
-          {rows.map((r) => (
-            <div key={r.id} style={{ color: '#ffd88f', font: '11px ui-monospace, monospace' }}>
-              {text('datumNumbers', r)}
-            </div>
-          ))}
-          <div style={{ marginTop: 4, color: '#c8d2de' }}>{text('datumBody', rows[0])}</div>
+          <DatumCaveatBody openings={openings} />
         </div>
       )}
     </div>
