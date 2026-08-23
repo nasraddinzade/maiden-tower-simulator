@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { activeBudget, overBudget } from '../../config/perf'
+import { activeBudget, activeDprPolicy, overBudget } from '../../config/perf'
 
 export interface PerfSample {
   fps: number
@@ -52,6 +52,10 @@ export function PerfProbe({ onSample }: PerfProbeProps) {
     // stops exposing its store on the canvas element, so there is no other way
     // in from the console.
     ;(window as unknown as Record<string, unknown>).__scene = scene
+    // Renderer and camera as well, for the same reason and one more: a GPU timer
+    // query has to bracket a real `gl.render`, and the camera has to be moved to
+    // the place being measured. Both are unreachable from outside r3f otherwise.
+    ;(window as unknown as Record<string, unknown>).__gfx = { gl, scene, camera }
   }, [gl, scene, camera])
 
   useFrame((_, delta) => {
@@ -80,6 +84,14 @@ export interface PerfHudProps {
   sample: PerfSample | null
   /** A snapshot to compare against, so the before/after is visible in the app. */
   baseline: PerfSample | null
+  /**
+   * Live device pixels per CSS pixel. Shown because it MOVES now: the ladder in
+   * lib/adaptiveDpr.ts lowers it when the frame stops fitting, and a frame time
+   * that improved because the image got softer is a different fact from one that
+   * improved because there was less to draw. Without this line the two are
+   * indistinguishable in this readout.
+   */
+  dpr: number
   onCapture: () => void
   onClear: () => void
 }
@@ -108,9 +120,9 @@ function Delta({ now, was, lowerIsBetter = true }: { now: number; was: number; l
  * on the device — a phone is held to half the draw calls and a third of the
  * triangles of a desktop.
  */
-export function PerfHud({ sample, baseline, onCapture, onClear }: PerfHudProps) {
+export function PerfHud({ sample, baseline, dpr, onCapture, onClear }: PerfHudProps) {
   const [open, setOpen] = useState(true)
-  const budget = activeBudget()
+  const budget = { ...activeBudget(), dprCeiling: activeDprPolicy().ceiling }
   if (!sample) return null
 
   const over = (v: number, limit: number) =>
@@ -161,6 +173,10 @@ export function PerfHud({ sample, baseline, onCapture, onClear }: PerfHudProps) 
           </div>
           <div style={{ color: '#93a1b3' }}>
             geom {sample.geometries} · tex {sample.textures} · prog {sample.programs}
+          </div>
+          <div style={{ color: dpr < budget.dprCeiling ? '#e8c98a' : '#93a1b3' }}>
+            dpr {dpr.toFixed(2)}
+            <span style={{ color: '#6f7885' }}> / {budget.dprCeiling}</span>
           </div>
 
           {baseline && (

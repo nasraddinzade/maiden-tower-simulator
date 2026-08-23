@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { ACESFilmicToneMapping } from 'three'
+import { ACESFilmicToneMapping, Matrix4 } from 'three'
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
@@ -81,6 +81,14 @@ import { CompactChrome } from './components/ui/CompactChrome'
 import { useScreenLayout } from './hooks/useViewport'
 import { describeLayout } from './lib/screenLayout'
 import { storeyAt } from './lib/visibility'
+import {
+  frustumPlanes,
+  interiorVisibleFromOutside,
+  type Plane,
+} from './lib/portal'
+import { AdaptiveDpr } from './components/perf/AdaptiveDpr'
+import { activeDprPolicy } from './config/perf'
+import { initialDpr } from './lib/adaptiveDpr'
 import { LoadingScreen } from './components/ui/LoadingScreen'
 import { HotspotMarkers } from './components/hotspots/HotspotMarkers'
 import { HotspotPanel, AttributionScreen } from './components/ui/HotspotPanel'
@@ -911,9 +919,25 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
   })
 
   const [viewerStorey, setViewerStorey] = useState(0)
+  /**
+   * Whether anything of the interior stack is reachable by an eye where the
+   * camera is. Starts true: until a frame has been measured, the safe answer to
+   * "can this be seen" is yes.
+   */
+  const [interiorInSight, setInteriorInSight] = useState(true)
 
-  // Phase-11 spec: the optimisation must be measurable and switchable, so the
-  // before/after can be compared rather than asserted.
+  /*
+   * Phase-11 spec: the optimisation must be measurable and switchable, so the
+   * before/after can be compared rather than asserted.
+   *
+   * ONE SWITCH, TWO CULLS, and they are not the same size. Inside the tower it
+   * is the storey window of lib/visibility.ts, measured at nought to two draw
+   * calls because three.js frustum-culls the neighbours already. Outside it is
+   * the portal test of lib/portal.ts, measured at 27 draw calls and 9 664
+   * triangles in the default view. The second is the one worth switching off to
+   * see; the first is kept because it costs nothing and states something true
+   * about the building.
+   */
   const perf = useControls('Performance', {
     cullStoreys: true,
   })
@@ -990,6 +1014,20 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
 
       <PerfProbe onSample={onPerf} />
       <ViewerStoreyTracker enabled={firstPerson} onChange={setViewerStorey} />
+      {/*
+        Whether the eight floors and eight vaults inside the drum can be seen at
+        all from where the camera is standing. Measured cost of getting this
+        wrong in the cheap direction — drawing them when they are sealed behind
+        4 m of stone — is 23 draw calls and 9 408 triangles every frame in the
+        view the visitor lands on. See lib/portal.ts for why the test is the
+        SUN's test run backwards, and for the two draw calls the addendum's own
+        proposal turned out to be worth.
+      */}
+      <InteriorSightTracker
+        enabled={!firstPerson && !cutaway && showShell && !water.xrayWalls && perf.cullStoreys}
+        apertures={apertures}
+        onChange={setInteriorInSight}
+      />
 
       {/*
         All static collision, as cuboids — see docs/optimization-addendum.md.
@@ -1006,6 +1044,7 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
       )}
 
       <FloorStructures
+        visible={interiorInSight}
         oculusRadius={floors.oculusRadius}
         cupolaRise={floors.cupolaRise}
         showCupolas={floors.showCupolas}
@@ -1180,6 +1219,27 @@ export default function App() {
   const [perf, setPerf] = useState<PerfSample | null>(null)
   const [perfBaseline, setPerfBaseline] = useState<PerfSample | null>(null)
   /**
+   * THE PIXEL RATIO LIVES HERE, NOT INSIDE THE CANVAS, and it has to.
+   *
+   * r3f re-applies the `dpr` prop on every render of `<Canvas>` — configure()
+   * compares the live viewport ratio with the prop and resets it when they
+   * differ — and this component re-renders about once a second, because
+   * PerfProbe hands the HUD a sample that often. A controller that called
+   * setDpr() from inside the canvas would therefore have its decision undone
+   * within the second, silently, and only on the machines slow enough to have
+   * made it. So the ratio is state up here, the prop reads it, and
+   * <AdaptiveDpr> asks rather than sets.
+   *
+   * The opening value is the CAP, written down: config/perf.ts. It is the same
+   * number r3f's own `dpr={[1,2]}` default was already producing — verified in
+   * the browser with devicePixelRatio forced to 3, drawing buffer 750×1624 for
+   * a 375×812 box — so naming it changes no pixel and makes a dependency bump
+   * unable to change one either.
+   */
+  const [dpr, setDpr] = useState(() =>
+    initialDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio, activeDprPolicy()),
+  )
+  /**
    * The touch stick's deflection, or null when no thumb is down. Held here
    * rather than in either component because BOTH ends need it and neither owns
    * it: TouchControls writes the thumb into it and FirstPersonPlayer reads it on
@@ -1266,6 +1326,7 @@ export default function App() {
         <PerfHud
           sample={perf}
           baseline={perfBaseline}
+          dpr={dpr}
           onCapture={() => setPerfBaseline(perf)}
           onClear={() => setPerfBaseline(null)}
         />
@@ -1437,9 +1498,11 @@ export default function App() {
          */
         ref={setCanvas}
         shadows="percentage"
+        dpr={dpr}
         gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1 }}
         camera={{ position: [36, 24, 36], fov: 50, near: 0.1, far: 600 }}
       >
+        <AdaptiveDpr onRatio={setDpr} />
         {/* Physics is here from Phase 4 so the steps carry colliders; the
             first-person controller that walks on them arrives in Phase 6. */}
         {/* Physics runs only in walk mode: colliders and the solver cost
@@ -1523,6 +1586,64 @@ function ViewerStoreyTracker({
     if (s !== last.current) {
       last.current = s
       onChange(s)
+    }
+  })
+  return null
+}
+
+/**
+ * Reports whether the interior stack can be seen from where the camera is.
+ *
+ * Runs only outside walk mode: from inside the tower the answer is always yes,
+ * and the storey window in lib/visibility.ts is what applies there. It costs six
+ * plane extractions and one test per opening — under 10 µs against the 23 draw
+ * calls it removes — and it reports only on a change, so the tree re-renders
+ * when the answer flips and not once a frame.
+ *
+ * THE DOORWAY IS PASSED SEPARATELY from the slits and is tested only for which
+ * way it faces. ENTRANCE has a measured outer width and height and no surveyed
+ * inner dimension at all, and inventing one to run it through the reveal test
+ * would make the test stricter than the doorway is — which is the direction that
+ * puts a hole in the model. See ENTRANCE_ADMITS_SIGHT in lib/portal.ts.
+ */
+function InteriorSightTracker({
+  enabled,
+  apertures,
+  onChange,
+}: {
+  enabled: boolean
+  apertures: OpeningAperture[]
+  onChange: (visible: boolean) => void
+}) {
+  const last = useRef<boolean | null>(null)
+  const planes = useRef<Plane[]>([])
+  const vp = useRef(new Matrix4())
+  useFrame(({ camera }) => {
+    if (!enabled) {
+      if (last.current !== true) {
+        last.current = true
+        onChange(true)
+      }
+      return
+    }
+    vp.current.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    planes.current = frustumPlanes(vp.current.elements)
+    const visible = interiorVisibleFromOutside(camera.position, planes.current, apertures, {
+      // the beak counts as building: see hullRadius in lib/portal.ts
+      hullRadius: TOWER.outerRadius + BUTTRESS.projection,
+      bottomY: TOWER.groundY,
+      topY: TOWER.topY,
+      entrance: {
+        azimuthDeg: ENTRANCE.azimuthDeg,
+        centreY: ENTRANCE.thresholdY + ENTRANCE.height / 2,
+        outerRadius: TOWER.outerRadius,
+        width: ENTRANCE.width,
+        height: ENTRANCE.height,
+      },
+    })
+    if (visible !== last.current) {
+      last.current = visible
+      onChange(visible)
     }
   })
   return null

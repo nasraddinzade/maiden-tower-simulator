@@ -42,6 +42,19 @@ interface FloorStructuresProps {
   viewerStorey?: number
   /** Skip the storey window — used when inspecting the tower from outside. */
   showAllStoreys?: boolean
+  /**
+   * Draw the stack at all.
+   *
+   * FALSE ONLY WHEN NO EYE CAN REACH IT. From outside, the drum is opaque and
+   * every one of these surfaces is sealed behind it except through an opening —
+   * measured at 23 draw calls and 9 408 triangles per frame, in the default
+   * view, of geometry that contributes no pixel. lib/portal.ts decides; the
+   * decision is a proof that nothing is visible, never a guess that little is.
+   *
+   * Never false in walk mode, so the colliders below are never withheld from a
+   * walker standing on them.
+   */
+  visible?: boolean
 }
 
 const RADIAL_SEGMENTS = 64
@@ -502,9 +515,20 @@ export function FloorStructures({
   xray = false,
   viewerStorey = 0,
   showAllStoreys = true,
+  visible = true,
 }: FloorStructuresProps) {
+  /*
+   * `visible` ON THE GROUP, NOT AN EARLY RETURN. Unmounting would throw away
+   * every lathe and every CSG result underneath and rebuild them all on the way
+   * back — a stall of whole frames each time the camera orbits past the
+   * doorway, paid to save a draw call. three skips an invisible subtree in
+   * projectObject() before it reaches any of its children, in the shadow pass as
+   * well as the main one, so the saving is the same and the rebuild never
+   * happens. It also leaves the colliders mounted, which matters the moment
+   * anything but the exterior view wants to switch this off.
+   */
   return (
-    <group>
+    <group visible={visible}>
       {FLOORS.map((f, i) => {
         /*
          * Scale factor, not a value: `oculusRadius` from leva is compared against
