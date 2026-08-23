@@ -16,6 +16,13 @@ import {
   type Vec3,
 } from '../../lib/playerMovement'
 import { stickVelocity, touchLookSensitivity, type Stick } from '../../lib/touchInput'
+import {
+  classifyPointer,
+  drivingKind,
+  pointerLockAction,
+  type LockAction,
+  type PointerKind,
+} from '../../lib/pointerLock'
 import { useKeyboard } from '../../hooks/useKeyboard'
 
 const DEG = Math.PI / 180
@@ -130,32 +137,97 @@ export function FirstPersonPlayer({
     }
   }, [world])
 
-  // Pointer lock + mouse look
+  /*
+   * Pointer lock + mouse look.
+   *
+   * ═══════════════════════════════════════════════════════════════════════
+   * THE LOCK IS GATED ON THE INPUT DRIVING THE APP, NOT ON THE DEVICE.
+   * ═══════════════════════════════════════════════════════════════════════
+   *
+   * THIS BLOCK USED TO SAY that on a phone "there is no pointer to lock, so it
+   * rejects — every time a thumb touched the scene", and that the request was
+   * therefore safe to make and merely needed catching. THAT WAS WRONG, and the
+   * measurement behind it was taken in a desktop browser's device-emulation
+   * mode, where `requestPointerLock()` answers `WrongDocumentError` whatever it
+   * is asked. Chrome on Android GRANTS it. The owner's screenshot, on a real
+   * Pixel: he tapped a hotspot, the panel opened, the touch controls stopped
+   * answering, and along the bottom of the phone sat the browser's own
+   * pointer-lock banner telling him to reload the page. With the pointer locked
+   * the browser reports movement deltas and freezes clientX/clientY, so the
+   * stick reads no throw from a frozen origin and a drag turns the view by
+   * nothing. The rejection was never protecting anybody.
+   *
+   * Nor was `preventDefault()` on the touch pointerdown, which the touch layer
+   * still calls: cancelling a pointerdown suppresses the compatibility MOUSE
+   * events and the Pointer Events spec exempts `click` from that list by name.
+   * The click arrived, and it asked.
+   *
+   * So the decision moved to lib/pointerLock.ts, where it is a pure function of
+   * the gesture and is tested. It keys on `pointerType` — the input actually in
+   * use — rather than on what hardware the machine has, because a touchscreen
+   * laptop is an ordinary visitor and must keep mouse look; the same session
+   * locks for a click and refuses for a finger. And when a touch arrives while
+   * a lock is somehow already engaged, it hands the lock BACK, which is the
+   * half that rescues a visitor already in the owner's screenshot rather than
+   * merely not putting the next one there.
+   */
   useEffect(() => {
     const canvas = gl.domElement
+    const supported = typeof canvas.requestPointerLock === 'function'
+    /**
+     * The kind of the last pointer to press the canvas. Consulted only when the
+     * click itself carries no `pointerType` — Firefox dispatches `click` as a
+     * plain MouseEvent — and at that instant it is the kind that pressed it.
+     */
+    let lastDown: PointerKind | null = null
 
-    const onClick = () => {
-      if (locked.current) return
-      /*
-       * THE APP'S ONLY CONSOLE ERROR LIVED ON THIS LINE. requestPointerLock()
-       * returns a promise, and on a phone there is no pointer to lock, so it
-       * rejects — every time a thumb touched the scene, unhandled, in the
-       * production build: `WrongDocumentError` out of an unhandledrejection with
-       * no stack a visitor could make sense of.
-       *
-       * Caught rather than avoided by feature-detection, because the rejection
-       * is not only about phones: a second request while the browser is still
-       * exiting a previous lock rejects on the desktop too, and that one is not
-       * an error either — it is a click that arrived a moment early.
-       *
-       * Typed `| undefined` on purpose: the DOM lib declares Promise<void>, and
-       * Safari has returned undefined here for years.
-       */
-      const request: Promise<void> | undefined = canvas.requestPointerLock()
-      request?.catch(() => {
-        // no lock on this device; the touch layer is the input here
-      })
+    const apply = (action: LockAction) => {
+      if (action === 'request') {
+        /*
+         * The `.catch()` stays, and it is now about the desktop alone: a second
+         * request while the browser is still exiting a previous lock rejects,
+         * and that is a click that arrived a moment early rather than an error.
+         * Rule 5 wants the console clean and an unhandled rejection is not.
+         *
+         * Typed `| undefined` on purpose: the DOM lib declares Promise<void>,
+         * and Safari has returned undefined here for years.
+         */
+        const request: Promise<void> | undefined = canvas.requestPointerLock()
+        request?.catch(() => {
+          // the lock was refused; the walk carries on without it
+        })
+      } else if (action === 'exit') {
+        document.exitPointerLock?.()
+      }
     }
+
+    /** Anything locked at all — this document has one canvas to lock. */
+    const lockedNow = () => document.pointerLockElement !== null
+
+    /*
+     * Read on pointerdown as well as on click, and not only to remember the
+     * kind: a touch that arrives while a lock is engaged must get it back
+     * BEFORE the tap resolves into anything, because by then its coordinates
+     * are already frozen. A `click` may never follow — a drag produces none.
+     *
+     * ONLY THE RELEASE HALF HAPPENS HERE. The desktop's REQUEST stays on
+     * `click`, exactly where it has always been, because a mouse press that
+     * never becomes a click — a drag, a press that leaves the canvas, a
+     * middle button — must not take the cursor. Measured before this line was
+     * narrowed: one mouse click asked twice, once on the down and once on the
+     * click, which is a mechanism the desktop did not have.
+     */
+    const onPointerDown = (e: PointerEvent) => {
+      lastDown = classifyPointer(e.pointerType)
+      const action = pointerLockAction({ kind: lastDown, locked: lockedNow(), supported })
+      if (action === 'exit') apply(action)
+    }
+
+    const onClick = (e: MouseEvent) => {
+      const kind = drivingKind((e as PointerEvent).pointerType, lastDown)
+      apply(pointerLockAction({ kind, locked: lockedNow(), supported }))
+    }
+
     const onLockChange = () => {
       locked.current = document.pointerLockElement === canvas
     }
@@ -173,13 +245,19 @@ export function FirstPersonPlayer({
       pitch.current = next.pitch
     }
 
+    canvas.addEventListener('pointerdown', onPointerDown)
     canvas.addEventListener('click', onClick)
     document.addEventListener('pointerlockchange', onLockChange)
     document.addEventListener('mousemove', onMove)
     return () => {
+      canvas.removeEventListener('pointerdown', onPointerDown)
       canvas.removeEventListener('click', onClick)
       document.removeEventListener('pointerlockchange', onLockChange)
       document.removeEventListener('mousemove', onMove)
+      // leaving walk mode must not leave the visitor locked to a canvas that is
+      // now an orbit view, with no cursor and nothing listening for the moves
+      if (document.pointerLockElement === canvas) document.exitPointerLock?.()
+      locked.current = false
     }
   }, [gl])
 

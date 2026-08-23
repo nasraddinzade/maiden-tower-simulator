@@ -216,10 +216,19 @@ export const PLAYER = {
 /**
  * The touch controls, 2026-08-23.
  *
- * A phone has no pointer lock, no WASD and no mouse, and the owner is about to
- * link this publicly — a phone visitor is the likeliest visitor there is. These
- * are the parameters of the input that replaces all three; the arithmetic that
- * consumes them is lib/touchInput.ts and it is tested there.
+ * A phone has no WASD and no mouse, and the owner is about to link this
+ * publicly — a phone visitor is the likeliest visitor there is. These are the
+ * parameters of the input that replaces both; the arithmetic that consumes them
+ * is lib/touchInput.ts and it is tested there.
+ *
+ * [2026-08-24] IT DOES HAVE POINTER LOCK, and this comment said otherwise until
+ * the owner's screenshot showed the banner. Chrome on Android grants
+ * requestPointerLock(); the WrongDocumentError this project measured came from
+ * a desktop browser's device-emulation mode and was an artefact of it. Granted,
+ * the lock freezes clientX/clientY and every number below stops meaning
+ * anything — a throw measured from a frozen origin is zero. So the lock is now
+ * refused for touch at the decision, in lib/pointerLock.ts, rather than assumed
+ * to refuse itself.
  *
  * They live in config rather than in the widget for the same reason every other
  * number in this project does (rule 2): the values below are the whole feel of
