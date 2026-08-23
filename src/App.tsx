@@ -1441,7 +1441,24 @@ export default function App() {
         </>
       )}
 
-      {firstPerson && <TouchControls canvas={canvas} stickRef={touchInput} lookRef={touchLook} />}
+      {firstPerson && (
+        <TouchControls
+          canvas={canvas}
+          stickRef={touchInput}
+          lookRef={touchLook}
+          /*
+            The two full-screen overlays, and the reason the touch layer has to
+            be told about them at all is that ONE of them is opened by touching
+            the building: a hotspot marker is on the canvas, so the touch
+            layer's own rule — a press whose target is not the canvas ends the
+            walk — cannot see it. The credits are reached from a button and are
+            already covered by that rule; they are named here anyway so the
+            condition reads as "a panel is over the canvas" rather than as a
+            list of exceptions.
+          */
+          coveredByPanel={hotspot !== null || creditsOpen}
+        />
+      )}
 
       {/*
         The CSG triangle count is a build diagnostic — it is how a run of this

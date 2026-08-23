@@ -27,6 +27,25 @@ export interface TouchControlsProps {
   stickRef: React.RefObject<Stick | null>
   /** Accumulated look delta in CSS px; the player consumes and zeroes it. */
   lookRef: React.RefObject<{ dx: number; dy: number }>
+  /**
+   * A full-screen panel stands over the canvas.
+   *
+   * THE ONE PANEL THAT IS OPENED BY TOUCHING THE BUILDING ITSELF. The chrome —
+   * the language sheet, the credits, the "Unsettled" detail, the hypotheses,
+   * the sun — is reached by pressing a control, and a press whose target is not
+   * the canvas already ends the walk's pointers (see onDocumentDown). A hotspot
+   * is reached by pressing the CANVAS, so that rule cannot see it, and measured
+   * at 375×812 the gap costs the visitor his bearings: thumb on the stick, tap
+   * a marker, the panel covers 351×698 of a 375×812 screen and the same thumb
+   * still drives — 1.753 m walked with nothing to see it by.
+   *
+   * He was never stranded (lifting the thumb stopped him; the first touch on
+   * the panel reset everything), but a walk nobody can see is not a walk he is
+   * making. The effect below simply does not run while this is true, so the
+   * canvas carries no listeners at all under a panel and the book is empty when
+   * one closes — structural, like the book itself, rather than remembered.
+   */
+  coveredByPanel?: boolean
 }
 
 /**
@@ -58,6 +77,12 @@ export interface TouchControlsProps {
  * the background, the phone being turned, a panel opening over the canvas — for
  * which there is no event on the pointer at all and the reset has to come from
  * outside. See the listeners below: everything that can end a walk ends it.
+ *
+ * SILENCE HAS TWO SOURCES AND ONLY ONE OF THEM IS AN EVENT. The document-level
+ * pointerdown covers every panel a visitor PRESSES A CONTROL to open. It cannot
+ * cover the hotspot panel, which is opened by pressing the canvas itself, and
+ * measured on a phone that gap let the same thumb walk 1.753 m under a panel
+ * filling the screen. `coveredByPanel` closes it — see the prop.
  *
  * POINTER EVENTS, NOT TOUCH EVENTS, and `setPointerCapture` on each id. Capture
  * is what makes a drag survive leaving the canvas: without it a thumb that
@@ -91,12 +116,21 @@ export interface TouchControlsProps {
  * below are mounted once and moved by writing `transform` directly, which costs
  * a compositor transform and no reconciliation at all.
  */
-export function TouchControls({ canvas, stickRef, lookRef }: TouchControlsProps) {
+export function TouchControls({
+  canvas,
+  stickRef,
+  lookRef,
+  coveredByPanel = false,
+}: TouchControlsProps) {
   const ringRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!canvas) return
+    // A panel over the canvas ends the walk by TEARING THIS EFFECT DOWN, not by
+    // remembering to stop: the cleanup below already calls resetAll(), so the
+    // ring goes out, the walker stops and every listener leaves with it. The
+    // panel closing rebuilds all of it around a fresh, empty book.
+    if (!canvas || coveredByPanel) return
 
     const book = createBook()
     const ring = ringRef.current
@@ -285,7 +319,7 @@ export function TouchControls({ canvas, stickRef, lookRef }: TouchControlsProps)
       // leaving walk mode with a thumb down must not leave the walker walking
       resetAll()
     }
-  }, [canvas, stickRef, lookRef])
+  }, [canvas, stickRef, lookRef, coveredByPanel])
 
   const r = TOUCH.stickRadiusPx
   const k = TOUCH.stickKnobRadiusPx
