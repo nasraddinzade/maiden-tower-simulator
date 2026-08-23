@@ -9,11 +9,51 @@ body,
   height: 100%;
 }
 
+/*
+ * NO PULL-TO-REFRESH AND NO RUBBER-BAND UNDER A WALK. A drag that starts on the
+ * canvas is a step or a turn, and on a phone the browser reads the first
+ * downward one as "reload the page" — which throws away the walk, the storey and
+ * the time of day. `overscroll-behavior` stops the chaining without stopping
+ * scrolling itself, so a panel that has more text than screen still scrolls; it
+ * just no longer hands the leftover to the document.
+ */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 #root {
   width: 100vw;
+  /*
+   * 100dvh, with 100vh under it for anything that has not heard of it.
+   *
+   * On a phone `100vh` is the LARGE viewport — the height the page would have if
+   * the address bar were hidden — so with the bar showing, the bottom of the
+   * layout sits below the glass and the page can be scrolled to reach it. That
+   * is the walk button and the stick's own zone pushed off the bottom of the
+   * screen. `100dvh` is the height that is actually visible, and it tracks the
+   * bar as it comes and goes.
+   */
   height: 100vh;
+  height: 100dvh;
 }
 
 canvas {
   display: block;
+  /*
+   * THE BROWSER'S GESTURES ARE THE WALKER'S GESTURES, and there is only one of
+   * each. Without this a drag across the canvas scrolls the page instead of
+   * turning the view, a pinch zooms the document instead of doing nothing, and a
+   * double tap zooms in on the tower's pixels.
+   *
+   * ON THE CANVAS, NOT ON THE DOCUMENT, and not via `user-scalable=no` in the
+   * viewport meta — which is the usual fix and the wrong one. The meta tag turns
+   * zoom off for the WHOLE page, including the hypothesis panel and the source
+   * citations, and a visitor who needs to enlarge text to read at all would lose
+   * the ability to read the thing this project exists to say. Scoping it to the
+   * canvas takes the gesture only where a gesture already means something else.
+   *
+   * It also serves the orbit view, where the same drags belong to OrbitControls.
+   */
+  touch-action: none;
 }

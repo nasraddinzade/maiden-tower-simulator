@@ -46,6 +46,33 @@ export const NO_INPUT: MoveInput = {
 }
 
 /**
+ * Rotate a UNIT ground direction in the walker's own axes into world space, at
+ * `speed`.
+ *
+ * The rotation is the one three.js applies to a camera about Y: local (x, z) →
+ * (x·cos + z·sin, −x·sin + z·cos). Check: at yaw 0 the forward vector (0, −1)
+ * stays north (0, −1); at yaw −90° it becomes east (1, 0).
+ *
+ * Shared with the touch stick (lib/touchInput.ts → stickVelocity) rather than
+ * written out twice. It is the same walker facing the same way, and two copies
+ * of this rotation is two chances for a thumb and a key to disagree about which
+ * way north is.
+ */
+export function headingToWorld(
+  localX: number,
+  localZ: number,
+  yawRad: number,
+  speed: number,
+): Planar {
+  const sin = Math.sin(yawRad)
+  const cos = Math.cos(yawRad)
+  return {
+    x: (localX * cos + localZ * sin) * speed,
+    z: (-localX * sin + localZ * cos) * speed,
+  }
+}
+
+/**
  * Ground velocity for the given key state and camera yaw.
  *
  * Diagonals are normalised, so holding two keys never outruns one — the classic
@@ -58,9 +85,6 @@ export function moveVelocity(
   runSpeed: number,
 ): Planar {
   // local axes: forward is −Z rotated by yaw, right is +X rotated by yaw
-  const sin = Math.sin(yawRad)
-  const cos = Math.cos(yawRad)
-
   let localX = 0
   let localZ = 0
   if (input.forward) localZ -= 1
@@ -70,17 +94,8 @@ export function moveVelocity(
 
   const len = Math.hypot(localX, localZ)
   if (len === 0) return { x: 0, z: 0 }
-  localX /= len
-  localZ /= len
 
-  const speed = input.run ? runSpeed : walkSpeed
-  // Rotate the local vector into world space the way three.js rotates a camera
-  // about Y: local (x, z) → (x·cos + z·sin, −x·sin + z·cos). Check: at yaw 0 the
-  // forward vector (0, −1) stays north (0, −1); at yaw −90° it becomes east (1, 0).
-  return {
-    x: (localX * cos + localZ * sin) * speed,
-    z: (-localX * sin + localZ * cos) * speed,
-  }
+  return headingToWorld(localX / len, localZ / len, yawRad, input.run ? runSpeed : walkSpeed)
 }
 
 /**
@@ -285,15 +300,12 @@ export function teleportTarget(
   return { x: r, y: floorY + 0.1, z: 0 }
 }
 
-/** Normalised joystick vector → the same MoveInput the keyboard produces. */
-export function joystickToInput(x: number, y: number, deadzone = 0.15, run = false): MoveInput {
-  const mag = Math.hypot(x, y)
-  if (mag < deadzone) return { ...NO_INPUT, run }
-  return {
-    forward: y < -deadzone,
-    back: y > deadzone,
-    left: x < -deadzone,
-    right: x > deadzone,
-    run,
-  }
-}
+/*
+ * joystickToInput() STOOD HERE UNTIL 2026-08-23 and it is gone rather than
+ * deprecated. It mapped a stick to the keyboard's five booleans, which means
+ * every touch was full walking pace in one of eight directions — a stick with
+ * the range of a keyboard is a keyboard. The replacement is
+ * lib/touchInput.ts → stickVelocity, which reads the deflection as a SPEED, and
+ * the two cannot coexist: whichever the controller asks first decides whether
+ * the thumb has a throttle.
+ */

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { CapsuleCollider, RigidBody, useRapier, type RapierRigidBody } from '@react-three/rapier'
 import { Ray } from '@dimforge/rapier3d-compat'
-import { LAMP, PLAYER } from '../../config/player'
+import { LAMP, PLAYER, TOUCH } from '../../config/player'
 import { FLOORS } from '../../config/tower'
 import {
   applyGravity,
@@ -13,17 +13,22 @@ import {
   moveVelocity,
   teleportTarget,
   UP,
-  type MoveInput,
   type Vec3,
 } from '../../lib/playerMovement'
+import { stickVelocity, touchLookSensitivity, type Stick } from '../../lib/touchInput'
 import { useKeyboard } from '../../hooks/useKeyboard'
 
 const DEG = Math.PI / 180
 
 export interface FirstPersonPlayerProps {
-  /** Extra movement from the on-screen joystick, merged with the keyboard. */
-  touchInput?: React.RefObject<MoveInput | null>
-  /** Accumulated look delta from touch dragging, consumed each frame. */
+  /**
+   * The on-screen stick's deflection, or null when no thumb is on the glass.
+   * Analog: its LENGTH is a speed, so the same thumb can edge along a stair
+   * passage and jog across a chamber. It used to be the keyboard's five
+   * booleans, which gave a phone visitor one speed and eight headings.
+   */
+  touchInput?: React.RefObject<Stick | null>
+  /** Accumulated look delta from touch dragging, in CSS px, consumed each frame. */
   touchLook?: React.RefObject<{ dx: number; dy: number }>
   /** Storey the player starts on. */
   startFloorIndex?: number
@@ -60,6 +65,13 @@ export function FirstPersonPlayer({
   lampIntensity = LAMP.intensity,
 }: FirstPersonPlayerProps) {
   const { camera, gl } = useThree()
+  /**
+   * The canvas's own CSS size, which is what the touch sensitivity is measured
+   * against — see touchLookSensitivity. Not `window.innerWidth`: the drag
+   * happens on the canvas, and on a phone with the address bar showing those two
+   * are not the same number.
+   */
+  const size = useThree((s) => s.size)
   const { world } = useRapier()
   const body = useRef<RapierRigidBody>(null)
   const keyboard = useKeyboard()
@@ -123,7 +135,26 @@ export function FirstPersonPlayer({
     const canvas = gl.domElement
 
     const onClick = () => {
-      if (!locked.current) canvas.requestPointerLock()
+      if (locked.current) return
+      /*
+       * THE APP'S ONLY CONSOLE ERROR LIVED ON THIS LINE. requestPointerLock()
+       * returns a promise, and on a phone there is no pointer to lock, so it
+       * rejects — every time a thumb touched the scene, unhandled, in the
+       * production build: `WrongDocumentError` out of an unhandledrejection with
+       * no stack a visitor could make sense of.
+       *
+       * Caught rather than avoided by feature-detection, because the rejection
+       * is not only about phones: a second request while the browser is still
+       * exiting a previous lock rejects on the desktop too, and that one is not
+       * an error either — it is a click that arrived a moment early.
+       *
+       * Typed `| undefined` on purpose: the DOM lib declares Promise<void>, and
+       * Safari has returned undefined here for years.
+       */
+      const request: Promise<void> | undefined = canvas.requestPointerLock()
+      request?.catch(() => {
+        // no lock on this device; the touch layer is the input here
+      })
     }
     const onLockChange = () => {
       locked.current = document.pointerLockElement === canvas
@@ -192,14 +223,26 @@ export function FirstPersonPlayer({
       return
     }
 
-    // touch look is consumed here so it feels identical to the mouse
+    /*
+     * Touch look is consumed here, on the frame, so it feels identical to the
+     * mouse — the drag accumulates between frames and is spent once.
+     *
+     * The SENSITIVITY is not the mouse's. A mouse under pointer lock reports
+     * device counts and can be dragged across a desk; a thumb reports CSS pixels
+     * and runs out of glass, so the sensitivity is derived from the canvas
+     * instead of being a constant: TOUCH.turnPerSweepRad across the short side.
+     * The old path multiplied the mouse figure by 1.6 and half a turn took 2.1
+     * screen widths.
+     */
     if (touchLook?.current && (touchLook.current.dx || touchLook.current.dy)) {
       const next = applyLook(
         yaw.current,
         pitch.current,
         touchLook.current.dx,
         touchLook.current.dy,
-        PLAYER.lookSensitivity * 1.6,
+        touchLookSensitivity(Math.min(size.width, size.height), TOUCH.turnPerSweepRad),
+        // the same clamp the mouse gets: the horizon must not roll over, and on
+        // a phone a wild drag is one flick of a thumb away
         PLAYER.maxPitchRad,
       )
       yaw.current = next.yaw
@@ -208,19 +251,26 @@ export function FirstPersonPlayer({
       touchLook.current.dy = 0
     }
 
-    const kb = keyboard.move
-    const touch = touchInput?.current
-    const input: MoveInput = touch
-      ? {
-          forward: kb.forward || touch.forward,
-          back: kb.back || touch.back,
-          left: kb.left || touch.left,
-          right: kb.right || touch.right,
-          run: kb.run || touch.run,
-        }
-      : kb
-
-    const planar = moveVelocity(input, yaw.current, PLAYER.walkSpeed, PLAYER.runSpeed)
+    /*
+     * THE STICK IS A VELOCITY, NOT A KEY. It used to be merged into the keyboard
+     * booleans, which threw away the deflection: any touch was full walking pace.
+     * Now the thumb's throw IS the speed, and the keyboard is what answers when
+     * no thumb is asking — so a desktop frame computes exactly what it always
+     * did, and a device with both keeps both.
+     */
+    const stick = touchInput?.current
+    const fromStick = stick
+      ? stickVelocity(stick, yaw.current, {
+          walkSpeed: PLAYER.walkSpeed,
+          runSpeed: PLAYER.runSpeed,
+          deadzone: TOUCH.deadzone,
+          runAt: TOUCH.runAt,
+        })
+      : null
+    const planar =
+      fromStick && (fromStick.x !== 0 || fromStick.z !== 0)
+        ? fromStick
+        : moveVelocity(keyboard.move, yaw.current, PLAYER.walkSpeed, PLAYER.runSpeed)
 
     const grounded = ctrl.computedGrounded()
     vertical.current = applyGravity(

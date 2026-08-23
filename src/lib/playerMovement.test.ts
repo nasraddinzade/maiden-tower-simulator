@@ -6,7 +6,7 @@ import {
   contactCycleDrift,
   desiredMovement,
   groundNormalOf,
-  joystickToInput,
+  headingToWorld,
   moveVelocity,
   teleportTarget,
   NO_INPUT,
@@ -76,6 +76,49 @@ describe('moveVelocity', () => {
   })
 })
 
+/*
+ * headingToWorld came out of moveVelocity's body on 2026-08-23 so the touch
+ * stick could rotate through the SAME arithmetic instead of a second copy of it
+ * — two copies is two chances for a thumb and a key to disagree about north.
+ * These cases pin the rotation itself, and the sweep at the end is the guard:
+ * whatever the keys ask for, the shared function must still answer it.
+ */
+describe('headingToWorld', () => {
+  it('leaves forward pointing north at yaw 0 (north = −Z)', () => {
+    const v = headingToWorld(0, -1, 0, 1)
+    expect(v.x).toBeCloseTo(0, 10)
+    expect(v.z).toBeCloseTo(-1, 10)
+  })
+
+  it('turns forward into east at yaw −90°', () => {
+    const v = headingToWorld(0, -1, -Math.PI / 2, 1)
+    expect(v.x).toBeCloseTo(1, 10)
+    expect(v.z).toBeCloseTo(0, 10)
+  })
+
+  it('scales by the speed and nothing else', () => {
+    const v = headingToWorld(0.6, -0.8, 1.1, 2.5)
+    expect(Math.hypot(v.x, v.z)).toBeCloseTo(2.5, 10)
+  })
+
+  it('is what moveVelocity has always computed, key for key and yaw for yaw', () => {
+    const cases: Array<[Partial<MoveInput>, number, number]> = [
+      [{ forward: true }, 0, -1],
+      [{ back: true }, 0, 1],
+      [{ left: true }, -1, 0],
+      [{ right: true }, 1, 0],
+    ]
+    for (let yaw = -Math.PI; yaw <= Math.PI; yaw += 0.37) {
+      for (const [keys, localX, localZ] of cases) {
+        const viaKeys = moveVelocity(held(keys), yaw, PLAYER.walkSpeed, PLAYER.runSpeed)
+        const viaHeading = headingToWorld(localX, localZ, yaw, PLAYER.walkSpeed)
+        expect(viaKeys.x).toBeCloseTo(viaHeading.x, 12)
+        expect(viaKeys.z).toBeCloseTo(viaHeading.z, 12)
+      }
+    }
+  })
+})
+
 describe('gravity', () => {
   const { gravity, maxFallSpeed, groundContactBias: bias } = PLAYER
 
@@ -134,22 +177,13 @@ describe('debug teleport (keys 1..8)', () => {
   })
 })
 
-describe('touch joystick', () => {
-  it('ignores small wobbles inside the deadzone', () => {
-    expect(joystickToInput(0.05, 0.05)).toEqual(NO_INPUT)
-  })
-  it('pushes forward when the stick goes up', () => {
-    expect(joystickToInput(0, -1).forward).toBe(true)
-  })
-  it('maps the four quadrants the same way the keys do', () => {
-    expect(joystickToInput(1, 0).right).toBe(true)
-    expect(joystickToInput(-1, 0).left).toBe(true)
-    expect(joystickToInput(0, 1).back).toBe(true)
-  })
-  it('carries the run flag through', () => {
-    expect(joystickToInput(0, -1, 0.15, true).run).toBe(true)
-  })
-})
+/*
+ * The four `touch joystick` cases that stood here went with joystickToInput on
+ * 2026-08-23. They asserted that a stick produces the keyboard's booleans, which
+ * is exactly the behaviour that had to go: they would have passed forever while
+ * a phone visitor had no throttle and eight headings. lib/touchInput.test.ts
+ * asserts the stick against a SPEED and a heading instead.
+ */
 
 /*
  * THE SLIDE ON A FLIGHT. See lib/playerMovement.ts → contactCycleDrift for the

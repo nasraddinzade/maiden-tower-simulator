@@ -202,10 +202,83 @@ export const PLAYER = {
    * longer exists. Everything above 0.001 is now paying for nothing.
    */
   normalNudgeFactor: 0.001,
-  /** Mouse/touch look sensitivity, radians per pixel. */
+  /**
+   * MOUSE look sensitivity, radians per pixel. Under pointer lock the deltas are
+   * raw device counts, not screen distance, so this is rightly a constant and
+   * rightly independent of the viewport — see TOUCH.turnPerSweepRad for why the
+   * thumb cannot be.
+   */
   lookSensitivity: 0.0025,
   /** Pitch is clamped so the view cannot roll over the top. */
   maxPitchRad: Math.PI / 2 - 0.05,
+} as const
+
+/**
+ * The touch controls, 2026-08-23.
+ *
+ * A phone has no pointer lock, no WASD and no mouse, and the owner is about to
+ * link this publicly — a phone visitor is the likeliest visitor there is. These
+ * are the parameters of the input that replaces all three; the arithmetic that
+ * consumes them is lib/touchInput.ts and it is tested there.
+ *
+ * They live in config rather than in the widget for the same reason every other
+ * number in this project does (rule 2): the values below are the whole feel of
+ * walking on a phone, and a feel argued about in a component is a feel nobody
+ * can find.
+ *
+ * WHAT IS A PHYSICAL LENGTH AND WHAT IS A FRACTION OF THE GLASS — the division
+ * that decides which of these scale with the screen:
+ *
+ *   the stick is a THUMB. A thumb is 20 mm of flesh whatever it is resting on,
+ *   so the ring is in CSS pixels, which are defined to hold a constant angular
+ *   size across devices. It does not scale.
+ *
+ *   the zone and the look sweep are GLASS. Where the thumb can reach and how far
+ *   it can travel are fractions of the display, so both are fractions.
+ */
+export const TOUCH = {
+  /**
+   * Ring radius, CSS px — full deflection. 56 px is a 112 px circle, about
+   * 30 mm, which is the reach of a thumb pivoting at its own knuckle. Carried
+   * over unchanged from the Phase-6 stick: it was the one thing about that stick
+   * that measured right.
+   */
+  stickRadiusPx: 56,
+  /** Knob radius, CSS px. Half the ring, so the knob is visible at any throw. */
+  stickKnobRadiusPx: 22,
+  /**
+   * Deflection below which the thumb is resting, not steering. Skin on glass
+   * wanders a few pixels while the hand holds the phone; 0.15 of 56 px is 8 px,
+   * which is under a thumbprint and over that wander.
+   */
+  deadzone: 0.15,
+  /**
+   * The throw at which the walk reaches PLAYER.walkSpeed. Above it the ramp runs
+   * on to PLAYER.runSpeed at the rim, so the last 15% of the ring is the jog
+   * that Shift is on a keyboard. Below it the whole band is a proportional walk,
+   * which is what lets a visitor edge along a 0.9 m stair passage.
+   */
+  runAt: 0.85,
+  /**
+   * The movement zone: the left half of the display, bottom 55% of it. On a
+   * 375 × 812 phone that is 187 × 447 px under a left thumb, and it leaves the
+   * upper left — where the walk button and the hint sit — as somewhere to drag
+   * to LOOK rather than as more joystick.
+   */
+  zoneWidthFraction: 0.5,
+  zoneHeightFraction: 0.55,
+  /**
+   * How far the view turns for a drag across the SHORT side of the display.
+   * Half a turn: one sweep of a thumb puts the room behind you in front of you.
+   *
+   * MEASURED AGAINST WHAT IT REPLACES. The touch path used to multiply the mouse
+   * sensitivity by 1.6 — 0.004 rad/px — so half a turn took 785 px, or 2.1
+   * screen widths of a 375 px phone, in three separate swipes. π across 375 px
+   * is 0.00838 rad/px, and it also puts the full pitch range (2 × maxPitchRad =
+   * 3.04 rad) inside 363 px, so floor to ceiling is one comfortable drag as
+   * well.
+   */
+  turnPerSweepRad: Math.PI,
 } as const
 
 /**

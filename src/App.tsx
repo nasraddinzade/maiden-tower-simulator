@@ -63,7 +63,7 @@ import { FloorStructures } from './components/tower/FloorStructures'
 import { RoofTerrace } from './components/tower/RoofTerrace'
 import { FirstPersonPlayer } from './components/player/FirstPersonPlayer'
 import { TouchControls } from './components/player/TouchControls'
-import { NO_INPUT, type MoveInput } from './lib/playerMovement'
+import type { Stick } from './lib/touchInput'
 import { useMasonry } from './hooks/useMasonry'
 import { COURSE_HEIGHT } from './lib/masonry'
 import { SunSystem } from './components/sun/SunSystem'
@@ -112,7 +112,7 @@ interface SceneProps {
   date: Date
   hypothesis: HypothesisId
   firstPerson: boolean
-  touchInput: React.RefObject<MoveInput | null>
+  touchInput: React.RefObject<Stick | null>
   touchLook: React.RefObject<{ dx: number; dy: number }>
 }
 
@@ -1156,8 +1156,17 @@ export default function App() {
   const xr = useLazyXR()
   const [perf, setPerf] = useState<PerfSample | null>(null)
   const [perfBaseline, setPerfBaseline] = useState<PerfSample | null>(null)
-  const touchInput = useRef<MoveInput | null>({ ...NO_INPUT })
+  /**
+   * The touch stick's deflection, or null when no thumb is down. Held here
+   * rather than in either component because BOTH ends need it and neither owns
+   * it: TouchControls writes the thumb into it and FirstPersonPlayer reads it on
+   * the frame, and a ref is what carries a value between them without a render
+   * per touch sample.
+   */
+  const touchInput = useRef<Stick | null>(null)
   const touchLook = useRef({ dx: 0, dy: 0 })
+  /** The canvas element, for the touch layer to listen on. See <Canvas ref>. */
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
 
   /**
    * Diagnostic overlays, per docs/optimization-addendum.md:
@@ -1269,7 +1278,7 @@ export default function App() {
         </button>
       </div>
 
-      {firstPerson && <TouchControls inputRef={touchInput} lookRef={touchLook} />}
+      {firstPerson && <TouchControls canvas={canvas} stickRef={touchInput} lookRef={touchLook} />}
 
       <SunControls
         date={date}
@@ -1332,6 +1341,13 @@ export default function App() {
         can act on is how a real one gets missed.
       */}
       <Canvas
+        /*
+         * The canvas element itself, held in state rather than a ref, because
+         * TouchControls listens on it: a ref would be read once by an effect
+         * that never re-runs, and a callback ref that sets state cannot be
+         * mounted in the wrong order relative to its reader.
+         */
+        ref={setCanvas}
         shadows="percentage"
         gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1 }}
         camera={{ position: [36, 24, 36], fov: 50, near: 0.1, far: 600 }}
