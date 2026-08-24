@@ -91,6 +91,7 @@ import { CompactChrome } from './components/ui/CompactChrome'
 import { useScreenLayout } from './hooks/useViewport'
 import { compactChrome, describeLayout, dockedChrome } from './lib/screenLayout'
 import { storeyAt } from './lib/visibility'
+import { showSurveyAids } from './lib/surveyAids'
 import {
   frustumPlanes,
   interiorVisibleFromOutside,
@@ -191,6 +192,13 @@ const OPENING_FITTINGS = windowData.passageOpenings as OpeningFitting[]
  */
 
 function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook, resetView }: SceneProps) {
+  /*
+   * The grid, the axes cross and the corner axis gizmo, in one decision. They
+   * were gated on `!firstPerson` and shipped to the public site because of it;
+   * lib/surveyAids.ts carries the measurement and the argument.
+   */
+  const surveyAids = showSurveyAids({ dev: import.meta.env.DEV, walking: firstPerson })
+
   const { showShell, showWireframe, showScaleRef, cutaway } = useControls('View', {
     showShell: true,
     showWireframe: false,
@@ -978,12 +986,12 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
       <ambientLight intensity={0.06} />
 
       {/*
-        Survey aids, for the orbit view only. Inside the tower they read as a
-        green line hanging down the middle of every room and a grid showing
-        through the floor — walking the model is the one place they must not
-        appear.
+        Survey aids, for the orbit view of a development build. Inside the tower
+        they read as a green line hanging down the middle of every room and a
+        grid showing through the floor; on the public site they read as a
+        surveyor's drawing laid over a museum. See lib/surveyAids.ts.
       */}
-      {!firstPerson && (
+      {surveyAids && (
         <>
           <Grid
             args={[80, 80]}
@@ -1156,8 +1164,14 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
         </mesh>
       )}
 
-      {/* also a survey aid: it draws into the scene, so it floats in the room */}
-      {!firstPerson && (
+      {/*
+        Also a survey aid, and the one that cost twice. It draws into a scene of
+        its own AFTER this one — drei's GizmoHelper is a Hud — which is why the
+        F3 readout spent the whole orbit view reporting the corner's nine draw
+        calls instead of the tower's eighty-six; see components/ui/PerfHud.tsx.
+        And it sits bottom-right, under a right thumb, on a phone.
+      */}
+      {surveyAids && (
       <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
         <GizmoViewport axisColors={['#d94f4f', '#3fbf6f', '#4a7fd9']} labelColor="#eee" />
       </GizmoHelper>

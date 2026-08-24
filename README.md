@@ -43,7 +43,17 @@ npm run dev
 solar position, and the collision guards. The renderer is not tested.
 
 **F3** shows the performance budget against its targets, **F4** draws every
-collider over the geometry.
+collider over the geometry. Both keys work in the built site; neither overlay is
+open unless asked for. The F3 figures are a whole frame — every render pass in
+it, not the last one — which is not a detail: while the axis gizmo was mounted it
+drew a second pass of its own and the readout spent the entire orbit view
+reporting that pass's nine draw calls instead of the frame's ninety-five. See
+[`src/lib/frameCounters.ts`](src/lib/frameCounters.ts).
+
+The survey aids — the ground grid, the axes cross, the corner axis gizmo — are
+for a development build only ([`src/lib/surveyAids.ts`](src/lib/surveyAids.ts)),
+along with the `leva` tuning panel. They are instruments for building the tower,
+and they had been shipping to the public site.
 
 ## Layout
 

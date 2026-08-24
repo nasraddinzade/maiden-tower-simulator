@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { activeBudget, activeDprPolicy, overBudget } from '../../config/perf'
+import { COUNTER_CLEAR_PRIORITY, EMPTY_FRAME, readFrame, type FrameCounters } from '../../lib/frameCounters'
 
 export interface PerfSample {
   fps: number
   frameMs: number
   drawCalls: number
   triangles: number
+  /** How many render passes those figures cover. See PerfProbe. */
+  passes: number
   programs: number
   geometries: number
   textures: number
@@ -21,11 +24,69 @@ export interface PerfProbeProps {
  *
  * Lives inside the Canvas because that is the only place `gl.info` is reachable;
  * the readout itself is DOM, so measuring costs no draw calls of its own.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WHERE THE COUNTERS ARE READ, AND WHY THAT POINT AND NOT ANOTHER.
+ *
+ * They used to be read here, in an ordinary `useFrame`, straight off
+ * `gl.info.render`. In walk mode that is correct and in the orbit view it was
+ * off by an order of magnitude: F3 reported 9 draw calls and 40 triangles for a
+ * frame that submitted 95 and 114,092. Measured 2026-08-24.
+ *
+ * Neither figure was a bug in the counting. three clears `info.render` at the
+ * head of every `render()` while `info.autoReset` is on, so the counters
+ * describe ONE PASS, and the orbit frame has two: drei's GizmoHelper is a Hud,
+ * it takes the render loop over at r3f priority 1, draws the scene, clears the
+ * depth buffer and draws its own corner scene of axes. What stood at the end of
+ * the frame was the corner. In walk mode the gizmo is not mounted, r3f renders
+ * the scene itself, one pass, and the same read told the truth — which is why
+ * the readout looked reliable exactly where the model is cheapest and lied
+ * exactly where it is heaviest.
+ *
+ * So the counters are now cleared ONCE PER FRAME rather than once per pass
+ * (`info.autoReset = false`, which is what three documents that switch for), and
+ * read at the top of the following frame, before anything in it has drawn:
+ *
+ *   · not after the last pass — r3f only allows that at a POSITIVE frame
+ *     priority, and a positive priority makes r3f stop rendering the scene
+ *     itself, which would blank the canvas in walk mode where nothing else
+ *     renders. See COUNTER_CLEAR_PRIORITY.
+ *   · not after the scene's own pass — there is no hook between passes, and a
+ *     figure that skipped the second pass would be a budget that excuses
+ *     whatever it does not like the look of. The GPU is handed the gizmo's nine
+ *     calls the same as the tower's eighty-six.
+ *   · not by re-rendering the scene to measure it, the way `__perf` below does
+ *     — that answers a different question (what one pass of the scene costs
+ *     from this camera) and it answers it by doing the work twice, every second,
+ *     on the phone whose frame time is being measured.
+ *
+ * The top of the frame is the one place a single hook sees a whole frame: every
+ * pass of the previous one, counted once, in the order the GPU actually got
+ * them. The figure is therefore a real frame's real cost, one frame stale.
  */
 export function PerfProbe({ onSample }: PerfProbeProps) {
   const { gl, scene, camera } = useThree()
   const frames = useRef(0)
   const elapsed = useRef(0)
+  /** The last complete frame, all passes. */
+  const lastFrame = useRef<FrameCounters>(EMPTY_FRAME)
+  /** three's pass counter as it stood when the figures were last cleared. */
+  const passesAtClear = useRef(0)
+
+  useEffect(() => {
+    const previous = gl.info.autoReset
+    gl.info.autoReset = false
+    passesAtClear.current = gl.info.render.frame
+    return () => {
+      gl.info.autoReset = previous
+    }
+  }, [gl])
+
+  useFrame(() => {
+    lastFrame.current = readFrame(gl.info.render, passesAtClear.current)
+    passesAtClear.current = gl.info.render.frame
+    gl.info.reset()
+  }, COUNTER_CLEAR_PRIORITY)
 
   // Dev-only handle: lets a headless check force one frame and read the
   // renderer's counters, which is otherwise impossible when the page is not
@@ -33,6 +94,8 @@ export function PerfProbe({ onSample }: PerfProbeProps) {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     ;(window as unknown as Record<string, unknown>).__perf = () => {
+      // clears explicitly: `autoReset` is off while the probe is mounted, and
+      // this handle exists to measure ONE pass of the scene on its own
       gl.info.reset()
       gl.render(scene, camera)
       let meshes = 0
@@ -67,8 +130,9 @@ export function PerfProbe({ onSample }: PerfProbeProps) {
     onSample({
       fps,
       frameMs: 1000 / Math.max(fps, 0.001),
-      drawCalls: gl.info.render.calls,
-      triangles: gl.info.render.triangles,
+      drawCalls: lastFrame.current.calls,
+      triangles: lastFrame.current.triangles,
+      passes: lastFrame.current.passes,
       programs: gl.info.programs?.length ?? 0,
       geometries: gl.info.memory.geometries,
       textures: gl.info.memory.textures,
@@ -119,6 +183,9 @@ function Delta({ now, was, lowerIsBetter = true }: { now: number; was: number; l
  * against the target, and the figure red when it is over. Which target depends
  * on the device — a phone is held to half the draw calls and a third of the
  * triangles of a desktop.
+ *
+ * The counters are a whole frame, every pass of it — see PerfProbe for how long
+ * that was not true and where it stopped being true.
  */
 export function PerfHud({ sample, baseline, dpr, onCapture, onClear }: PerfHudProps) {
   const [open, setOpen] = useState(true)
@@ -165,6 +232,15 @@ export function PerfHud({ sample, baseline, dpr, onCapture, onClear }: PerfHudPr
             draw calls <b style={over(sample.drawCalls, budget.drawCalls)}>{fmt(sample.drawCalls)}</b>
             {limitNote(budget.drawCalls)}
             {baseline && <Delta now={sample.drawCalls} was={baseline.drawCalls} />}
+            {/*
+              WHAT THE FIGURE COVERS, shown only when it is more than the obvious
+              one pass. Without it the orbit view's number looks like a
+              regression against walk mode rather than a second pass being
+              counted at last — the difference this readout exists to tell.
+            */}
+            {sample.passes > 1 && (
+              <span style={{ color: '#6f7885' }}> · {sample.passes} passes</span>
+            )}
           </div>
           <div>
             triangles <b style={over(sample.triangles, budget.triangles)}>{fmt(sample.triangles)}</b>
