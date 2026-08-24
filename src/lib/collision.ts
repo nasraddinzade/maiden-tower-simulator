@@ -32,6 +32,23 @@ export interface BoxSpec {
 }
 
 /**
+ * One upright cylinder collider — axis along world Y, no rotation offered.
+ *
+ * Two things in the model are round and are stood on or leant against rather
+ * than walked around: the paved ground outside, and the steel newel the modern
+ * spiral turns about. Both were written straight into JSX as rapier elements;
+ * they are specs here for the same reason BoxSpec is — so the collider set can
+ * be handed to the physics layer as data, and the physics layer can be the only
+ * module in the app that has ever heard of rapier.
+ */
+export interface CylinderSpec {
+  /** Half the height, matching rapier's own CylinderCollider argument. */
+  halfHeight: number
+  radius: number
+  position: [number, number, number]
+}
+
+/**
  * The yaw that points a box's local +X radially OUTWARD at an azimuth.
  *
  * rotateY(π/2 − az) sends +X to (sin az, 0, −cos az). The first version of this

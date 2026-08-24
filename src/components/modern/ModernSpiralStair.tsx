@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
+import { Colliders } from '../physics/lazyPhysics'
 import { TREAD_OVERLAP_FRACTION, planFlight, stairTreadVertices } from '../../lib/staircase'
 import {
   helicalGuardBoxes,
@@ -38,25 +38,17 @@ const COLLIDER_THICKNESS = 0.08
 
 export interface ModernSpiralStairProps {
   visible: boolean
-  withColliders: boolean
 }
 
 /**
- * The inserted steel spiral from the entry chamber up to storey 2.
+ * The flight itself — planned once, from config alone, and shared by the stair
+ * you can see and the stair you can stand on.
  *
- * Laid out with the SAME planFlight() the masonry flights use — a helix is a
- * helix — with the inner edge pinned to the central tube instead of to the wall
- * face. Reusing it means this stair inherits every fix the stone one has had:
- * the tread winding, the tread block reaching down to the walking surface, and
- * the ramp-chain collider that the character controller can actually climb.
- *
- * Everything about its size comes from config/modern.ts, where each figure
- * carries how it was measured off the 2026 footage and how far it might be out.
- * The tread COUNT is not measured — no frame shows the whole flight — so it is
- * derived from the storey height and the measured riser, and moves by itself if
- * the storey height is ever corrected.
+ * Those two are separate components now (see ModernSpiralStairColliders), which
+ * makes this the seam they must not drift across: the drawn tread and the ramp
+ * box under it are the same helix or the walk is a lie about the model.
  */
-export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairProps) {
+function useSpiralPlan() {
   const steps = useMemo(() => {
     if (!MODERN_SPIRAL_LIFT) return []
     const width = MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius
@@ -72,24 +64,6 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
       winding: MODERN_SPIRAL.winding,
     })
   }, [])
-
-  const treadGeometry = useMemo(() => {
-    if (steps.length === 0) return null
-    const width = MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius
-    const { positions, indices } = stairTreadVertices(steps, width, () => TREAD_PLATE)
-    const g = new THREE.BufferGeometry()
-    g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    g.setIndex(indices)
-    g.computeVertexNormals()
-    const uv: number[] = []
-    for (let i = 0; i < positions.length / 3; i++) uv.push(0, 0)
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
-    g.computeBoundingSphere()
-    return g
-  }, [steps])
-
-  useEffect(() => () => treadGeometry?.dispose(), [treadGeometry])
-
   /**
    * The flight with the band and the guard read off at every nosing.
    *
@@ -114,6 +88,173 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
       }
     })
   }, [steps])
+
+  return { steps, flight }
+}
+
+/**
+ * The inserted steel spiral from the entry chamber up to storey 2.
+ *
+ * Laid out with the SAME planFlight() the masonry flights use — a helix is a
+ * helix — with the inner edge pinned to the central tube instead of to the wall
+ * face. Reusing it means this stair inherits every fix the stone one has had:
+ * the tread winding, the tread block reaching down to the walking surface, and
+ * the ramp-chain collider that the character controller can actually climb.
+ *
+ * Everything about its size comes from config/modern.ts, where each figure
+ * carries how it was measured off the 2026 footage and how far it might be out.
+ * The tread COUNT is not measured — no frame shows the whole flight — so it is
+ * derived from the storey height and the measured riser, and moves by itself if
+ * the storey height is ever corrected.
+ */
+export function ModernSpiralStair({ visible }: ModernSpiralStairProps) {
+  const { steps } = useSpiralPlan()
+
+  const treadGeometry = useMemo(() => {
+    if (steps.length === 0) return null
+    const width = MODERN_SPIRAL.outerRadius - MODERN_SPIRAL.columnRadius
+    const { positions, indices } = stairTreadVertices(steps, width, () => TREAD_PLATE)
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    g.setIndex(indices)
+    g.computeVertexNormals()
+    const uv: number[] = []
+    for (let i = 0; i < positions.length / 3; i++) uv.push(0, 0)
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+    g.computeBoundingSphere()
+    return g
+  }, [steps])
+
+  useEffect(() => () => treadGeometry?.dispose(), [treadGeometry])
+
+  /**
+   * The balustrade as one mesh: a post on every tread's outer corner, the infill
+   * between them, and the rail linking their heads.
+   *
+   * MODERN_SPIRAL.rodsPerTread has recorded three since the survey landed — «one
+   * thicker post on each tread's outer corner, with two thinner infill rods
+   * between consecutive posts», a direct count off four frames needing no scale
+   * — and nothing read it. What got built was one post per tread and a single
+   * tube over the top, leaving a 0.468 m gap between uprights: «кажется там
+   * перила просто фасад прозрачный». It was, in both senses.
+   *
+   * Merged rather than drawn as 66 cylinders, which is not tidiness: the draw
+   * budget is 120 for the whole interior (config/perf.ts) and the balustrade
+   * alone was spending 43 of it.
+   */
+  const balustradeGeometry = useMemo(() => {
+    if (steps.length === 0) return null
+    const parts: THREE.BufferGeometry[] = []
+    const D = Math.PI / 180
+    const at = (azimuthDeg: number, y: number, radius: number) => {
+      const a = azimuthDeg * D
+      return new THREE.Vector3(Math.sin(a) * radius, y, -Math.cos(a) * radius)
+    }
+    /** An upright tube standing on `bottom` and reaching `top`. */
+    const upright = (azimuthDeg: number, bottom: number, top: number, radius: number) => {
+      const h = top - bottom
+      if (h <= 0) return
+      const g = new THREE.CylinderGeometry(radius, radius, h, 8)
+      const p = at(azimuthDeg, (bottom + top) / 2, MODERN_SPIRAL_RAIL.postRadius)
+      g.translate(p.x, p.y, p.z)
+      parts.push(g)
+    }
+
+    const railY = (s: (typeof steps)[number]) => s.treadY + MODERN_SPIRAL.guardHeight
+    for (const s of steps) upright(s.azimuthDeg, s.treadY, railY(s), MODERN_SPIRAL.rodRadius)
+
+    for (let i = 0; i < steps.length - 1; i++) {
+      const a = steps[i]
+      const b = steps[i + 1]
+      // the infill: rodsPerTread counts the post and the rods between it and the
+      // next, so the gaps are that many and the rods one fewer
+      for (let k = 1; k < MODERN_SPIRAL.rodsPerTread; k++) {
+        const t = k / MODERN_SPIRAL.rodsPerTread
+        const az = a.azimuthDeg + (b.azimuthDeg - a.azimuthDeg) * t
+        // the treads are level plates centred on their own nosings, so an infill
+        // rod stands on whichever plate it is over, not on the sloping mean
+        const foot = t < 0.5 ? a.treadY : b.treadY
+        upright(az, foot, railY(a) + (railY(b) - railY(a)) * t, MODERN_SPIRAL.infillRodRadius)
+      }
+
+      const ha = at(a.azimuthDeg, railY(a), MODERN_SPIRAL_RAIL.postRadius)
+      const hb = at(b.azimuthDeg, railY(b), MODERN_SPIRAL_RAIL.postRadius)
+      const dir = hb.clone().sub(ha)
+      const g = new THREE.CylinderGeometry(
+        MODERN_SPIRAL.rodRadius,
+        MODERN_SPIRAL.rodRadius,
+        dir.length(),
+        8,
+      )
+      const q = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        dir.clone().normalize(),
+      )
+      g.applyQuaternion(q)
+      const mid = ha.clone().add(hb).multiplyScalar(0.5)
+      g.translate(mid.x, mid.y, mid.z)
+      parts.push(g)
+    }
+
+    if (parts.length === 0) return null
+    const merged = mergeGeometries(parts, false)
+    for (const g of parts) g.dispose()
+    return merged
+  }, [steps])
+
+  useEffect(() => () => balustradeGeometry?.dispose(), [balustradeGeometry])
+
+  const steel = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#3a3a3e', roughness: 0.55, metalness: 0.75 }),
+    [],
+  )
+  const bright = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#b8bcc0', roughness: 0.3, metalness: 0.9 }),
+    [],
+  )
+  useEffect(
+    () => () => {
+      steel.dispose()
+      bright.dispose()
+    },
+    [steel, bright],
+  )
+
+  if (steps.length === 0 || !MODERN_SPIRAL_LIFT) return null
+  if (!visible) return null
+
+  const rise = MODERN_SPIRAL_LIFT.toY - MODERN_SPIRAL_LIFT.fromY
+  const newelHeight = rise + 0.3
+
+  return (
+    <group>
+      {treadGeometry && <mesh geometry={treadGeometry} material={steel} castShadow receiveShadow />}
+
+      {/* the central tube, running the full rise plus a little into each floor */}
+      <mesh material={bright} position={[0, MODERN_SPIRAL_LIFT.fromY + rise / 2, 0]} castShadow>
+        <cylinderGeometry
+          args={[MODERN_SPIRAL.columnRadius, MODERN_SPIRAL.columnRadius, newelHeight, 16]}
+        />
+      </mesh>
+
+      {balustradeGeometry && <mesh geometry={balustradeGeometry} material={bright} castShadow />}
+    </group>
+  )
+}
+
+/**
+ * The spiral as something to climb, in a component of its own because it belongs
+ * in a different part of the tree: collision lives inside <Physics>, which is
+ * mounted only for a walk and which rebuilds everything under it when it
+ * appears. The drawn steel must not be rebuilt because somebody pressed a
+ * button, so it stays above.
+ *
+ * Same ramp chain as the masonry flights, and for the same reason: this
+ * character controller will not climb a vertical face, so a box per tread makes
+ * the stair unclimbable however correct it looks.
+ */
+export function ModernSpiralStairColliders() {
+  const { steps, flight } = useSpiralPlan()
 
   const ramp = useMemo(() => {
     if (steps.length < 2) return []
@@ -200,6 +341,7 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
       ...approaches.flatMap((a) => stairRampBoxes(a, width, 1, COLLIDER_THICKNESS)),
     ]
   }, [steps, flight])
+
 
   /**
    * THE HEAD OF THE FLIGHT: a landing that is a floor, and a stop past it.
@@ -315,174 +457,35 @@ export function ModernSpiralStair({ visible, withColliders }: ModernSpiralStairP
     [flight],
   )
 
-  /**
-   * The balustrade as one mesh: a post on every tread's outer corner, the infill
-   * between them, and the rail linking their heads.
-   *
-   * MODERN_SPIRAL.rodsPerTread has recorded three since the survey landed — «one
-   * thicker post on each tread's outer corner, with two thinner infill rods
-   * between consecutive posts», a direct count off four frames needing no scale
-   * — and nothing read it. What got built was one post per tread and a single
-   * tube over the top, leaving a 0.468 m gap between uprights: «кажется там
-   * перила просто фасад прозрачный». It was, in both senses.
-   *
-   * Merged rather than drawn as 66 cylinders, which is not tidiness: the draw
-   * budget is 120 for the whole interior (config/perf.ts) and the balustrade
-   * alone was spending 43 of it.
-   */
-  const balustradeGeometry = useMemo(() => {
-    if (steps.length === 0) return null
-    const parts: THREE.BufferGeometry[] = []
-    const D = Math.PI / 180
-    const at = (azimuthDeg: number, y: number, radius: number) => {
-      const a = azimuthDeg * D
-      return new THREE.Vector3(Math.sin(a) * radius, y, -Math.cos(a) * radius)
-    }
-    /** An upright tube standing on `bottom` and reaching `top`. */
-    const upright = (azimuthDeg: number, bottom: number, top: number, radius: number) => {
-      const h = top - bottom
-      if (h <= 0) return
-      const g = new THREE.CylinderGeometry(radius, radius, h, 8)
-      const p = at(azimuthDeg, (bottom + top) / 2, MODERN_SPIRAL_RAIL.postRadius)
-      g.translate(p.x, p.y, p.z)
-      parts.push(g)
-    }
-
-    const railY = (s: (typeof steps)[number]) => s.treadY + MODERN_SPIRAL.guardHeight
-    for (const s of steps) upright(s.azimuthDeg, s.treadY, railY(s), MODERN_SPIRAL.rodRadius)
-
-    for (let i = 0; i < steps.length - 1; i++) {
-      const a = steps[i]
-      const b = steps[i + 1]
-      // the infill: rodsPerTread counts the post and the rods between it and the
-      // next, so the gaps are that many and the rods one fewer
-      for (let k = 1; k < MODERN_SPIRAL.rodsPerTread; k++) {
-        const t = k / MODERN_SPIRAL.rodsPerTread
-        const az = a.azimuthDeg + (b.azimuthDeg - a.azimuthDeg) * t
-        // the treads are level plates centred on their own nosings, so an infill
-        // rod stands on whichever plate it is over, not on the sloping mean
-        const foot = t < 0.5 ? a.treadY : b.treadY
-        upright(az, foot, railY(a) + (railY(b) - railY(a)) * t, MODERN_SPIRAL.infillRodRadius)
-      }
-
-      const ha = at(a.azimuthDeg, railY(a), MODERN_SPIRAL_RAIL.postRadius)
-      const hb = at(b.azimuthDeg, railY(b), MODERN_SPIRAL_RAIL.postRadius)
-      const dir = hb.clone().sub(ha)
-      const g = new THREE.CylinderGeometry(
-        MODERN_SPIRAL.rodRadius,
-        MODERN_SPIRAL.rodRadius,
-        dir.length(),
-        8,
-      )
-      const q = new THREE.Quaternion().setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0),
-        dir.clone().normalize(),
-      )
-      g.applyQuaternion(q)
-      const mid = ha.clone().add(hb).multiplyScalar(0.5)
-      g.translate(mid.x, mid.y, mid.z)
-      parts.push(g)
-    }
-
-    if (parts.length === 0) return null
-    const merged = mergeGeometries(parts, false)
-    for (const g of parts) g.dispose()
-    return merged
-  }, [steps])
-
-  useEffect(() => () => balustradeGeometry?.dispose(), [balustradeGeometry])
-
-  const steel = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#3a3a3e', roughness: 0.55, metalness: 0.75 }),
-    [],
-  )
-  const bright = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#b8bcc0', roughness: 0.3, metalness: 0.9 }),
-    [],
-  )
-  useEffect(
-    () => () => {
-      steel.dispose()
-      bright.dispose()
-    },
-    [steel, bright],
-  )
-
   if (steps.length === 0 || !MODERN_SPIRAL_LIFT) return null
-  if (!visible && !withColliders) return null
+  if (ramp.length === 0 && guard.length === 0 && head.length === 0) return null
 
   const rise = MODERN_SPIRAL_LIFT.toY - MODERN_SPIRAL_LIFT.fromY
   const newelHeight = rise + 0.3
 
   return (
-    <group>
-      {visible && (
-        <>
-          {treadGeometry && <mesh geometry={treadGeometry} material={steel} castShadow receiveShadow />}
-
-          {/* the central tube, running the full rise plus a little into each floor */}
-          <mesh
-            material={bright}
-            position={[0, MODERN_SPIRAL_LIFT.fromY + rise / 2, 0]}
-            castShadow
-          >
-            <cylinderGeometry
-              args={[MODERN_SPIRAL.columnRadius, MODERN_SPIRAL.columnRadius, newelHeight, 16]}
-            />
-          </mesh>
-
-          {balustradeGeometry && <mesh geometry={balustradeGeometry} material={bright} castShadow />}
-        </>
-      )}
-
-      {/*
-        Same ramp chain as the masonry flights, and for the same reason: this
-        character controller will not climb a vertical face, so a box per tread
-        makes the stair unclimbable however correct it looks.
-      */}
-      {withColliders && (ramp.length > 0 || guard.length > 0 || head.length > 0) && (
-        <RigidBody type="fixed" colliders={false}>
-          {ramp.map((b, i) => (
-            <CuboidCollider
-              key={`mramp-${i}`}
-              args={b.halfExtents}
-              position={b.position}
-              quaternion={b.quaternion}
-            />
-          ))}
-          {guard.map((b, i) => (
-            <CuboidCollider
-              key={`mguard-${i}`}
-              args={b.halfExtents}
-              position={b.position}
-              quaternion={b.quaternion}
-            />
-          ))}
-          {head.map((b, i) => (
-            <CuboidCollider
-              key={`mhead-${i}`}
-              args={b.halfExtents}
-              position={b.position}
-              quaternion={b.quaternion}
-            />
-          ))}
-          {/*
-            THE NEWEL, which was drawn and carried nothing.
-            throughOpeningWalkBand says so in as many words, and the walk proved
-            what it costs: aimed inward off the band a capsule passed clean
-            through the 115 mm tube — measured at r 0.061 against a column of
-            0.0575 — and fell down the middle of the stair. It is a steel
-            column; you can put a hand on it.
-          */}
-          <CylinderCollider
-            args={[newelHeight / 2, MODERN_SPIRAL.columnRadius]}
-            position={[0, MODERN_SPIRAL_LIFT.fromY + rise / 2, 0]}
-          />
-        </RigidBody>
-      )}
-    </group>
+    <Colliders
+      keyPrefix="spiral"
+      boxes={[...ramp, ...guard, ...head]}
+      /*
+        THE NEWEL, which was drawn and carried nothing.
+        throughOpeningWalkBand says so in as many words, and the walk proved what
+        it costs: aimed inward off the band a capsule passed clean through the
+        115 mm tube — measured at r 0.061 against a column of 0.0575 — and fell
+        down the middle of the stair. It is a steel column; you can put a hand on
+        it.
+      */
+      cylinders={[
+        {
+          halfHeight: newelHeight / 2,
+          radius: MODERN_SPIRAL.columnRadius,
+          position: [0, MODERN_SPIRAL_LIFT.fromY + rise / 2, 0],
+        },
+      ]}
+    />
   )
 }
+
 
 /** Treads the flight ends up with, for the budget readout and for tests. */
 export const MODERN_SPIRAL_STEP_COUNT = MODERN_SPIRAL_TREADS

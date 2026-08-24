@@ -34,10 +34,49 @@ export const BUDGET_MOBILE: PerfBudget = {
   frameMs: 33,
 }
 
-/** Payload targets, bytes. Checked at build time, not at runtime. */
+/**
+ * Payload targets, bytes. Checked at build time, not at runtime — and now
+ * actually checked: vite.config.ts runs lib/bootBudget.ts over the emitted
+ * bundle and fails the build. It said "checked at build time" for months while
+ * nothing read it, which is how 906 kB of physics engine came to be downloaded
+ * before the first pixel of a view that has no physics in it.
+ */
 export const PAYLOAD_BUDGET = {
-  /** Everything the first paint waits on. */
+  /**
+   * Everything the first paint waits on, DECOMPRESSED. Straight out of
+   * docs/optimization-addendum.md («вес первой загрузки < 6 МБ»), whose
+   * reference point is Messenger at 5.7 MB for an entire multiplayer world.
+   *
+   * IT NEVER CAUGHT ANYTHING, and that is worth writing down rather than
+   * quietly retuning: the eager set was 4 528 kB with the whole of rapier in
+   * it, comfortably inside 6 MB, so the budget said the page was fine while a
+   * phone sat on a blank screen. A ceiling this far above the measurement is a
+   * ceiling that only notices a catastrophe.
+   */
   firstLoadBytes: 6 * 1024 * 1024,
+  /**
+   * The same set as it crosses the wire, gzipped — the number a visitor on a
+   * phone actually waits for, and the sharp one.
+   *
+   * 750 kB is the measurement plus a quarter, not a round figure chosen for
+   * comfort: the eager set is 608 kB after this change, and a budget set at
+   * arm's length is the mistake above repeated. Anything that pushes the first
+   * paint past three quarters of a megabyte has to be argued for in the diff
+   * that does it.
+   */
+  firstLoadTransferBytes: 750_000,
+  /**
+   * Packages that must be reachable only through an `import()`. Matched against
+   * module ids, because chunk NAMES lie — the hand-written chunk map this repo
+   * used to carry produced a chunk called `physics` holding react and one
+   * called `csg` holding the whole of three.js.
+   */
+  deferredPackages: [
+    { name: 'rapier (physics)', marker: '@dimforge/rapier3d-compat' },
+    { name: 'rapier (react bindings)', marker: '@react-three/rapier' },
+    { name: 'WebXR', marker: '@react-three/xr' },
+    { name: 'the XR emulator', marker: '@iwer/' },
+  ],
   /** Everything, including lazily-loaded chunks. */
   totalBytes: 20 * 1024 * 1024,
   /** GPU texture memory. */

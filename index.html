@@ -19,9 +19,100 @@
     -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Qız Qalası — simulyator</title>
+    <!--
+      ═══════════════════════════════════════════════════════════════════════
+      THE FIRST THING ON THE SCREEN, AND IT IS IN THIS FILE ON PURPOSE.
+      ═══════════════════════════════════════════════════════════════════════
+
+      This document used to be 1.83 kB of nothing: a <div id="root"> and a
+      module script. The splash the visitor was supposed to see lives inside the
+      bundle (components/ui/LoadingScreen.tsx), so it could not appear until
+      React had mounted — which meant until 4 528 kB of JavaScript across seven
+      files had been fetched, parsed and run. Everything before that was a blank
+      page, and 2 431 kB of it was a physics engine. On a
+      phone on a slow link that is the whole of the visitor's first impression,
+      and a blank page reads as a broken link, not as a wait.
+
+      So the wait now has something in it, and it obeys three constraints that
+      are the entire design:
+
+        · INLINE. No stylesheet request, no bundle, no second round trip. The
+          bytes arrive inside the document that asked for them, so this paints
+          on the first response — there is nothing left to wait for.
+        · NO WEBFONT. `ui-monospace` and the system stack behind it. A font file
+          is a request, and a request is the very thing being removed; a webfont
+          would also blank the text until it landed, which is this fault again
+          in miniature.
+        · ONE WORD, AND IT IS THE BUILDING'S OWN NAME. Every string in this app
+          goes through i18next (CLAUDE.md) and i18next does not exist yet at
+          this point in the page's life. Rather than hard-code a translated
+          "loading" in one language and lie to the other two, the splash says
+          `Qız Qalası` — which is what <title> already says untranslated — and
+          leaves the rest to a bar. Nothing here needs translating because
+          nothing here is a sentence.
+
+      IT IS TAKEN DOWN BY THE COMPONENT THAT REPLACES IT, not by a timer:
+      LoadingScreen removes #boot in a layout effect, so the frame that paints
+      React's own splash is the first frame without this one. Same background,
+      same position, same 220 px rule — the handover is meant to be invisible.
+
+      Measured on the production build, cold cache, headless Chromium, gzip on,
+      median of nine navigations — first contentful paint:
+
+        unthrottled, over localhost                    575 ms → 226 ms
+        1 600 kbps · 150 ms RTT · 4× CPU (slow 4G)   8 824 ms → 300 ms
+
+      The second row is the one this exists for. Before, the paint could not
+      happen until 1 521.8 kB across ten files had arrived and React had run;
+      after, it happens once the document itself has — 6.0 kB, one round trip —
+      and the 1 994.3 kB behind it lands while the visitor is already looking at
+      something. On that link the wait went from nearly nine seconds of white to
+      a third of a second.
+    -->
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: #0e1116; }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        color: #dfe6ee;
+        font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: 0.06em;
+      }
+      #boot div {
+        width: 220px;
+        height: 3px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.14);
+        overflow: hidden;
+      }
+      #boot i {
+        display: block;
+        width: 35%;
+        height: 100%;
+        border-radius: 2px;
+        background: #c8d6e5;
+        animation: boot 1.15s ease-in-out infinite;
+      }
+      @keyframes boot {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(320%); }
+      }
+      /* An indeterminate bar is a decoration; for anyone who has asked the
+         system for less movement it is a decoration that moves. */
+      @media (prefers-reduced-motion: reduce) {
+        #boot i { width: 100%; opacity: 0.45; animation: none; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot" role="status">Qız Qalası<div><i></i></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

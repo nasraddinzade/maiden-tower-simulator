@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { CuboidCollider, CylinderCollider, RigidBody } from '@react-three/rapier'
+import { Colliders } from '../physics/lazyPhysics'
 import {
   approachGuardBoxes,
   entrancePassageBoxes,
@@ -65,7 +65,6 @@ const BALUSTRADE_PARAMS: BalustradeParams = {
 
 export interface SiteAndEntranceStairProps {
   visible: boolean
-  withColliders: boolean
 }
 
 /**
@@ -87,57 +86,7 @@ export interface SiteAndEntranceStairProps {
  * that the flight is laid against the drum and turns a quarter circle onto the
  * door, which is what it now does.
  */
-export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntranceStairProps) {
-  /**
-   * The walking surface the walker actually climbs, and the landing after it.
-   *
-   * Three nodes, one straight line in plan: the landing is the flight's own line
-   * carried past the door on the level, so the chain gives a raking box and then
-   * a flat one and the joint between them needs no special case.
-   */
-  const ramp = useMemo(() => {
-    if (!withColliders) return []
-    return stairRampBoxes(APPROACH.walkingLine, EXTERNAL_STAIR.width, 1, 0.3)
-  }, [withColliders])
-
-  /**
-   * The balustrades in physics: an upright slab along every edge that has one.
-   *
-   * They are needed, and the sum is the stair's own. The ramp is one box
-   * EXTERNAL_STAIR.width across — 1.4 m — so a walker keeps a contact until
-   * their capsule centre is half that plus a capsule radius off the centreline,
-   * 1.0 m, and past it they leave the flight sideways and fall its whole rise
-   * onto the paving. Nothing else stood there: the site's ground cylinder is
-   * what they landed on, and it is 1.98 m down at the head. Drawing a balustrade
-   * and not building this is the worse half of that — a rail you can see and
-   * walk through is the same fault as a floor you can see and fall through, and
-   * this model keeps finding the second one.
-   *
-   * WHICH EDGES, and the answer used to be "both, the whole way", which sealed
-   * the doorway: the wall-side slab's outer face lands on the drum's face by an
-   * identity, and at the door the drum is a hole. approachGuardBoxes() argues it
-   * where the shapes are made. The one thing to keep in mind here is that the
-   * DRAWN wall-side rail runs 0.15 m further than its slab, on past the head to
-   * the doorway's near jamb; what is behind that stretch of rail is the drum,
-   * 0.02–0.04 m away and solid, so there is nothing to fall through and nothing
-   * for a collider to add.
-   *
-   * The height is the drawn guard plus a riser. The rail is a guard height above
-   * the NOSING line, while the walking line the ramp chain gives passes through
-   * the BACK edge of every tread's surface and so runs exactly one riser below
-   * the nosings. A slab measured off the walking line therefore has to be a
-   * riser taller to reach the top of what a visitor can see.
-   */
-  const guards = useMemo(() => {
-    if (!withColliders) return []
-    return approachGuardBoxes({
-      line: APPROACH.walkingLine,
-      width: EXTERNAL_STAIR.width,
-      height: EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser,
-      outward: APPROACH.outward,
-    })
-  }, [withColliders])
-
+export function SiteAndEntranceStair({ visible }: SiteAndEntranceStairProps) {
   /**
    * The visible treads: plain boxes, since the flight is straight — turned to
    * the way it is CLIMBED, which is no longer the entrance's radius.
@@ -250,40 +199,6 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
     mesh.computeBoundingSphere()
   }, [balustrade, visible])
 
-  /*
-   * The entrance passage, from the outer face through to the room: the sill you
-   * walk in on and the masonry either side of it. COLLIDER ONLY now.
-   *
-   * The sill used to be drawn here too, and it was a second opaque surface at
-   * the height of one the shell already has. The entrance is cut through the
-   * wall by an arched tunnel whose own sill sits at ENTRANCE.thresholdY, so the
-   * stone the arch came out of is left with an up-facing face at that Y right
-   * through the passage — continuous with the chamber floor inside, which is the
-   * same cut. The drawn box sat exactly on it and the two z-fought in the
-   * doorway, which is the first thing you look at walking up the stair. Dropping
-   * it also gives the note that used to hang on that mesh what it asked for: the
-   * sill is now literally the tower's own stone rather than a box wearing its
-   * colour.
-   *
-   * The COLLIDER is not redundant and stays. Without it the doorway is an
-   * opening with nothing under it: the walker reaches the threshold and drops
-   * through the wall. wallColliders leaves the entrance open as a gap in the
-   * wall bands, which is right — but a gap needs a sill to walk on, and a sill
-   * on its own is a plank over a 2 m drop. The cheeks are why;
-   * entrancePassageBoxes argues it where the shapes are made.
-   */
-  const passage = useMemo(
-    () =>
-      entrancePassageBoxes({
-        azimuthDeg: ENTRANCE.azimuthDeg,
-        width: ENTRANCE.width,
-        height: ENTRANCE.height,
-        thresholdY: ENTRANCE.thresholdY,
-        innerRadius: innerRadiusAt(ENTRANCE.thresholdY),
-        outerRadius: TOWER.outerRadius,
-      }),
-    [],
-  )
 
   const paving = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#8d8577', roughness: 0.95 }),
@@ -371,43 +286,118 @@ export function SiteAndEntranceStair({ visible, withColliders }: SiteAndEntrance
         </>
       )}
 
-      {withColliders && (
-        <RigidBody type="fixed" colliders={false}>
-          {/* the ground. One cylinder is cheaper than a ring of boxes and the
-              tower's own floors sit above it, so it interferes with nothing. */}
-          <CylinderCollider
-            args={[SITE.thickness / 2, SITE.radius]}
-            position={[0, GROUND_Y - SITE.thickness / 2, 0]}
-          />
-          {ramp.map((b, i) => (
-            <CuboidCollider
-              key={`eramp-${i}`}
-              args={b.halfExtents}
-              position={b.position}
-              quaternion={b.quaternion}
-            />
-          ))}
-          {guards.map((b, i) => (
-            <CuboidCollider
-              key={`eguard-${i}`}
-              args={b.halfExtents}
-              position={b.position}
-              quaternion={b.quaternion}
-            />
-          ))}
-          {[passage.sill, ...passage.jambs].map((b, i) => (
-            <CuboidCollider
-              key={`epassage-${i}`}
-              args={b.halfExtents}
-              position={b.position}
-              quaternion={b.quaternion}
-            />
-          ))}
-        </RigidBody>
-      )}
     </group>
   )
 }
+
+/**
+ * The ground, the flight and the doorway's sill as things to stand on.
+ *
+ * A component of its own because collision lives inside <Physics>, which is
+ * mounted only for a walk and rebuilds everything beneath it when it appears.
+ * The paving and the drawn stair must not be rebuilt because somebody pressed a
+ * button, so they stay above it and this comes below.
+ */
+export function SiteAndEntranceStairColliders() {
+  /**
+   * The walking surface the walker actually climbs, and the landing after it.
+   *
+   * Three nodes, one straight line in plan: the landing is the flight's own line
+   * carried past the door on the level, so the chain gives a raking box and then
+   * a flat one and the joint between them needs no special case.
+   */
+  const ramp = useMemo(() => {
+    return stairRampBoxes(APPROACH.walkingLine, EXTERNAL_STAIR.width, 1, 0.3)
+  }, [])
+  /**
+   * The balustrades in physics: an upright slab along every edge that has one.
+   *
+   * They are needed, and the sum is the stair's own. The ramp is one box
+   * EXTERNAL_STAIR.width across — 1.4 m — so a walker keeps a contact until
+   * their capsule centre is half that plus a capsule radius off the centreline,
+   * 1.0 m, and past it they leave the flight sideways and fall its whole rise
+   * onto the paving. Nothing else stood there: the site's ground cylinder is
+   * what they landed on, and it is 1.98 m down at the head. Drawing a balustrade
+   * and not building this is the worse half of that — a rail you can see and
+   * walk through is the same fault as a floor you can see and fall through, and
+   * this model keeps finding the second one.
+   *
+   * WHICH EDGES, and the answer used to be "both, the whole way", which sealed
+   * the doorway: the wall-side slab's outer face lands on the drum's face by an
+   * identity, and at the door the drum is a hole. approachGuardBoxes() argues it
+   * where the shapes are made. The one thing to keep in mind here is that the
+   * DRAWN wall-side rail runs 0.15 m further than its slab, on past the head to
+   * the doorway's near jamb; what is behind that stretch of rail is the drum,
+   * 0.02–0.04 m away and solid, so there is nothing to fall through and nothing
+   * for a collider to add.
+   *
+   * The height is the drawn guard plus a riser. The rail is a guard height above
+   * the NOSING line, while the walking line the ramp chain gives passes through
+   * the BACK edge of every tread's surface and so runs exactly one riser below
+   * the nosings. A slab measured off the walking line therefore has to be a
+   * riser taller to reach the top of what a visitor can see.
+   */
+  const guards = useMemo(() => {
+    return approachGuardBoxes({
+      line: APPROACH.walkingLine,
+      width: EXTERNAL_STAIR.width,
+      height: EXTERNAL_STAIR.guardHeight + EXTERNAL_STAIR.riser,
+      outward: APPROACH.outward,
+    })
+  }, [])
+
+  /**
+   * The entrance passage, from the outer face through to the room: the sill you
+   * walk in on and the masonry either side of it. COLLIDER ONLY now.
+   *
+   * The sill used to be drawn here too, and it was a second opaque surface at
+   * the height of one the shell already has. The entrance is cut through the
+   * wall by an arched tunnel whose own sill sits at ENTRANCE.thresholdY, so the
+   * stone the arch came out of is left with an up-facing face at that Y right
+   * through the passage — continuous with the chamber floor inside, which is the
+   * same cut. The drawn box sat exactly on it and the two z-fought in the
+   * doorway, which is the first thing you look at walking up the stair. Dropping
+   * it also gives the note that used to hang on that mesh what it asked for: the
+   * sill is now literally the tower's own stone rather than a box wearing its
+   * colour.
+   *
+   * The COLLIDER is not redundant and stays. Without it the doorway is an
+   * opening with nothing under it: the walker reaches the threshold and drops
+   * through the wall. wallColliders leaves the entrance open as a gap in the
+   * wall bands, which is right — but a gap needs a sill to walk on, and a sill
+   * on its own is a plank over a 2 m drop. The cheeks are why;
+   * entrancePassageBoxes argues it where the shapes are made.
+   */
+  const passage = useMemo(
+    () =>
+      entrancePassageBoxes({
+        azimuthDeg: ENTRANCE.azimuthDeg,
+        width: ENTRANCE.width,
+        height: ENTRANCE.height,
+        thresholdY: ENTRANCE.thresholdY,
+        innerRadius: innerRadiusAt(ENTRANCE.thresholdY),
+        outerRadius: TOWER.outerRadius,
+      }),
+    [],
+  )
+
+  return (
+    <Colliders
+      keyPrefix="site"
+      boxes={[...ramp, ...guards, passage.sill, ...passage.jambs]}
+      /* the ground. One cylinder is cheaper than a ring of boxes and the
+         tower's own floors sit above it, so it interferes with nothing. */
+      cylinders={[
+        {
+          halfHeight: SITE.thickness / 2,
+          radius: SITE.radius,
+          position: [0, GROUND_Y - SITE.thickness / 2, 0],
+        },
+      ]}
+    />
+  )
+}
+
 
 /**
  * Where a walker should be dropped to start outside, facing the way in.

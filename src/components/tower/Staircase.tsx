@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import { CuboidCollider, RigidBody } from '@react-three/rapier'
+import { Colliders } from '../physics/lazyPhysics'
 import {
   PASSAGE_SIDE_CLEARANCE,
   flightRiser,
@@ -26,11 +26,19 @@ export interface StaircaseProps {
   startAzimuthDeg: number
   /** Draw the steps. */
   visible: boolean
-  /** Attach a physics collider to every step (Phase-6 walking surface). */
-  withColliders: boolean
   /** Procedural limestone from Phase 7. */
   material?: THREE.Material
 }
+
+/**
+ * Everything the flights are planned from — the drawn stair and the collided one
+ * take the same numbers, and taking them from one type is what keeps the two
+ * from drifting apart when a leva slider moves.
+ */
+export type StairPlan = Pick<
+  StaircaseProps,
+  'winding' | 'riserTarget' | 'goingTarget' | 'width' | 'wallClearance' | 'startAzimuthDeg'
+>
 
 interface PlacedStep extends StepPlacement {
   /** Radial thickness of the tread block. */
@@ -44,7 +52,7 @@ interface PlacedStep extends StepPlacement {
  * inner wall face, which widens with height, so upper flights sit slightly
  * further out — exactly as the tapering masonry requires.
  */
-function useFlights(p: StaircaseProps): PlacedStep[] {
+function useFlights(p: StairPlan): PlacedStep[] {
   return useMemo(() => {
     const flights = planAllFlights(
       stairSettings({
@@ -133,7 +141,7 @@ function useFlights(p: StaircaseProps): PlacedStep[] {
  * fabricated a ramp straight from the head of one flight to the foot of the next,
  * letting the walker skip the room the building makes you walk through.
  */
-function useRampBoxes(p: StaircaseProps) {
+function useRampBoxes(p: StairPlan) {
   return useMemo(() => {
     const flights = planAllFlights(
       stairSettings({
@@ -179,7 +187,6 @@ function useRampBoxes(p: StaircaseProps) {
  */
 export function Staircase(props: StaircaseProps) {
   const steps = useFlights(props)
-  const ramp = useRampBoxes(props)
 
   const fallback = useMemo(
     () => new THREE.MeshStandardMaterial({ color: '#9c9484', roughness: 0.95 }),
@@ -214,32 +221,32 @@ export function Staircase(props: StaircaseProps) {
 
   useEffect(() => () => geometry.dispose(), [geometry])
 
-  if (!props.visible && !props.withColliders) return null
+  if (!props.visible) return null
 
   return (
     <group>
-      {props.visible && (
-        <mesh geometry={geometry} material={stoneMaterial} castShadow receiveShadow />
-      )}
-
-      {/*
-        Collision is the inclined ramp chain, not the tread boxes. Per-tread
-        cuboids make a winder stair unclimbable for a capsule controller — it
-        has to be lifted over a riser at every step and grinds on the corner
-        where two boxes meet. The tread boxes stay purely visual.
-      */}
-      {props.withColliders && ramp.length > 0 && (
-        <RigidBody type="fixed" colliders={false}>
-          {ramp.map((b, i) => (
-            <CuboidCollider
-              key={`ramp-${i}`}
-              args={b.halfExtents}
-              position={b.position}
-              quaternion={b.quaternion}
-            />
-          ))}
-        </RigidBody>
-      )}
+      <mesh geometry={geometry} material={stoneMaterial} castShadow receiveShadow />
     </group>
   )
+}
+
+/**
+ * The same stair as something to stand on, and it is a SEPARATE COMPONENT
+ * because it lives in a different part of the tree.
+ *
+ * Collision belongs inside <Physics>, which is mounted only for a walk and which
+ * remounts everything under it when it appears; the drawn treads belong to the
+ * model, which must not be rebuilt because somebody pressed a button. Both are
+ * planned from the same StairPlan, so the thing you can see and the thing you
+ * can stand on cannot come from different numbers.
+ *
+ * Collision is the inclined ramp chain, not the tread boxes. Per-tread cuboids
+ * make a winder stair unclimbable for a capsule controller — it has to be lifted
+ * over a riser at every step and grinds on the corner where two boxes meet. The
+ * tread boxes stay purely visual.
+ */
+export function StaircaseColliders(plan: StairPlan) {
+  const ramp = useRampBoxes(plan)
+  if (ramp.length === 0) return null
+  return <Colliders keyPrefix="stair" boxes={ramp} />
 }

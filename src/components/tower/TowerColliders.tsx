@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { CuboidCollider, RigidBody } from '@react-three/rapier'
+import { Colliders } from '../physics/lazyPhysics'
 import {
   BALUSTRADE,
   ENTRANCE,
@@ -354,16 +354,5 @@ export function TowerColliders({
 
   onCount?.(boxes.length)
 
-  return (
-    <RigidBody type="fixed" colliders={false}>
-      {boxes.map((b, i) => (
-        <CuboidCollider
-          key={`${b.kind}-${i}`}
-          args={b.halfExtents}
-          position={b.position}
-          quaternion={b.quaternion}
-        />
-      ))}
-    </RigidBody>
-  )
+  return <Colliders keyPrefix="tower" boxes={boxes} />
 }

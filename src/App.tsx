@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { ACESFilmicToneMapping, Matrix4 } from 'three'
 import { GizmoHelper, GizmoViewport, Grid } from '@react-three/drei'
-import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
 import {
   stairSettings,
@@ -49,9 +48,13 @@ import {
 } from './lib/passageOpenings'
 import { stairhead, stairheadClearance } from './lib/stairhead'
 import { chamberDaylight, daylightCensus } from './lib/chamberDaylight'
-import { Staircase } from './components/tower/Staircase'
-import { ModernSpiralStair } from './components/modern/ModernSpiralStair'
-import { SiteAndEntranceStair, OUTDOOR_START } from './components/modern/SiteAndEntranceStair'
+import { Staircase, StaircaseColliders } from './components/tower/Staircase'
+import { ModernSpiralStair, ModernSpiralStairColliders } from './components/modern/ModernSpiralStair'
+import {
+  SiteAndEntranceStair,
+  SiteAndEntranceStairColliders,
+  OUTDOOR_START,
+} from './components/modern/SiteAndEntranceStair'
 import type { StairwellCut } from './components/tower/FloorStructures'
 import type { WindowCut } from './lib/towerShell'
 import { chaseBreaches, downpipeChases, type DownpipeChase } from './lib/waterSystem'
@@ -65,7 +68,12 @@ import { TowerShell, type ShellStats } from './components/tower/TowerShell'
 import { TowerColliders } from './components/tower/TowerColliders'
 import { FloorStructures } from './components/tower/FloorStructures'
 import { RoofTerrace } from './components/tower/RoofTerrace'
-import { FirstPersonPlayer } from './components/player/FirstPersonPlayer'
+import {
+  MaybePhysics,
+  Walker,
+  useLazyPhysics,
+  usePhysicsRuntime,
+} from './components/physics/lazyPhysics'
 import { OrbitView } from './components/player/OrbitView'
 import { TouchControls } from './components/player/TouchControls'
 import {
@@ -134,6 +142,8 @@ interface SceneProps {
   date: Date
   hypothesis: HypothesisId
   firstPerson: boolean
+  /** F4: draw rapier's own collider wireframes over the model. */
+  showColliders: boolean
   touchInput: React.RefObject<Stick | null>
   touchLook: React.RefObject<{ dx: number; dy: number }>
   /**
@@ -191,7 +201,15 @@ const OPENING_FITTINGS = windowData.passageOpenings as OpeningFitting[]
  * what would bring it back is in src/data/windows.json → chamberOpeningsHistory.
  */
 
-function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook, resetView }: SceneProps) {
+function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, showColliders, touchInput, touchLook, resetView }: SceneProps) {
+  /*
+   * The physics runtime, read from the module store because this component is
+   * on the far side of <Canvas> — a second reconciler root, which React context
+   * from the page does not reach. It is only ever handed to <MaybePhysics>
+   * below; everything that actually needs a world asks the context that wrapper
+   * provides, which answers «am I inside one», not «has the module arrived».
+   */
+  const physics = usePhysicsRuntime()
   /*
    * The grid, the axes cross and the corner axis gizmo, in one decision. They
    * were gated on `!firstPerson` and shipped to the public site because of it;
@@ -1054,20 +1072,6 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
         onChange={setInteriorInSight}
       />
 
-      {/*
-        All static collision, as cuboids — see docs/optimization-addendum.md.
-        Built only in walk mode: colliders cost nothing to look at, but building
-        several hundred of them for an orbit view is wasted work.
-      */}
-      {firstPerson && (
-        <TowerColliders
-          stairPassage={stairPassage}
-          stairwells={stairwells}
-          doorways={doorways}
-          stairhead={roofStairhead}
-        />
-      )}
-
       <FloorStructures
         visible={interiorInSight}
         oculusRadius={floors.oculusRadius}
@@ -1139,7 +1143,6 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
         wallClearance={stair.wallClearance}
         startAzimuthDeg={stair.startAzimuthDeg}
         visible={stair.showStair}
-        withColliders={stair.withColliders}
         material={innerMat}
       />
 
@@ -1148,14 +1151,14 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
         between those two floors in the tower as it stands, so without it the
         model has a hole where the visitor route begins.
       */}
-      <ModernSpiralStair visible={stair.showStair} withColliders={stair.withColliders} />
+      <ModernSpiralStair visible={stair.showStair} />
 
       {/*
         The ground outside and the stair up to the doorway. Without them the
         walker has to start inside a sealed tower, which is the one route into
         the building that does not exist.
       */}
-      <SiteAndEntranceStair visible withColliders={stair.withColliders} />
+      <SiteAndEntranceStair visible />
 
       {showScaleRef && (
         <mesh position={[TOWER.outerRadius + 2.5, 1.75 / 2, 0]}>
@@ -1177,17 +1180,124 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
       </GizmoHelper>
       )}
 
-      {firstPerson ? (
-        <FirstPersonPlayer
-          touchInput={touchInput}
-          touchLook={touchLook}
-          startAt={OUTDOOR_START}
-          lamp={lampCtl.lamp}
-          lampIntensity={lampCtl.lampIntensity}
-        />
-      ) : (
-        <OrbitView resetRef={resetView} />
-      )}
+      {!firstPerson && <OrbitView resetRef={resetView} />}
+
+      {/*
+        ═══════════════════════════════════════════════════════════════════════
+        THE PHYSICS WORLD, AND IT IS DOWN HERE RATHER THAN AROUND ALL OF THE
+        ABOVE, WHICH IS THE WHOLE POINT.
+        ═══════════════════════════════════════════════════════════════════════
+
+        <Physics> used to wrap the entire scene from the first frame, because
+        rapier was in the first-paint bundle and there was no reason not to. It
+        is fetched on the walk button now (components/physics/lazyPhysics.tsx),
+        and a wrapper that APPEARS is a wrapper that remounts everything beneath
+        it — React reconciles by element type, and a Fragment becoming a
+        <Physics> is a type change at that slot.
+
+        MEASURED ON THE SHIPPED BUILD with the wrapper still on top: pressing
+        «Walk inside» blanked the tower for 6.9 s while the shell's CSG, the
+        floors, the stair, every material and every shader were discarded and
+        rebuilt. A fast first paint bought with a broken second one is not a
+        trade worth making, and it would have fallen on the one action this page
+        exists for.
+
+        So the world contains COLLISION AND THE WALKER AND NOTHING ELSE. The
+        model is above it and is never rebuilt: the tower on screen when the
+        button is pressed is the tower being stood in a moment later. The stair,
+        the spiral and the entrance stair each ship a *Colliders component beside
+        the drawn one, planned from the same numbers — see their files for why
+        that seam is safe.
+
+        ITS OWN <Suspense>, and not the one around the canvas. @react-three/rapier
+        instantiates the WASM inside a suspend-react call, so a cold <Physics>
+        throws a promise; caught higher up, that promise would blank the model
+        for the length of a WASM compile — the very fault this whole arrangement
+        exists to remove. Caught here it suspends an empty subtree.
+      */}
+      <Suspense fallback={null}>
+        <MaybePhysics
+          runtime={physics}
+          paused={!firstPerson}
+          /* debug draws rapier's own collider wireframes — the actual shapes, not a guess */
+          debug={showColliders}
+          /*
+            `timeStep="vary"` — one physics step per rendered frame, at that
+            frame's own delta, instead of rapier's default 1/60 accumulator.
+
+            THE DEFAULT WAS COSTING THE WALKER HIS SPEED, and the arithmetic is
+            exact. FirstPersonPlayer integrates against the RENDER delta and
+            hands rapier a POSITION through setNextKinematicTranslation, not an
+            increment. Under the accumulator, a frame that arrives before the
+            accumulator has reached 1/60 computes a target and then has it
+            overwritten by the next frame's, computed from the same unchanged
+            body: that movement is not deferred, it is deleted. Measured on the
+            flat floor of storey 1, 2 s of model time, nominal 1.4 m/s:
+
+              render Hz   30     60     90     120    144    240
+              covered     2.66   2.78   1.87   1.40   1.17   0.70  m
+              actual      1.33   1.39   0.93   0.70   0.58   0.35  m/s
+              frames that moved nothing at all — 0%, 0%, 33%, 50%, 58%, 75%
+
+            That is 1.4 × min(1, 60/renderHz). ON A 144 Hz SCREEN THE TOWER IS
+            CROSSED 2.4 TIMES SLOWER THAN IT WAS BUILT TO BE, and three frames
+            in five show a camera that has not moved since the last one — which
+            is the second half of what «трясёт» describes: not a wobble, a
+            stutter. Even at a nominal 60 Hz the jitter in rAF makes the
+            accumulator skip and double at random, so the stutter is there too,
+            just sparser.
+
+            NOTHING IS GIVEN UP. A fixed step exists to keep DYNAMICS stable,
+            and this world has no dynamics: every rigid body in the model is
+            `fixed` except the walker's own capsule, which is kinematicPosition
+            and is therefore not simulated at all — it is placed. A character
+            controller is a variable-timestep integrator already; the
+            accumulator underneath it was only ever a beat frequency. A stalled
+            frame still cannot teleport anyone: the controller clamps its own
+            delta to 1/30 before asking for anything (FirstPersonPlayer), so the
+            request is bounded whatever the step is.
+          */
+          timeStep="vary"
+        >
+          {firstPerson && (
+            <>
+              {/*
+                All static collision, as cuboids — see
+                docs/optimization-addendum.md. Built only in walk mode: colliders
+                cost nothing to look at, but building several hundred of them for
+                an orbit view is wasted work.
+              */}
+              <TowerColliders
+                stairPassage={stairPassage}
+                stairwells={stairwells}
+                doorways={doorways}
+                stairhead={roofStairhead}
+              />
+              {stair.withColliders && (
+                <>
+                  <StaircaseColliders
+                    winding={winding}
+                    riserTarget={stair.riserTarget}
+                    goingTarget={stair.goingTarget}
+                    width={stair.stairWidth}
+                    wallClearance={stair.wallClearance}
+                    startAzimuthDeg={stair.startAzimuthDeg}
+                  />
+                  <ModernSpiralStairColliders />
+                  <SiteAndEntranceStairColliders />
+                </>
+              )}
+              <Walker
+                touchInput={touchInput}
+                touchLook={touchLook}
+                startAt={OUTDOOR_START}
+                lamp={lampCtl.lamp}
+                lampIntensity={lampCtl.lampIntensity}
+              />
+            </>
+          )}
+        </MaybePhysics>
+      </Suspense>
     </>
   )
 }
@@ -1220,9 +1330,44 @@ export default function App() {
   /** Ends the [OSM] trace cannot settle; see SceneProps.onDatumCaveats. */
   const [datumCaveats, setDatumCaveats] = useState<PassageOpening[]>([])
 
-  // Walk mode is a top-level switch: it decides whether physics runs, whether
-  // colliders are built, and which camera controls the view.
-  const [firstPerson, setFirstPerson] = useState(false)
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * WALK MODE IS NOW A REQUEST THAT THE ENGINE HAS TO ARRIVE FOR.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * It is still the one top-level switch — it decides whether physics runs,
+   * whether colliders are built and which camera has the view — but it is no
+   * longer a plain boolean, because the physics is no longer already on the
+   * page. 891 kB of it used to be fetched before the first pixel for the sake
+   * of a mode most visitors never enter (components/physics/lazyPhysics.tsx has
+   * the measurement). The chunk is fetched on the press instead.
+   *
+   * DERIVED, NOT SYNCHRONISED. `walkRequested` is what the button holds;
+   * `firstPerson` is that AND a loaded runtime. An effect that flipped a second
+   * boolean when the promise landed would have a window — one commit — in which
+   * the app believed it was walking and had no world to walk in, and everything
+   * downstream reads `firstPerson`: colliders, culling, the touch zone, the
+   * chrome's own edge. There is no such window here by construction.
+   */
+  const [walkRequested, setWalkRequested] = useState(false)
+  const physics = useLazyPhysics()
+  const firstPerson = walkRequested && physics.runtime !== null
+  const toggleWalk = () => {
+    if (walkRequested) {
+      setWalkRequested(false)
+      return
+    }
+    setWalkRequested(true)
+    physics.load()
+  }
+  /*
+   * A failed fetch drops the request, so the button returns to «Walk inside»
+   * rather than sitting at «…» for a walk that is never going to start. The
+   * loader clears its own memo on failure too, so the next press retries.
+   */
+  useEffect(() => {
+    if (physics.error) setWalkRequested(false)
+  }, [physics.error])
   // The moment being shown. Opens on NOW — the sun over Baku as it actually is
   // at this instant. `new Date()` is the right value whatever timezone the
   // viewer is in: the sun's position depends on the absolute instant plus the
@@ -1460,7 +1605,8 @@ export default function App() {
           viewport={screen.viewport}
           orientation={screen.orientation}
           firstPerson={firstPerson}
-          onToggleFirstPerson={() => setFirstPerson((v) => !v)}
+          onToggleFirstPerson={toggleWalk}
+          walkLoading={physics.loading}
           onResetView={() => resetView.current?.()}
           date={date}
           live={liveClock}
@@ -1488,7 +1634,7 @@ export default function App() {
           <DatumCaveat openings={datumCaveats} />
 
           <button
-            onClick={() => setFirstPerson((v) => !v)}
+            onClick={toggleWalk}
             style={{
               position: 'fixed',
               left: 12,
@@ -1503,7 +1649,7 @@ export default function App() {
               cursor: 'pointer',
             }}
           >
-            {firstPerson ? t('walking') : t('walkInside')}
+            {physics.loading ? '…' : firstPerson ? t('walking') : t('walkInside')}
           </button>
 
           {firstPerson && (
@@ -1671,64 +1817,33 @@ export default function App() {
       >
         <FieldOfView />
         <AdaptiveDpr onRatio={setDpr} />
-        {/* Physics is here from Phase 4 so the steps carry colliders; the
-            first-person controller that walks on them arrives in Phase 6. */}
-        {/* Physics runs only in walk mode: colliders and the solver cost
-            nothing while you are inspecting the model from outside. */}
+        {/*
+          Physics arrived in Phase 4 so the steps could carry colliders, and it
+          used to be mounted here, around the whole scene, from the first frame
+          with `paused` true. It is now mounted inside <Scene>, around collision
+          alone, and only once the visitor has asked to walk: the world costs
+          nothing to LOOK at, the 840 kB it takes to fetch cost the first paint
+          everything, and a wrapper that appears around the model rebuilds the
+          model. See components/physics/lazyPhysics.tsx and the note beside
+          <MaybePhysics> in Scene.
+        */}
         <Suspense fallback={null}>
         <MaybeXR session={xr.session}>
-        {/* debug draws rapier's own collider wireframes — the actual shapes, not a guess */}
-        {/*
-          `timeStep="vary"` — one physics step per rendered frame, at that
-          frame's own delta, instead of rapier's default 1/60 accumulator.
-
-          THE DEFAULT WAS COSTING THE WALKER HIS SPEED, and the arithmetic is
-          exact. FirstPersonPlayer integrates against the RENDER delta and hands
-          rapier a POSITION through setNextKinematicTranslation, not an
-          increment. Under the accumulator, a frame that arrives before the
-          accumulator has reached 1/60 computes a target and then has it
-          overwritten by the next frame's, computed from the same unchanged
-          body: that movement is not deferred, it is deleted. Measured on the
-          flat floor of storey 1, 2 s of model time, nominal 1.4 m/s:
-
-            render Hz   30     60     90     120    144    240
-            covered     2.66   2.78   1.87   1.40   1.17   0.70  m
-            actual      1.33   1.39   0.93   0.70   0.58   0.35  m/s
-            frames that moved nothing at all — 0%, 0%, 33%, 50%, 58%, 75%
-
-          That is 1.4 × min(1, 60/renderHz). ON A 144 Hz SCREEN THE TOWER IS
-          CROSSED 2.4 TIMES SLOWER THAN IT WAS BUILT TO BE, and three frames in
-          five show a camera that has not moved since the last one — which is
-          the second half of what «трясёт» describes: not a wobble, a stutter.
-          Even at a nominal 60 Hz the jitter in rAF makes the accumulator skip
-          and double at random, so the stutter is there too, just sparser.
-
-          NOTHING IS GIVEN UP. A fixed step exists to keep DYNAMICS stable, and
-          this world has no dynamics: every rigid body in the model is `fixed`
-          except the walker's own capsule, which is kinematicPosition and is
-          therefore not simulated at all — it is placed. A character controller
-          is a variable-timestep integrator already; the accumulator underneath
-          it was only ever a beat frequency. A stalled frame still cannot
-          teleport anyone: the controller clamps its own delta to 1/30 before
-          asking for anything (FirstPersonPlayer), so the request is bounded
-          whatever the step is.
-        */}
-        <Physics paused={!firstPerson} debug={showColliders} timeStep="vary">
-          <Scene
-            onStats={setStats}
-            onApertures={setApertures}
-            onDatumCaveats={setDatumCaveats}
-            onPerf={setPerf}
-            date={date}
-            hypothesis={hypothesis}
-            hotspot={hotspot}
-            onHotspot={setHotspot}
-            firstPerson={firstPerson}
-            touchInput={touchInput}
-            touchLook={touchLook}
-            resetView={resetView}
-          />
-        </Physics>
+        <Scene
+          onStats={setStats}
+          onApertures={setApertures}
+          onDatumCaveats={setDatumCaveats}
+          onPerf={setPerf}
+          date={date}
+          hypothesis={hypothesis}
+          hotspot={hotspot}
+          onHotspot={setHotspot}
+          firstPerson={firstPerson}
+          showColliders={showColliders}
+          touchInput={touchInput}
+          touchLook={touchLook}
+          resetView={resetView}
+        />
         </MaybeXR>
         </Suspense>
       </Canvas>

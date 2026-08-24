@@ -53,6 +53,14 @@ export interface CompactChromeProps {
   firstPerson: boolean
   onToggleFirstPerson: () => void
   /**
+   * The physics chunk is on its way. The walk button reports it because the
+   * press now starts a download — see components/physics/lazyPhysics.tsx — and
+   * a button that looks unpressed for the length of a fetch gets pressed again.
+   * It changes the button's TEXT and nothing about its box, so the bar's height
+   * and the thumb zone cut from it are unmoved.
+   */
+  walkLoading?: boolean
+  /**
    * Put the orbit camera back where the app opened it. In the bar and not in
    * `More`, because the state it recovers from is one where the visitor cannot
    * see the building: a control you have to go looking for behind a sheet is no
@@ -116,6 +124,7 @@ export function CompactChrome({
   orientation,
   firstPerson,
   onToggleFirstPerson,
+  walkLoading = false,
   onResetView,
   date,
   live,
@@ -474,7 +483,7 @@ export function CompactChrome({
             cursor: 'pointer',
           }}
         >
-          {firstPerson ? text('walkingShort') : text('walkInside')}
+          {walkLoading ? '…' : firstPerson ? text('walkingShort') : text('walkInside')}
         </button>
 
         {!firstPerson && (
