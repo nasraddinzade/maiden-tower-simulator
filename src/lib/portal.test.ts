@@ -31,7 +31,15 @@ const SITE = {
   topY: TOWER.topY,
 }
 
-/** A camera at a point, aimed at a point. The app's own fov and near/far. */
+/**
+ * A camera at a point, aimed at a point. The app's own near/far, and a fixed 50°
+ * vertical field — which since config/camera.ts is what the app gives every
+ * viewport at 3:2 or wider, and NOT what it gives the 375×812 default aspect
+ * below (that gets 90°, a wider frustum). Left fixed on purpose: these are
+ * assertions about what an opening lets through at a stated frustum, and a
+ * frustum that changes with the aspect would make them assertions about the
+ * aspect. lib/fieldOfView.test.ts is where the shipped field is checked.
+ */
 function lookFrom(from: Point3, at: Point3 = { x: 0, y: TOWER.topY / 2, z: 0 }, aspect = 375 / 812) {
   const cam = new THREE.PerspectiveCamera(50, aspect, 0.1, 600)
   cam.position.set(from.x, from.y, from.z)

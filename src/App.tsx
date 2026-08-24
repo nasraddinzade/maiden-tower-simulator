@@ -26,6 +26,9 @@ import {
 } from './config/tower'
 import { LAMP, PLAYER } from './config/player'
 import { ORBIT } from './config/orbit'
+import { CAMERA } from './config/camera'
+import { verticalFovFor } from './lib/fieldOfView'
+import { FieldOfView } from './components/camera/FieldOfView'
 import {
   planAllFlights,
   stairDoorways,
@@ -1538,8 +1541,29 @@ export default function App() {
         shadows="percentage"
         dpr={dpr}
         gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1 }}
-        camera={{ position: ORBIT.opening.position, fov: 50, near: 0.1, far: 600 }}
+        /*
+         * `fov` HERE IS ONLY THE OPENING VALUE, and it has to be computed rather
+         * than typed. three's fov is the VERTICAL angle; on a 375×812 phone the
+         * 50 that used to sit here came out as 24.3° across, which is a slot,
+         * and the horizontal is the axis a wall leaves the frame on. The rule
+         * that holds the horizontal instead is config/camera.ts, the arithmetic
+         * is lib/fieldOfView.ts, and <FieldOfView> below keeps it true as the
+         * viewport changes — r3f applies this prop exactly once and never
+         * touches `fov` again, not even on resize.
+         *
+         * The window is the right measure for THIS one value and the wrong one
+         * afterwards: at first render the canvas has not been laid out yet, so
+         * there is no box to read; from the second frame on <FieldOfView> reads
+         * the canvas's own box, which is the rectangle actually projected into.
+         */
+        camera={{
+          position: ORBIT.opening.position,
+          fov: verticalFovFor(screen.viewport.width / screen.viewport.height, CAMERA.fov),
+          near: CAMERA.near,
+          far: CAMERA.far,
+        }}
       >
+        <FieldOfView />
         <AdaptiveDpr onRatio={setDpr} />
         {/* Physics is here from Phase 4 so the steps carry colliders; the
             first-person controller that walks on them arrives in Phase 6. */}
