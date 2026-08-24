@@ -2,7 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { ACESFilmicToneMapping, Matrix4 } from 'three'
-import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from '@react-three/drei'
+import { GizmoHelper, GizmoViewport, Grid } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { Leva, useControls } from 'leva'
 import {
@@ -25,6 +25,7 @@ import {
   innerRadiusAt,
 } from './config/tower'
 import { LAMP, PLAYER } from './config/player'
+import { ORBIT } from './config/orbit'
 import {
   planAllFlights,
   stairDoorways,
@@ -62,6 +63,7 @@ import { TowerColliders } from './components/tower/TowerColliders'
 import { FloorStructures } from './components/tower/FloorStructures'
 import { RoofTerrace } from './components/tower/RoofTerrace'
 import { FirstPersonPlayer } from './components/player/FirstPersonPlayer'
+import { OrbitView } from './components/player/OrbitView'
 import { TouchControls } from './components/player/TouchControls'
 import type { Stick } from './lib/touchInput'
 import { useMasonry } from './hooks/useMasonry'
@@ -125,6 +127,13 @@ interface SceneProps {
   firstPerson: boolean
   touchInput: React.RefObject<Stick | null>
   touchLook: React.RefObject<{ dx: number; dy: number }>
+  /**
+   * The other direction across the `<Canvas>` wall: OrbitView writes its
+   * reset-the-framing function in here so the button in the chrome — which is
+   * DOM, and outside the canvas — can call it. Null while walking, because the
+   * orbit controls are not mounted then and there is nothing to return.
+   */
+  resetView: React.RefObject<(() => void) | null>
 }
 
 /**
@@ -173,7 +182,7 @@ const OPENING_FITTINGS = windowData.passageOpenings as OpeningFitting[]
  * what would bring it back is in src/data/windows.json → chamberOpeningsHistory.
  */
 
-function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook }: SceneProps) {
+function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis, hotspot, onHotspot, firstPerson, touchInput, touchLook, resetView }: SceneProps) {
   const { showShell, showWireframe, showScaleRef, cutaway } = useControls('View', {
     showShell: true,
     showWireframe: false,
@@ -1155,7 +1164,7 @@ function Scene({ onStats, onApertures, onDatumCaveats, onPerf, date, hypothesis,
           lampIntensity={lampCtl.lampIntensity}
         />
       ) : (
-        <OrbitControls target={[0, TOWER.topY / 2, 0]} enableDamping />
+        <OrbitView resetRef={resetView} />
       )}
     </>
   )
@@ -1248,6 +1257,8 @@ export default function App() {
    */
   const touchInput = useRef<Stick | null>(null)
   const touchLook = useRef({ dx: 0, dy: 0 })
+  /** Filled in by OrbitView while the orbit camera is mounted; see SceneProps. */
+  const resetView = useRef<(() => void) | null>(null)
   /** The canvas element, for the touch layer to listen on. See <Canvas ref>. */
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
 
@@ -1352,6 +1363,7 @@ export default function App() {
           orientation={screen.orientation}
           firstPerson={firstPerson}
           onToggleFirstPerson={() => setFirstPerson((v) => !v)}
+          onResetView={() => resetView.current?.()}
           date={date}
           live={liveClock}
           onDate={(d) => {
@@ -1417,6 +1429,15 @@ export default function App() {
           )}
 
           <div style={{ position: 'fixed', left: 12, top: 52, zIndex: 20, display: 'flex', gap: 6 }}>
+            {/*
+              The way back. Only while orbiting: in walk mode these controls are
+              not mounted and the walker has his own way out, which is the door.
+            */}
+            {!firstPerson && (
+              <button onClick={() => resetView.current?.()} style={secondaryButton}>
+                {t('resetView')}
+              </button>
+            )}
             <button onClick={() => setCreditsOpen(true)} style={secondaryButton}>
               {t('credits')}
             </button>
@@ -1517,7 +1538,7 @@ export default function App() {
         shadows="percentage"
         dpr={dpr}
         gl={{ toneMapping: ACESFilmicToneMapping, toneMappingExposure: 1 }}
-        camera={{ position: [36, 24, 36], fov: 50, near: 0.1, far: 600 }}
+        camera={{ position: ORBIT.opening.position, fov: 50, near: 0.1, far: 600 }}
       >
         <AdaptiveDpr onRatio={setDpr} />
         {/* Physics is here from Phase 4 so the steps carry colliders; the
@@ -1575,6 +1596,7 @@ export default function App() {
             firstPerson={firstPerson}
             touchInput={touchInput}
             touchLook={touchLook}
+            resetView={resetView}
           />
         </Physics>
         </MaybeXR>

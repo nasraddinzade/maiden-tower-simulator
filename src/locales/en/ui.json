@@ -34,5 +34,6 @@
   "panelVersions": "Versions",
   "panelMore": "More",
   "close": "Close",
-  "touchHint": "left half — the stick, to walk · right half — drag to look"
+  "touchHint": "left half — the stick, to walk · right half — drag to look",
+  "resetView": "Reset view"
 }

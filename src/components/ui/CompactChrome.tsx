@@ -52,6 +52,14 @@ export interface CompactChromeProps {
   orientation: Orientation
   firstPerson: boolean
   onToggleFirstPerson: () => void
+  /**
+   * Put the orbit camera back where the app opened it. In the bar and not in
+   * `More`, because the state it recovers from is one where the visitor cannot
+   * see the building: a control you have to go looking for behind a sheet is no
+   * use to somebody staring at a black screen. Shown only while orbiting — in
+   * walk mode there is no orbit camera to return.
+   */
+  onResetView: () => void
   date: Date
   live: boolean
   onDate: (d: Date) => void
@@ -78,6 +86,7 @@ export function CompactChrome({
   orientation,
   firstPerson,
   onToggleFirstPerson,
+  onResetView,
   date,
   live,
   onDate,
@@ -394,6 +403,14 @@ export function CompactChrome({
           {firstPerson ? text('walkingShort') : text('walkInside')}
         </button>
 
+        {!firstPerson && (
+          <BarButton
+            active={false}
+            label={text('resetView')}
+            onClick={onResetView}
+            icon={<RecentreIcon />}
+          />
+        )}
         <BarButton
           active={sheet === 'sun'}
           label={text('panelSun')}
@@ -542,6 +559,20 @@ const svg = {
   strokeWidth: 1.5,
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
+}
+
+/**
+ * The way back: a frame with the building put back in the middle of it. Not a
+ * circular-arrow "reload" glyph, which on a page that costs 1.5 MB to reload is
+ * the one promise this button must not appear to make.
+ */
+function RecentreIcon() {
+  return (
+    <svg {...svg} aria-hidden>
+      <path d="M3 7V3.6h3.4M17 7V3.6h-3.4M3 13v3.4h3.4M17 13v3.4h-3.4" />
+      <path d="M8 13V9.2l2-2 2 2V13Z" />
+    </svg>
+  )
 }
 
 function SunIcon() {

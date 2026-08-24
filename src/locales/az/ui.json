@@ -34,5 +34,6 @@
   "panelVersions": "Versiyalar",
   "panelMore": "Daha çox",
   "close": "Bağla",
-  "touchHint": "solda çubuq — getmək · sağda barmağı sürüşdür — baxmaq"
+  "touchHint": "solda çubuq — getmək · sağda barmağı sürüşdür — baxmaq",
+  "resetView": "Görünüşü sıfırla"
 }
