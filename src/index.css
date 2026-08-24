@@ -54,6 +54,39 @@ canvas {
    * canvas takes the gesture only where a gesture already means something else.
    *
    * It also serves the orbit view, where the same drags belong to OrbitControls.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * `!important`, AND IT IS NOT A STYLE PREFERENCE — THIS RULE WAS BEING LOST.
+   *
+   * OrbitControls writes `touch-action` as an INLINE style on the same canvas:
+   * `none` when it connects, and on dispose it does not clear the property, it
+   * assigns the string `auto`. Grep the built bundle — `touchAction=\`auto\`` in
+   * the OrbitControls dispose closure is the only assignment of that value in
+   * the whole application. A normal author declaration in a stylesheet loses to
+   * an inline one, so from that moment the rule above was dead and the canvas
+   * was `touch-action: auto` for the rest of the visit.
+   *
+   * WHAT THAT COST, measured in Chrome on a 375×812 phone profile against the
+   * built bundle, real touch through the browser's own input pipeline (not
+   * `dispatchEvent(new PointerEvent(...))`, which never reaches the compositor
+   * and therefore never reproduces this at all):
+   *
+   *   canvas touch-action   first pointermove of a stick push   walker moved
+   *   auto                  pointercancel + lostpointercapture  0.000 m
+   *   none                  pointermove, pointermove, …         8.53 m
+   *
+   * The cancel is the browser claiming the drag for itself. TouchControls hears
+   * it and does the only correct thing — `stopMoving()`, because a pointer that
+   * was cancelled is a thumb it can no longer account for — so the ring goes out
+   * and the walker stops dead on the first millimetre of every push. Eight
+   * directions, 2.5 s each: 0.000 m in all eight. The keyboard still walked,
+   * which is why this survived: it is invisible to every check that does not
+   * put a real finger on real glass.
+   *
+   * An important declaration in an author stylesheet outranks a normal inline
+   * one, so this is the one form of the rule a dependency's teardown cannot
+   * take back. Setting it inline instead would only be another write in the
+   * same slot, and the last writer would still win.
    */
-  touch-action: none;
+  touch-action: none !important;
 }
