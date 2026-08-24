@@ -1,9 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Sky } from '@react-three/drei'
 import { sunDirection, sunPosition } from '../../lib/sun'
 import { daylightFraction } from '../../lib/exposure'
-import { SUN } from '../../config/lighting'
-import { SITE, TOWER } from '../../config/tower'
+import { redrawAngleRad, shadowTexelMetres } from '../../lib/shadowRefresh'
+import { SHADOW, SUN, shadowMapSize } from '../../config/lighting'
+import { isMobileProfile } from '../../config/perf'
+import { SITE } from '../../config/tower'
+import { ShadowRefresh } from './ShadowRefresh'
 
 export interface SunSystemProps {
   /** The moment being shown. */
@@ -12,9 +15,6 @@ export interface SunSystemProps {
   showSky?: boolean
 }
 
-/** Distance to place the light at — far enough that its shadow frustum covers the tower. */
-const LIGHT_DISTANCE = 90
-
 /**
  * Phase 8 — an astronomically placed sun.
  *
@@ -22,9 +22,16 @@ const LIGHT_DISTANCE = 90
  * every shadow in the scene is the shadow that would fall at that instant. This
  * is what makes the solar hypotheses testable rather than decorative: nothing
  * here is aimed at any opening.
+ *
+ * THE SHADOW MAP IS NO LONGER REDRAWN EVERY FRAME. Its size, its frustum and its
+ * bias now come from config/lighting.ts → SHADOW instead of being literals in
+ * this file, the mobile profile gets a 1024² map where the desktop keeps 2048²,
+ * and <ShadowRefresh> below marks the map dirty only when the sun has actually
+ * turned or the set of casters has changed. What that was costing, and why the
+ * gate is an angle rather than a flag, is argued in those two files.
  */
 export function SunSystem({ date, showSky = true }: SunSystemProps) {
-  const { position, sun, intensity } = useMemo(() => {
+  const { position, direction, sun, intensity } = useMemo(() => {
     const s = sunPosition(date, SITE.latitude, SITE.longitude)
     const d = sunDirection(s)
     /*
@@ -37,12 +44,34 @@ export function SunSystem({ date, showSky = true }: SunSystemProps) {
     const i = SUN.fullIntensity * daylightFraction(s.altitudeDeg)
     return {
       sun: s,
-      position: [d.x * LIGHT_DISTANCE, d.y * LIGHT_DISTANCE, d.z * LIGHT_DISTANCE] as [number, number, number],
+      direction: d,
+      position: [
+        d.x * SHADOW.lightDistance,
+        d.y * SHADOW.lightDistance,
+        d.z * SHADOW.lightDistance,
+      ] as [number, number, number],
       intensity: i,
     }
   }, [date])
 
-  const shadowExtent = TOWER.outerRadius * 3.2
+  /*
+   * READ ONCE, ON PURPOSE. three allocates the shadow map's depth target on the
+   * first shadow render and will not resize it afterwards without the old target
+   * being disposed, so a map size that tracked the viewport would be a map size
+   * that silently stopped taking effect. useState's initialiser is the only hook
+   * that guarantees "once" — useMemo is allowed to forget. See shadowMapSize().
+   */
+  const [mapSize] = useState(() => shadowMapSize(isMobileProfile()))
+  /*
+   * How far the sun must turn before the map it drew is no longer the map it
+   * would draw: one texel of ground across the deepest the shadow camera can
+   * see. Derived from the size chosen above, so the coarser mobile map also
+   * asks for fewer redraws — 0.0131° against the desktop's 0.0066°.
+   */
+  const redrawAngle = useMemo(
+    () => redrawAngleRad(shadowTexelMetres(SHADOW.extentMetres, mapSize), SHADOW.cameraFar),
+    [mapSize],
+  )
 
   return (
     <>
@@ -63,15 +92,17 @@ export function SunSystem({ date, showSky = true }: SunSystemProps) {
         intensity={intensity}
         color={sun.altitudeDeg < SUN.lowAltitudeDeg ? SUN.lowColour : SUN.dayColour}
         castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0004}
-        shadow-camera-left={-shadowExtent}
-        shadow-camera-right={shadowExtent}
-        shadow-camera-top={shadowExtent}
-        shadow-camera-bottom={-shadowExtent}
-        shadow-camera-near={1}
-        shadow-camera-far={LIGHT_DISTANCE * 2.5}
+        shadow-mapSize={[mapSize, mapSize]}
+        shadow-bias={SHADOW.bias}
+        shadow-camera-left={-SHADOW.extentMetres}
+        shadow-camera-right={SHADOW.extentMetres}
+        shadow-camera-top={SHADOW.extentMetres}
+        shadow-camera-bottom={-SHADOW.extentMetres}
+        shadow-camera-near={SHADOW.cameraNear}
+        shadow-camera-far={SHADOW.cameraFar}
       />
+
+      <ShadowRefresh direction={direction} minAngleRad={redrawAngle} />
 
       {/*
         Sky fill: bluish by day, almost nothing at night, so the interior does
