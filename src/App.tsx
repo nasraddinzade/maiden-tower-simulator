@@ -24,7 +24,7 @@ import {
   WINDOW_EMBRASURE,
   innerRadiusAt,
 } from './config/tower'
-import { LAMP, PLAYER } from './config/player'
+import { LAMP, PLAYER, TOUCH } from './config/player'
 import { ORBIT } from './config/orbit'
 import { CAMERA } from './config/camera'
 import { verticalFovFor } from './lib/fieldOfView'
@@ -68,7 +68,12 @@ import { RoofTerrace } from './components/tower/RoofTerrace'
 import { FirstPersonPlayer } from './components/player/FirstPersonPlayer'
 import { OrbitView } from './components/player/OrbitView'
 import { TouchControls } from './components/player/TouchControls'
-import type { Stick } from './lib/touchInput'
+import {
+  describeThumbZone,
+  stickPlantRect,
+  thumbZoneRect,
+  type Stick,
+} from './lib/touchInput'
 import { useMasonry } from './hooks/useMasonry'
 import { COURSE_HEIGHT } from './lib/masonry'
 import { SunSystem } from './components/sun/SunSystem'
@@ -84,7 +89,7 @@ import { HYPOTHESES, type HypothesisId } from './data/hypotheses'
 import { PerfHud, PerfProbe, type PerfSample } from './components/ui/PerfHud'
 import { CompactChrome } from './components/ui/CompactChrome'
 import { useScreenLayout } from './hooks/useViewport'
-import { describeLayout } from './lib/screenLayout'
+import { compactChrome, describeLayout, dockedChrome } from './lib/screenLayout'
 import { storeyAt } from './lib/visibility'
 import {
   frustumPlanes,
@@ -1264,6 +1269,73 @@ export default function App() {
   const resetView = useRef<(() => void) | null>(null)
   /** The canvas element, for the touch layer to listen on. See <Canvas ref>. */
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
+  /**
+   * The compact bar has something raised from it — a sheet or the language
+   * popover. Reported up here because the touch layer has to know: see
+   * `coveredByPanel` on <TouchControls>.
+   */
+  const [compactPanelOpen, setCompactPanelOpen] = useState(false)
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * WHERE THE STICK MAY BE PLANTED, CUT OUT OF THE SAME LAYOUT THE CHROME USES.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * The thumb zone used to be two fractions of the canvas and nothing else, and
+   * on a phone that made it a promise the interface did not keep: measured at
+   * 812×375, the zone was x 0…406, y 169…375 and the chrome ran from y 211 to
+   * the bottom edge, so a thumb resting where a thumb rests hit the datum
+   * notice, or the exit-walk button, which is 588 px of the bottom edge and
+   * takes the visitor out of the walk. Here the zone is cut around the chrome's
+   * own rectangles instead — lib/touchInput.ts → thumbZoneRect() has the
+   * reasoning and lib/touchInput.test.ts sweeps it over every viewport.
+   *
+   * TWO THINGS ARE DELIBERATELY THE WORST CASE RATHER THAN THE TRUTH OF THE
+   * INSTANT, and both for the same reason: a rectangle that moves under a thumb
+   * is a rectangle nobody can learn.
+   *
+   *   · the touch hint is counted as present even after it has taken itself
+   *     away, so the zone does not grow downward seven seconds into a walk;
+   *   · the datum notice is counted whenever there is one to show, dismissed or
+   *     not.
+   *
+   * The raised sheet is NOT counted, because a raised sheet suspends the stick
+   * altogether (coveredByPanel below) — there is no zone to protect while one is
+   * up, and counting it would shrink the zone permanently for a state the walk
+   * is not in.
+   */
+  const thumbZone = useMemo(() => {
+    const chrome = compact
+      ? compactChrome(
+          screen.viewport,
+          {
+            notice: datumCaveats.length > 0,
+            hint: true,
+            sheetOpen: false,
+            walking: firstPerson,
+          },
+          screen.insets,
+        )
+      : /*
+         * The docked layout has no touch controls of its own — it is what a
+         * fine pointer gets — but a laptop with a touchscreen reports a fine
+         * pointer and still has a finger. Its panels are handed over on the
+         * same terms, so the stick stands clear of them rather than under the
+         * sun panel in the corner.
+         */
+        dockedChrome(screen.viewport, firstPerson)
+    const zone = thumbZoneRect(
+      screen.viewport,
+      {
+        widthFraction: TOUCH.zoneWidthFraction,
+        heightFraction: TOUCH.zoneHeightFraction,
+        minSpanPx: TOUCH.zoneMinSpanPx,
+      },
+      chrome,
+      screen.insets,
+    )
+    return { zone, plant: stickPlantRect(zone, TOUCH.stickRadiusPx) }
+  }, [compact, screen.viewport, screen.insets, datumCaveats.length, firstPerson])
 
   /**
    * Diagnostic overlays, per docs/optimization-addendum.md:
@@ -1295,13 +1367,22 @@ export default function App() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     console.warn(
-      `[layout] ${describeLayout(screen.viewport, {
-        notice: datumCaveats.length > 0,
-        hint: false,
-        sheetOpen: false,
-      })}`,
+      `[layout] ${describeLayout(
+        screen.viewport,
+        {
+          notice: datumCaveats.length > 0,
+          hint: false,
+          sheetOpen: false,
+          walking: firstPerson,
+        },
+        screen.insets,
+      )}`,
     )
-  }, [screen.viewport, datumCaveats.length])
+    // and what the thumb was left, which is the other half of the same question
+    console.warn(
+      `[layout] ${describeThumbZone(thumbZone.zone, thumbZone.plant, TOUCH.stickRadiusPx)}`,
+    )
+  }, [screen.viewport, screen.insets, datumCaveats.length, firstPerson, thumbZone])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1384,6 +1465,7 @@ export default function App() {
           onCredits={() => setCreditsOpen(true)}
           onEnterXR={xr.enter}
           xrLoading={xr.loading}
+          onPanelOpen={setCompactPanelOpen}
         />
       ) : (
         <>
@@ -1470,6 +1552,7 @@ export default function App() {
           canvas={canvas}
           stickRef={touchInput}
           lookRef={touchLook}
+          plantRect={thumbZone.plant}
           /*
             The two full-screen overlays, and the reason the touch layer has to
             be told about them at all is that ONE of them is opened by touching
@@ -1479,8 +1562,17 @@ export default function App() {
             already covered by that rule; they are named here anyway so the
             condition reads as "a panel is over the canvas" rather than as a
             list of exceptions.
+
+            THE COMPACT SHEET IS THE THIRD, added 2026-08-24 with the thumb
+            zone. It is not full-screen — half the point of the compact layout
+            is that the tower stays visible behind it — but it stands exactly
+            where the zone would be in portrait, and a zone that shrank while a
+            sheet was up would be a zone that moves under the thumb. Suspending
+            the stick instead costs nothing anybody does: a visitor reading the
+            sun panel is reading it, and the walk resumes on the same rectangle
+            when it closes.
           */
-          coveredByPanel={hotspot !== null || creditsOpen}
+          coveredByPanel={hotspot !== null || creditsOpen || compactPanelOpen}
         />
       )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { TOUCH } from '../../config/player'
 import { inThumbZone, stickVector, type Stick } from '../../lib/touchInput'
+import type { Rect } from '../../lib/screenLayout'
 import {
   beginThumb,
   createBook,
@@ -27,6 +28,19 @@ export interface TouchControlsProps {
   stickRef: React.RefObject<Stick | null>
   /** Accumulated look delta in CSS px; the player consumes and zeroes it. */
   lookRef: React.RefObject<{ dx: number; dy: number }>
+  /**
+   * Where a thumb may plant the stick, in CSS client coordinates — the rectangle
+   * of ring CENTRES, already inset by the ring's radius from the safe area and
+   * from every rectangle the interface occupies.
+   *
+   * Handed in rather than worked out here, because the answer depends on things
+   * this component cannot see: the safe-area insets, which layout is in use, and
+   * which strips the chrome has up. App computes it from the same
+   * compactChrome() the interface lays itself out from — lib/touchInput.ts →
+   * thumbZoneRect(), where the reasoning is. Empty means there is no room for a
+   * ring on this screen and therefore no stick; every touch is then a look.
+   */
+  plantRect: Rect
   /**
    * A full-screen panel stands over the canvas.
    *
@@ -120,10 +134,22 @@ export function TouchControls({
   canvas,
   stickRef,
   lookRef,
+  plantRect,
   coveredByPanel = false,
 }: TouchControlsProps) {
   const ringRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)
+  /*
+   * THE ZONE IS READ WHEN A THUMB LANDS, NOT WHEN THE LISTENERS WERE ATTACHED,
+   * and it is a ref rather than a dependency for exactly that reason. The
+   * rectangle changes whenever the interface does — the phone is turned, a strip
+   * takes itself away, the address bar collapses — and putting it in the
+   * dependency array would tear the effect down and call resetAll() each time,
+   * which is a walker stopped dead by a strip disappearing above him. Held here,
+   * a change lands on the NEXT plant and leaves the thumb already down alone.
+   */
+  const plantRef = useRef(plantRect)
+  plantRef.current = plantRect
 
   useEffect(() => {
     // A panel over the canvas ends the walk by TEARING THIS EFFECT DOWN, not by
@@ -184,11 +210,15 @@ export function TouchControls({
       const dead = dropDead(book, (t) => !t.captured || canvas.hasPointerCapture(t.id))
       if (dead.includes('move')) stopMoving()
 
-      const box = canvas.getBoundingClientRect()
-      const inZone = inThumbZone(e.clientX - box.left, e.clientY - box.top, box.width, box.height, {
-        widthFraction: TOUCH.zoneWidthFraction,
-        heightFraction: TOUCH.zoneHeightFraction,
-      })
+      /*
+       * IN CLIENT COORDINATES, NOT CANVAS ONES, and it is the same thing said
+       * once instead of twice: the zone is cut out of the viewport the interface
+       * is laid out in, the ring below is `position: fixed` and drawn at
+       * clientX/clientY, and the canvas is the whole viewport (index.css → #root
+       * is 100vw × 100dvh). Subtracting the canvas box here would leave the ring
+       * and the zone measuring from different origins the day it is not.
+       */
+      const inZone = inThumbZone(e.clientX, e.clientY, plantRef.current)
 
       const { role, retired } = beginThumb(book, {
         id: e.pointerId,

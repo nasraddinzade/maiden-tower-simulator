@@ -213,6 +213,9 @@ export const PLAYER = {
   maxPitchRad: Math.PI / 2 - 0.05,
 } as const
 
+/** The ring's radius, needed twice below: as itself and as the zone's floor. */
+const STICK_RADIUS_PX = 56
+
 /**
  * The touch controls, 2026-08-23.
  *
@@ -252,7 +255,7 @@ export const TOUCH = {
    * over unchanged from the Phase-6 stick: it was the one thing about that stick
    * that measured right.
    */
-  stickRadiusPx: 56,
+  stickRadiusPx: STICK_RADIUS_PX,
   /** Knob radius, CSS px. Half the ring, so the knob is visible at any throw. */
   stickKnobRadiusPx: 22,
   /**
@@ -269,13 +272,53 @@ export const TOUCH = {
    */
   runAt: 0.85,
   /**
-   * The movement zone: the left half of the display, bottom 55% of it. On a
-   * 375 × 812 phone that is 187 × 447 px under a left thumb, and it leaves the
-   * upper left — where the walk button and the hint sit — as somewhere to drag
+   * The movement zone: the leading half of the display, bottom 55% of it, and it
+   * leaves the upper leading corner — where the hint sits — as somewhere to drag
    * to LOOK rather than as more joystick.
+   *
+   * ═════════════════════════════════════════════════════════════════════════
+   * THESE ARE NOW WHAT THE ZONE ASKS FOR, NOT WHAT IT GETS. 2026-08-24.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   * They used to be the whole answer: inThumbZone() multiplied them by the
+   * canvas and took any touch inside. Measured on a phone, that zone was not
+   * the zone the visitor had — three real touches at 812×375, the shipped
+   * build:
+   *
+   *   (100, 210) → the canvas             walked 2.036 m
+   *   (100, 300) → the datum notice       0 m
+   *   ( 60, 350) → the exit-walk button   0 m, AND out of walk mode
+   *
+   * The zone was x 0…406, y 169…375 and the chrome — notice, hint and bar —
+   * began at y 211, so four fifths of the zone belonged to the interface. Worse,
+   * the zone reached the edges of the glass, and the ring is planted where the
+   * thumb lands: a plant at the corner puts 56 px of the ring off the left of
+   * the screen and 56 px off the bottom, where no thumb can follow it, so half
+   * the deflection band in those two directions did not exist.
+   *
+   * So the fractions are now the zone's WISH, and lib/touchInput.ts →
+   * thumbZoneRect() is what it gets: the wish, clipped to the safe area, moved
+   * clear of every rectangle the interface occupies, and inset by the ring's own
+   * radius so that the whole ring is on the glass whatever the thumb does.
    */
   zoneWidthFraction: 0.5,
   zoneHeightFraction: 0.55,
+  /**
+   * The smallest a zone may shrink to before it stops being a zone, CSS px.
+   *
+   * DERIVED FROM THE RING, not chosen: 3 × the ring's radius is the 112 px ring
+   * plus one radius of latitude, which is the difference between a stick a thumb
+   * can land ON and a stick a thumb has to AIM at. The zone exists precisely
+   * because a visitor walking a building is looking at the building and not at
+   * the glass (see inThumbZone), and a zone with no latitude is the fixed circle
+   * that argument rejects.
+   *
+   * It is a floor, not a size: where the fractions above ask for more, they get
+   * more, and where the screen cannot give this much the zone shrinks further
+   * rather than overlapping something. The ring itself — 2 × the radius — is the
+   * hard minimum below which there is no stick at all.
+   */
+  zoneMinSpanPx: 3 * STICK_RADIUS_PX,
   /**
    * How far the view turns for a drag across the SHORT side of the display.
    * Half a turn: one sweep of a thumb puts the room behind you in front of you.

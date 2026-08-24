@@ -211,14 +211,14 @@ describe('the compact layout — what a visitor meets first', () => {
   })
 
   it('still keeps a third of the height with a panel raised in portrait', () => {
-    const view = compactViewRect(PHONE_PORTRAIT, { notice: false, hint: false, sheetOpen: true })
+    const view = compactViewRect(PHONE_PORTRAIT, { ...NOTHING_OPEN, sheetOpen: true })
     expect(view.h / PHONE_PORTRAIT.height).toBeGreaterThan(0.3)
   })
 
   it('does not squeeze the view to a strip in landscape', () => {
     // the brief's constraint, as a number. The docked layout failed it: panels
     // reached y 363 of 375 and left the building a band across the middle.
-    const view = compactViewRect(PHONE_LANDSCAPE, { notice: true, hint: false, sheetOpen: true })
+    const view = compactViewRect(PHONE_LANDSCAPE, { ...NOTHING_OPEN, notice: true, sheetOpen: true })
     expect(view.w / PHONE_LANDSCAPE.width).toBeGreaterThan(0.5)
     expect(view.h / PHONE_LANDSCAPE.height).toBeGreaterThan(0.8)
   })
@@ -264,7 +264,7 @@ describe('safe areas', () => {
     expect(box.width).toBeLessThanOrEqual(Math.round(usable * UI.compact.sheetWidthFraction))
     const view = compactViewRect(
       PHONE_LANDSCAPE,
-      { notice: false, hint: false, sheetOpen: true },
+      { ...NOTHING_OPEN, sheetOpen: true },
       LANDSCAPE_INSETS,
     )
     expect(view.w / usable).toBeGreaterThan(0.5)
@@ -277,13 +277,13 @@ describe('noticeStackHeight', () => {
     expect(noticeStackHeight({ ...NOTHING_OPEN, notice: true })).toBe(
       UI.compact.noticeHeight + UI.compact.stackGap,
     )
-    expect(noticeStackHeight({ notice: true, hint: true, sheetOpen: false })).toBe(
+    expect(noticeStackHeight({ ...NOTHING_OPEN, notice: true, hint: true })).toBe(
       UI.compact.noticeHeight + UI.compact.hintHeight + 2 * UI.compact.stackGap,
     )
   })
 
   it('is what the chrome and the view rect both settle up with', () => {
-    const state = { notice: true, hint: true, sheetOpen: false }
+    const state = { ...NOTHING_OPEN, notice: true, hint: true }
     const view = compactViewRect(PHONE_PORTRAIT, state)
     expect(view.h).toBe(
       PHONE_PORTRAIT.height - barOuterHeight({ top: 0, right: 0, bottom: 0, left: 0 }) -

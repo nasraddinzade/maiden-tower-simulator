@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
   inThumbZone,
+  stickPlantRect,
   stickSpeed,
   stickThrow,
   stickVector,
   stickVelocity,
+  thumbZoneRect,
   touchLookSensitivity,
 } from './touchInput'
+import {
+  NO_INSETS,
+  compactChrome,
+  type CompactState,
+  type Insets,
+  type Rect,
+  type Viewport,
+} from './screenLayout'
 import { moveVelocity } from './playerMovement'
 import { PLAYER, TOUCH } from '../config/player'
 
@@ -239,51 +249,236 @@ describe('touchLookSensitivity', () => {
   })
 })
 
-describe('inThumbZone', () => {
-  const W_PX = 375
-  const H_PX = 812
-  const zone = { widthFraction: TOUCH.zoneWidthFraction, heightFraction: TOUCH.zoneHeightFraction }
-  const inZone = (x: number, y: number) => inThumbZone(x, y, W_PX, H_PX, zone)
+describe('the thumb zone, cut around the interface', () => {
+  /*
+   * ═════════════════════════════════════════════════════════════════════════
+   * THE TWO INVARIANTS, AND THEY ARE STATEMENTS ABOUT EVERY SCREEN AT ONCE.
+   * ═════════════════════════════════════════════════════════════════════════
+   *
+   *   1. THE WHOLE RING IS ON THE GLASS. The ring is planted where the thumb
+   *      lands, and a thumb cannot travel past the edge of the screen: a ring
+   *      hanging 56 px off the left of the display is a stick that cannot be
+   *      pushed left, so half the deflection band in that direction does not
+   *      exist. On the shipped build it hung off BOTH the left and the bottom,
+   *      because the zone reached the corner of the canvas.
+   *
+   *   2. THE RING NEVER LIES OVER A CONTROL. Not the plant point — the whole
+   *      ring, because the thumb travels over all of it, and because a ring
+   *      drawn across the bar is an invitation to press it. On the shipped
+   *      build the zone reached the datum notice, the touch hint AND the bar,
+   *      exit-walk button included.
+   *
+   * Both were run against the shipped fractional zone before this existed and
+   * both failed; the numbers are in the commit message. What makes them
+   * statements about the interface rather than about a model of it is that the
+   * obstacles below are compactChrome()'s own rectangles — the same ones the
+   * components lay themselves out from.
+   */
+  const ZONE = {
+    widthFraction: TOUCH.zoneWidthFraction,
+    heightFraction: TOUCH.zoneHeightFraction,
+    minSpanPx: TOUCH.zoneMinSpanPx,
+  }
+  const R = TOUCH.stickRadiusPx
 
-  it('takes a thumb resting at the bottom left', () => {
-    expect(inZone(60, 740)).toBe(true)
-  })
+  /** The chrome at its tallest while walking: every strip up, nothing raised. */
+  const WALKING: CompactState = { notice: true, hint: true, sheetOpen: false, walking: true }
 
-  it('leaves the right side for looking', () => {
-    expect(inZone(300, 740)).toBe(false)
-  })
+  /**
+   * EVERY VIEWPORT A VISITOR IS LIKELY TO HOLD, both ways round. The smallest is
+   * an iPhone SE turned sideways — 320 px of height, of which the chrome takes
+   * 164 — and it is in the table precisely because it is the one that has to
+   * fight for the room.
+   */
+  const SCREENS: [string, number, number][] = [
+    ['iPhone SE', 320, 568],
+    ['Android compact', 360, 640],
+    ['the measured phone', 375, 812],
+    ['iPhone 13', 390, 844],
+    ['Pixel 8', 412, 915],
+    ['iPad mini', 744, 1133],
+    ['iPad Pro', 834, 1194],
+  ]
+  /** iPhone-class insets, and the same phone turned: the cutout changes edge. */
+  const NOTCH_PORTRAIT: Insets = { top: 59, right: 0, bottom: 34, left: 0 }
+  const NOTCH_LANDSCAPE: Insets = { top: 0, right: 44, bottom: 21, left: 44 }
 
-  it('leaves the UPPER left for looking too', () => {
-    // where the walk button and the hint sit; half the screen must not become
-    // a joystick just because the visitor is left-handed
-    expect(inZone(60, 120)).toBe(false)
-  })
-
-  it('lands the boundary on the zone, not beside it', () => {
-    expect(inZone(W_PX * TOUCH.zoneWidthFraction, H_PX)).toBe(true)
-    expect(inZone(W_PX * TOUCH.zoneWidthFraction + 1, H_PX)).toBe(false)
-    expect(inZone(0, H_PX * (1 - TOUCH.zoneHeightFraction))).toBe(true)
-    expect(inZone(0, H_PX * (1 - TOUCH.zoneHeightFraction) - 1)).toBe(false)
-  })
-
-  it('is a zone in every orientation the visitor may hold the phone', () => {
-    for (const [w, h] of [
-      [375, 812], // portrait phone
-      [812, 375], // landscape phone — the way a tower gets looked at
-      [768, 1024], // tablet
+  interface Case {
+    name: string
+    v: Viewport
+    insets: Insets
+  }
+  const CASES: Case[] = []
+  for (const [name, w, h] of SCREENS) {
+    for (const [orient, vw, vh] of [
+      ['portrait', w, h],
+      ['landscape', h, w],
     ] as const) {
-      expect(inThumbZone(w * 0.1, h * 0.9, w, h, zone)).toBe(true)
-      expect(inThumbZone(w * 0.9, h * 0.9, w, h, zone)).toBe(false)
-      expect(inThumbZone(w * 0.1, h * 0.1, w, h, zone)).toBe(false)
+      const v: Viewport = { width: vw, height: vh, coarsePointer: true }
+      const cutout = orient === 'portrait' ? NOTCH_PORTRAIT : NOTCH_LANDSCAPE
+      CASES.push({ name: `${name} ${orient}`, v, insets: NO_INSETS })
+      CASES.push({ name: `${name} ${orient}, with a cutout`, v, insets: cutout })
     }
+  }
+
+  const zoneOf = (c: Case) => {
+    const chrome = compactChrome(c.v, WALKING, c.insets)
+    const zone = thumbZoneRect(c.v, ZONE, chrome, c.insets)
+    return { chrome, zone, plant: stickPlantRect(zone, R) }
+  }
+  const overlaps = (a: Rect, b: Rect) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  /** The ring around every plant point in the rectangle, as one rectangle. */
+  const ringSpan = (plant: Rect): Rect => ({
+    x: plant.x - R,
+    y: plant.y - R,
+    w: plant.w + 2 * R,
+    h: plant.h + 2 * R,
   })
 
-  it('leaves room for two thumbs at once', () => {
-    // the whole point of the split: a move point and a look point that are both
-    // valid at the same instant, neither of them cancelling the other
-    const move = { x: 60, y: 740 }
-    const look = { x: 300, y: 500 }
-    expect(inZone(move.x, move.y)).toBe(true)
-    expect(inZone(look.x, look.y)).toBe(false)
+  for (const c of CASES) {
+    describe(c.name, () => {
+      it('has a stick at all', () => {
+        const { plant } = zoneOf(c)
+        expect(plant.w).toBeGreaterThan(0)
+        expect(plant.h).toBeGreaterThan(0)
+      })
+
+      it('keeps the whole ring on the glass, wherever the thumb plants it', () => {
+        const { plant } = zoneOf(c)
+        const ring = ringSpan(plant)
+        expect(ring.x).toBeGreaterThanOrEqual(c.insets.left)
+        expect(ring.y).toBeGreaterThanOrEqual(c.insets.top)
+        expect(ring.x + ring.w).toBeLessThanOrEqual(c.v.width - c.insets.right)
+        expect(ring.y + ring.h).toBeLessThanOrEqual(c.v.height - c.insets.bottom)
+      })
+
+      it('never draws the ring over a control', () => {
+        const { chrome, plant } = zoneOf(c)
+        const ring = ringSpan(plant)
+        expect(chrome.filter((r) => overlaps(ring, r))).toEqual([])
+      })
+
+      it('reaches the bottom of the glass, which is where the hand is', () => {
+        // the walking bar stands on the TOP edge, so nothing of ours is between
+        // the zone and the bottom of the screen but the safe area itself
+        const { zone } = zoneOf(c)
+        expect(zone.y + zone.h).toBe(c.v.height - c.insets.bottom)
+        expect(zone.x).toBe(c.insets.left)
+      })
+    })
+  }
+
+  describe('the three touches the phone audit measured, at 812×375', () => {
+    const v: Viewport = { width: 812, height: 375, coarsePointer: true }
+    const chrome = compactChrome(v, WALKING, NO_INSETS)
+    const zone = thumbZoneRect(v, ZONE, chrome, NO_INSETS)
+    const plant = stickPlantRect(zone, R)
+    const under = (x: number, y: number) =>
+      chrome.filter((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h)
+
+    it('is the rectangle it says it is', () => {
+      // bar 0…56, hint 64…108, notice 116…164, all of it on the top edge now,
+      // and the zone is 55% of the height standing on the bottom of the glass
+      expect(zone.x).toBe(0)
+      expect(zone.w).toBe(406)
+      expect(zone.y).toBeCloseTo(168.75, 6)
+      expect(zone.h).toBeCloseTo(206.25, 6)
+      expect(plant.x).toBe(56)
+      expect(plant.w).toBe(294)
+      expect(plant.y).toBeCloseTo(224.75, 6)
+      expect(plant.h).toBeCloseTo(94.25, 6)
+    })
+
+    it('gives the one touch that used to work back to looking', () => {
+      /*
+       * (100, 210) reached the canvas on the shipped build and walked 2.036 m —
+       * it was the ONLY one of the three that did, and it worked by being in
+       * the 42 px sliver the chrome had not taken. It is still canvas, and it
+       * is no longer a stick: the plant band is 224…319 now, which is where a
+       * thumb rests rather than where the interface happened to leave a gap.
+       * Re-driven in the browser: ring 0, 0 m walked, still in walk mode.
+       */
+      expect(under(100, 210)).toEqual([])
+      expect(inThumbZone(100, 210, plant)).toBe(false)
+    })
+
+    it('walks from the touch that used to land on the datum notice', () => {
+      // (100, 300) walked 0 m: the notice was at 263…311, above the bar
+      expect(under(100, 300)).toEqual([])
+      expect(inThumbZone(100, 300, plant)).toBe(true)
+    })
+
+    it('no longer has a way out of walk mode under a resting thumb', () => {
+      /*
+       * (60, 350) was the exit-walk button — 588×44 at (12, 325) — and pressing
+       * it dumped the visitor back into the orbit view. Nothing of ours is
+       * there now. It is not a plant point either, and that is the ring rule
+       * rather than the chrome: 25 px from the bottom of the glass there is
+       * nowhere for the thumb to push, so the touch turns the view rather than
+       * pretending to be a stick that cannot be steered.
+       */
+      expect(under(60, 350)).toEqual([])
+      expect(inThumbZone(60, 350, plant)).toBe(false)
+    })
+  })
+
+  describe('what the zone still refuses', () => {
+    const v: Viewport = { width: 375, height: 812, coarsePointer: true }
+    const plant = stickPlantRect(
+      thumbZoneRect(v, ZONE, compactChrome(v, WALKING, NO_INSETS), NO_INSETS),
+      R,
+    )
+
+    it('takes a thumb resting at the bottom leading corner', () => {
+      expect(inThumbZone(100, 740, plant)).toBe(true)
+    })
+
+    it('leaves the trailing side for looking', () => {
+      expect(inThumbZone(300, 740, plant)).toBe(false)
+    })
+
+    it('leaves the UPPER leading corner for looking too', () => {
+      // half the screen must not become a joystick just because the visitor is
+      // left-handed, or because their eye went to something up there
+      expect(inThumbZone(60, 300, plant)).toBe(false)
+    })
+
+    it('leaves room for two thumbs at once', () => {
+      // the whole point of the split: a move point and a look point that are
+      // both valid at the same instant, neither cancelling the other
+      expect(inThumbZone(100, 740, plant)).toBe(true)
+      expect(inThumbZone(300, 500, plant)).toBe(false)
+    })
+
+    it('lands the boundary on the zone, not beside it', () => {
+      expect(inThumbZone(plant.x, plant.y + plant.h, plant)).toBe(true)
+      expect(inThumbZone(plant.x - 1, plant.y + plant.h, plant)).toBe(false)
+      expect(inThumbZone(plant.x, plant.y - 1, plant)).toBe(false)
+    })
+
+    it('takes nothing at all when there is no room for a ring', () => {
+      // a viewport barely taller than the chrome it carries: no stick, and
+      // every touch is a look rather than a stick that cannot be steered
+      const slot: Viewport = { width: 375, height: 220, coarsePointer: true }
+      const none = stickPlantRect(
+        thumbZoneRect(slot, ZONE, compactChrome(slot, WALKING, NO_INSETS), NO_INSETS),
+        R,
+      )
+      expect(none.w).toBe(0)
+      expect(inThumbZone(100, 200, none)).toBe(false)
+    })
+  })
+
+  describe('the orbit layout, where the bar is still on the bottom edge', () => {
+    it('cuts the zone above the bar rather than under it', () => {
+      const v: Viewport = { width: 375, height: 812, coarsePointer: true }
+      const orbit: CompactState = { notice: true, hint: false, sheetOpen: false, walking: false }
+      const chrome = compactChrome(v, orbit, NO_INSETS)
+      const zone = thumbZoneRect(v, ZONE, chrome, NO_INSETS)
+      // the notice's own top edge: 812 − 56 − 8 − 48
+      expect(zone.y + zone.h).toBe(700)
+      for (const r of chrome) expect(overlaps(zone, r)).toBe(false)
+    })
   })
 })

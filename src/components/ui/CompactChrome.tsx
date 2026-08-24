@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { UI, type Orientation } from '../../config/ui'
-import { compactSheetBox, type Viewport } from '../../lib/screenLayout'
+import { NO_INSETS, compactBarEdge, compactSheetBox, type Viewport } from '../../lib/screenLayout'
 import { LANGUAGE_NAMES, SUPPORTED_LANGUAGES, setLanguage, type Language } from '../../i18n'
 import { useFallbackText } from '../../hooks/useFallbackText'
 import { SunControlsBody } from './SunControls'
@@ -71,6 +71,15 @@ export interface CompactChromeProps {
   onCredits: () => void
   onEnterXR: () => void
   xrLoading: boolean
+  /**
+   * Something has been raised from the bar, or put away again.
+   *
+   * The touch layer needs it: a raised sheet stands where the thumb zone is in
+   * portrait, and rather than cut the zone smaller for a state the walk is not
+   * in, App suspends the stick while one is up. See <TouchControls
+   * coveredByPanel>.
+   */
+  onPanelOpen?: (open: boolean) => void
 }
 
 /* ── the safe area, spelled the same way everywhere ─────────────────────────── */
@@ -78,8 +87,29 @@ const SAFE_BOTTOM = 'env(safe-area-inset-bottom)'
 const SAFE_LEFT = 'env(safe-area-inset-left)'
 const SAFE_RIGHT = 'env(safe-area-inset-right)'
 const SAFE_TOP = 'env(safe-area-inset-top)'
-/** Where the bar's top edge is: its own height plus whatever the phone claims below it. */
-const ABOVE_BAR = `calc(${UI.compact.barHeight}px + ${SAFE_BOTTOM})`
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════
+ * THE BAR STANDS ON THE EDGE THE THUMBS ARE NOT ON, AND THAT CHANGES.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
+ * Orbiting, it is the bottom: the phone is held in one hand and the thumb
+ * reaches the bottom third, which is the whole reason this layout exists.
+ *
+ * Walking, it is the top, because the bottom has become the controls. The left
+ * thumb is the stick and it lands where the hand holds the phone; the right one
+ * drags to look. Measured at 812×375 on the shipped build, this bar put its
+ * exit-walk button 588×44 at (12, 325) — 72% of the width along the bottom edge
+ * — so a thumb resting there left walk mode without meaning to, and the notice
+ * and hint above it took the rest of the band. The rule is compactBarEdge() in
+ * lib/screenLayout.ts, and the layout arithmetic and this file read the same
+ * one; the zone the stick gets is cut around what this returns.
+ *
+ * Everything anchored to the bar — the sheet, the strips, the language popover —
+ * turns over with it, so the stack keeps its order and only its edge changes.
+ */
+const barAnchor = (atTop: boolean, px: number) =>
+  `calc(${px}px + ${atTop ? SAFE_TOP : SAFE_BOTTOM})`
 
 export function CompactChrome({
   viewport,
@@ -98,6 +128,7 @@ export function CompactChrome({
   onCredits,
   onEnterXR,
   xrLoading,
+  onPanelOpen,
 }: CompactChromeProps) {
   const { text } = useFallbackText('ui')
   const [sheet, setSheet] = useState<SheetId | null>(null)
@@ -107,6 +138,23 @@ export function CompactChrome({
 
   const hasCaveat = datumCaveats.length > 0
   const showNotice = hasCaveat && !noticeDismissed
+
+  /*
+   * Which edge everything hangs off. Asked of the layout arithmetic rather than
+   * written out here as `firstPerson ? … : …`, so that the rectangles the thumb
+   * zone is cut around cannot disagree with the pixels a visitor presses.
+   */
+  const atTop =
+    compactBarEdge({
+      notice: showNotice,
+      hint,
+      sheetOpen: sheet !== null,
+      walking: firstPerson,
+    }) === 'top'
+  const barFace = barAnchor(atTop, UI.compact.barHeight)
+  const stackFace = barAnchor(atTop, UI.compact.barHeight + UI.compact.stackGap)
+  const anchor = atTop ? 'top' : 'bottom'
+  const farEdge = atTop ? 'bottom' : 'top'
 
   /*
    * The touch hint takes itself away. It says what the two halves of the screen
@@ -129,7 +177,22 @@ export function CompactChrome({
     setSheet((cur) => (cur === id ? null : id))
   }
 
-  const box = compactSheetBox(viewport)
+  /*
+   * WHAT IS RAISED, TOLD TO WHOEVER IS DRIVING THE STICK. A sheet stands where
+   * the thumb zone is in portrait, and App answers it by suspending the stick
+   * rather than by cutting the zone smaller for a state the walk is not in —
+   * see <TouchControls coveredByPanel>. The language popover counts: it is the
+   * same kind of thing raised from the same bar.
+   */
+  const panelOpen = sheet !== null || langOpen
+  useEffect(() => {
+    onPanelOpen?.(panelOpen)
+  }, [panelOpen, onPanelOpen])
+  // and nothing is raised once this layout is gone, e.g. a tablet given a
+  // keyboard mid-session and handed the docked layout with a sheet up
+  useEffect(() => () => onPanelOpen?.(false), [onPanelOpen])
+
+  const box = compactSheetBox(viewport, NO_INSETS, atTop ? 'top' : 'bottom')
   const side = orientation === 'landscape'
 
   const sheetTitle: Record<SheetId, string> = {
@@ -148,10 +211,10 @@ export function CompactChrome({
             position: 'fixed',
             zIndex: 29,
             boxSizing: 'border-box',
-            bottom: ABOVE_BAR,
+            [anchor]: barFace,
             ...(side
               ? {
-                  top: `calc(${UI.gutter}px + ${SAFE_TOP})`,
+                  [farEdge]: `calc(${UI.gutter}px + ${atTop ? SAFE_BOTTOM : SAFE_TOP})`,
                   right: `calc(${UI.gutter}px + ${SAFE_RIGHT})`,
                   width: box.width,
                 }
@@ -166,7 +229,8 @@ export function CompactChrome({
             color: '#e8e8e8',
             background: 'rgba(10,12,16,.94)',
             border: '1px solid rgba(255,255,255,.14)',
-            borderRadius: side ? 10 : '10px 10px 0 0',
+            // the corners that meet the bar stay square, whichever edge it is on
+            borderRadius: side ? 10 : atTop ? '0 0 10px 10px' : '10px 10px 0 0',
             overflow: 'hidden',
           }}
         >
@@ -247,9 +311,11 @@ export function CompactChrome({
           zIndex: 28,
           left: `calc(${UI.gutter}px + ${SAFE_LEFT})`,
           right: `calc(${UI.gutter}px + ${SAFE_RIGHT})`,
-          bottom: `calc(${UI.compact.barHeight + UI.compact.stackGap}px + ${SAFE_BOTTOM})`,
+          [anchor]: stackFace,
           display: 'flex',
-          flexDirection: 'column',
+          // the hint stays the strip closest to the bar in both arrangements,
+          // which is what noticeStackHeight() and compactChrome() both assume
+          flexDirection: atTop ? 'column-reverse' : 'column',
           gap: UI.compact.stackGap,
           pointerEvents: 'none',
         }}
@@ -340,7 +406,7 @@ export function CompactChrome({
             position: 'fixed',
             zIndex: 31,
             right: `calc(${UI.gutter}px + ${SAFE_RIGHT})`,
-            bottom: `calc(${UI.compact.barHeight + UI.compact.stackGap}px + ${SAFE_BOTTOM})`,
+            [anchor]: stackFace,
             display: 'flex',
             flexDirection: 'column',
             minWidth: 160,
@@ -363,19 +429,27 @@ export function CompactChrome({
           zIndex: 30,
           left: 0,
           right: 0,
-          bottom: 0,
+          [anchor]: 0,
           boxSizing: 'content-box',
           minHeight: UI.compact.barHeight,
           // the inset rides OUTSIDE the 56, so the touchable part never sits
-          // under a home indicator or a rounded corner
-          paddingBottom: SAFE_BOTTOM,
+          // under a home indicator, a notch or a rounded corner
+          [atTop ? 'paddingTop' : 'paddingBottom']: atTop ? SAFE_TOP : SAFE_BOTTOM,
           paddingLeft: `calc(${UI.gutter}px + ${SAFE_LEFT})`,
           paddingRight: `calc(${UI.gutter}px + ${SAFE_RIGHT})`,
           display: 'flex',
           alignItems: 'center',
           gap: 6,
           background: 'rgba(10,12,16,.94)',
-          borderTop: '1px solid rgba(255,255,255,.14)',
+          /*
+           * DRAWN, NOT LAID OUT. As a border this hairline made the bar 57 px
+           * tall against the 56 the layout arithmetic reports, and the thumb
+           * zone is cut to within a pixel of the bar's face — a model that is
+           * one pixel short of the interface is a stick that can be planted one
+           * pixel inside it. A shadow paints outside the box and occupies no
+           * height, so barOuterHeight() is now the bar's real height.
+           */
+          boxShadow: `0 ${atTop ? 1 : -1}px 0 rgba(255,255,255,.14)`,
         }}
       >
         <button

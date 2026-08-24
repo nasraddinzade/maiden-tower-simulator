@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LayoutMode, Orientation } from '../config/ui'
-import { layoutModeOf, orientationOf, type Viewport } from '../lib/screenLayout'
+import { NO_INSETS, layoutModeOf, orientationOf, type Insets, type Viewport } from '../lib/screenLayout'
 
 /**
  * THE ONE PLACE THE INTERFACE ASKS HOW BIG THE SCREEN IS.
@@ -70,13 +70,102 @@ function read(): Viewport {
   }
 }
 
+/**
+ * THE SAFE AREA, READ RATHER THAN ASSUMED — the one number in the layout that
+ * CSS knows and script does not.
+ *
+ * `env(safe-area-inset-*)` is not exposed to JavaScript in any form: there is no
+ * property on `screen`, `visualViewport` or anywhere else that reports the
+ * notch, and the values are not readable off `:root` either. The only way to see
+ * them is to spend them on something and measure what was spent, which is what
+ * this does — a hidden element whose padding is the four env() values, read back
+ * through getComputedStyle in resolved pixels.
+ *
+ * WHY IT IS NEEDED AT ALL, given that screenLayout.ts has always said the
+ * components apply the insets through CSS calc() and the model only needs them
+ * in tests. Because the thumb zone is not laid out by CSS. It is a rectangle
+ * compared against a touch point in script (lib/touchInput.ts → thumbZoneRect),
+ * and a zone that ignored the insets would put the stick's rim under the rounded
+ * corner of a landscape phone — 44 px a side is ordinary — where a thumb cannot
+ * press and the browser may claim the gesture for a system swipe.
+ *
+ * Zero everywhere is both the fallback and the ordinary answer: without
+ * `viewport-fit=cover` in the viewport meta the insets ARE zero, and index.html
+ * has it precisely so they are not.
+ */
+export function readSafeAreaInsets(): Insets {
+  if (typeof document === 'undefined' || !document.body) return NO_INSETS
+  const probe = document.createElement('div')
+  probe.style.cssText =
+    'position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+    'padding-top:env(safe-area-inset-top);padding-right:env(safe-area-inset-right);' +
+    'padding-bottom:env(safe-area-inset-bottom);padding-left:env(safe-area-inset-left);'
+  document.body.appendChild(probe)
+  const s = getComputedStyle(probe)
+  const px = (v: string) => {
+    const n = Number.parseFloat(v)
+    return Number.isFinite(n) ? n : 0
+  }
+  const insets: Insets = {
+    top: px(s.paddingTop),
+    right: px(s.paddingRight),
+    bottom: px(s.paddingBottom),
+    left: px(s.paddingLeft),
+  }
+  probe.remove()
+  return insets
+}
+
+/**
+ * The insets, kept current and kept IDENTICAL while they do not change.
+ *
+ * The identity matters as much as the value: the rectangle derived from these is
+ * memoised on it, and a fresh object every render would recompute the thumb zone
+ * on every frame the perf sample lands.
+ */
+export function useSafeAreaInsets(): Insets {
+  const [insets, setInsets] = useState<Insets>(readSafeAreaInsets)
+
+  useEffect(() => {
+    const update = () =>
+      setInsets((prev) => {
+        const next = readSafeAreaInsets()
+        const same =
+          prev.top === next.top &&
+          prev.right === next.right &&
+          prev.bottom === next.bottom &&
+          prev.left === next.left
+        return same ? prev : next
+      })
+
+    // a rotation moves the cutout from one edge to another; a resize can be the
+    // address bar going away, which changes the bottom inset on some browsers
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    window.visualViewport?.addEventListener('resize', update)
+    // the first read can precede the browser resolving env() on a cold load
+    update()
+
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('orientationchange', update)
+      window.visualViewport?.removeEventListener('resize', update)
+    }
+  }, [])
+
+  return insets
+}
+
 export interface ScreenLayout {
   viewport: Viewport
   mode: LayoutMode
   orientation: Orientation
+  /** What the notch and the rounded corners cost, in CSS px. */
+  insets: Insets
 }
 
 export function useScreenLayout(): ScreenLayout {
   const viewport = useViewport()
-  return { viewport, mode: layoutModeOf(viewport), orientation: orientationOf(viewport) }
+  const insets = useSafeAreaInsets()
+  return { viewport, mode: layoutModeOf(viewport), orientation: orientationOf(viewport), insets }
 }

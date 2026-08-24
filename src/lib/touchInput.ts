@@ -11,6 +11,7 @@
  */
 
 import { headingToWorld, type Planar } from './playerMovement'
+import { NO_INSETS, type Insets, type Rect, type Viewport } from './screenLayout'
 
 /**
  * A stick deflection in screen axes, already clamped to the ring: |v| ≤ 1.
@@ -144,29 +145,184 @@ export function touchLookSensitivity(shortSidePx: number, turnPerSweepRad: numbe
 }
 
 export interface ThumbZone {
-  /** Fraction of the viewport width the zone reaches in from the left edge. */
+  /** Fraction of the usable width the zone asks for, in from the leading edge. */
   widthFraction: number
-  /** Fraction of the viewport height the zone reaches up from the bottom edge. */
+  /** Fraction of the usable height the zone asks for, up from the bottom edge. */
   heightFraction: number
+  /** Smallest span worth calling a zone; below it the stick is a spot to aim at. */
+  minSpanPx: number
 }
 
 /**
- * Is this touch point in the movement zone?
+ * ═════════════════════════════════════════════════════════════════════════
+ * WHERE THE STICK MAY STAND, AS A RECTANGLE THE INTERFACE CANNOT REACH INTO.
+ * 2026-08-24.
+ * ═════════════════════════════════════════════════════════════════════════
  *
- * A ZONE, NOT A SPOT, and not the whole left half either. The stick appears
- * wherever inside it the thumb lands, because a thumb reaching for a fixed
- * circle has to look at the screen to find it and a visitor walking a building
- * is looking at the building. The zone is bounded rather than being the entire
- * left half so that the upper left is still somewhere to drag to LOOK — a
- * left-handed visitor, or anyone whose eye is drawn to something on that side,
- * otherwise finds half the screen turns into a joystick.
+ * A ZONE, NOT A SPOT, and that part is unchanged: the stick appears wherever
+ * inside it the thumb lands, because a thumb reaching for a fixed circle has to
+ * look at the screen to find it, and a visitor walking a building is looking at
+ * the building. The zone is bounded rather than being the whole leading half so
+ * that the upper leading corner is still somewhere to drag to LOOK.
+ *
+ * WHAT CHANGED IS THAT THE ZONE NOW KNOWS WHAT ELSE IS ON THE SCREEN. It used to
+ * be two fractions of the canvas and nothing else, and measured at 812×375 that
+ * put four fifths of it under the interface — a thumb at (100, 300) landed on
+ * the datum notice and walked 0 m, one at (60, 350) landed on the exit-walk
+ * button and left walk mode. The fractions were never wrong; they were answering
+ * a question nobody had asked them, which is "how much of the glass", when the
+ * question is "which part of the glass is mine".
+ *
+ * THREE THINGS BOUND IT, and all three are hard:
+ *
+ *   · THE SAFE AREA. A cutout or a rounded corner is glass a thumb cannot press,
+ *     so the zone starts inside it. env() is not readable from script, so the
+ *     insets are measured off a probe element and handed in — see
+ *     hooks/useViewport.ts → useSafeAreaInsets().
+ *   · THE INTERFACE'S OWN RECTANGLES, whatever they are. Not a list of controls
+ *     kept in step by hand: the same compactChrome() the components lay
+ *     themselves out from, so a strip that appears is a strip the zone already
+ *     stands clear of.
+ *   · THE RING'S RADIUS. The ring is planted where the thumb lands, so a plant
+ *     within one radius of any of the above puts part of the ring where the
+ *     thumb cannot follow it — off the glass, or over a button. This function
+ *     returns the rectangle the RING may occupy; stickPlantRect() insets it by
+ *     the radius to get the points a thumb may plant at.
+ *
+ * HOW IT RESOLVES, and the order is the honest part: vertically first, then
+ * horizontally, both leaning toward the bottom leading corner where the hand is.
+ * The vertical pass cuts the column the zone wants into free bands and takes the
+ * LOWEST one that is big enough to be a zone; the horizontal pass does the same
+ * across the band that survived, taking the most leading. Exact for a layout
+ * whose chrome is a band along one edge, which is what the compact layout is;
+ * for anything else it is conservative rather than optimal — it may hand back a
+ * smaller rectangle than the largest free one, and it never hands back one that
+ * overlaps.
  */
-export function inThumbZone(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
+export function thumbZoneRect(
+  v: Viewport,
   zone: ThumbZone,
-): boolean {
-  return x >= 0 && x <= width * zone.widthFraction && y >= height * (1 - zone.heightFraction) && y <= height
+  obstacles: Rect[] = [],
+  insets: Insets = NO_INSETS,
+): Rect {
+  const left = insets.left
+  const right = v.width - insets.right
+  const top = insets.top
+  const bottom = v.height - insets.bottom
+  const usableW = Math.max(0, right - left)
+  const usableH = Math.max(0, bottom - top)
+  // what the fractions ask for, floored at a zone worth landing in and capped at
+  // what there is: the floor is why a short landscape phone still gets a stick
+  const wantW = Math.min(usableW, Math.max(usableW * zone.widthFraction, zone.minSpanPx))
+  const wantH = Math.min(usableH, Math.max(usableH * zone.heightFraction, zone.minSpanPx))
+  if (wantW <= 0 || wantH <= 0) return { x: left, y: bottom, w: 0, h: 0 }
+
+  const live = obstacles.filter((r) => r.w > 0 && r.h > 0)
+
+  // ── vertically: the lowest free band worth a zone, in the column it wants ──
+  const inColumn = live.filter((r) => r.x < left + wantW && r.x + r.w > left)
+  const [y0, y1] = freeSpan(
+    inColumn.map((r) => [r.y, r.y + r.h]),
+    top,
+    bottom,
+    zone.minSpanPx,
+    'end',
+  )
+  const h = Math.max(0, Math.min(wantH, y1 - y0))
+  const y = y1 - h
+
+  // ── horizontally: the same, across the band that survived ─────────────────
+  const inBand = live.filter((r) => r.y < y + h && r.y + r.h > y)
+  const [x0, x1] = freeSpan(
+    inBand.map((r) => [r.x, r.x + r.w]),
+    left,
+    right,
+    zone.minSpanPx,
+    'start',
+  )
+  const w = Math.max(0, Math.min(wantW, x1 - x0))
+
+  return { x: x0, y, w, h }
+}
+
+/**
+ * The interval [lo, hi] with the blocked ones taken out of it, resolved to the
+ * ONE span the zone gets: the last one — the lowest, or the most leading — that
+ * is at least `minSpan` long, and failing that the longest there is.
+ *
+ * The preference is the hand, not the arithmetic. A zone put in the tallest gap
+ * on the screen would sit wherever the interface happened to leave room,
+ * including the middle of the view, and a thumb does not reach the middle of the
+ * view; a zone put in the lowest gap ends up in a 8 px slot between two strips
+ * if that is what the bottom edge borders. Taking the lowest gap that is big
+ * enough to be a zone at all is both of those answers where they agree and
+ * neither where they do not.
+ */
+function freeSpan(
+  blocked: [number, number][],
+  lo: number,
+  hi: number,
+  minSpan: number,
+  prefer: 'start' | 'end',
+): [number, number] {
+  const clipped = blocked
+    .map(([a, b]): [number, number] => [Math.max(lo, a), Math.min(hi, b)])
+    .filter(([a, b]) => b > a)
+    .sort((p, q) => p[0] - q[0])
+
+  const free: [number, number][] = []
+  let cursor = lo
+  for (const [a, b] of clipped) {
+    if (a > cursor) free.push([cursor, a])
+    cursor = Math.max(cursor, b)
+  }
+  if (cursor < hi) free.push([cursor, hi])
+  if (free.length === 0) return [hi, hi]
+
+  const worth = free.filter(([a, b]) => b - a >= minSpan)
+  if (worth.length > 0) return prefer === 'end' ? worth[worth.length - 1] : worth[0]
+  return free.reduce((best, span) => (span[1] - span[0] > best[1] - best[0] ? span : best))
+}
+
+/**
+ * The points a thumb may plant the stick at: the zone less the ring's radius on
+ * every side, so that the ring around any of them lies inside the zone.
+ *
+ * Zero width or height means there is no stick on this screen at all — the ring
+ * does not fit in what the interface left. That is the honest answer rather than
+ * a stick half off the glass, and screenLayout's viewport table asserts it never
+ * happens on anything a visitor is likely to hold.
+ */
+export function stickPlantRect(zone: Rect, ringRadiusPx: number): Rect {
+  const w = zone.w - 2 * ringRadiusPx
+  const h = zone.h - 2 * ringRadiusPx
+  if (w <= 0 || h <= 0) return { x: zone.x + zone.w / 2, y: zone.y + zone.h / 2, w: 0, h: 0 }
+  return { x: zone.x + ringRadiusPx, y: zone.y + ringRadiusPx, w, h }
+}
+
+/**
+ * Is this touch point somewhere the stick may be planted?
+ *
+ * The rectangle is stickPlantRect()'s, in the same CSS coordinates the touch
+ * arrives in. An empty rectangle takes nothing — a screen with no room for a
+ * ring has no movement zone, and every touch on it is a look.
+ */
+export function inThumbZone(x: number, y: number, plant: Rect): boolean {
+  if (plant.w <= 0 || plant.h <= 0) return false
+  return x >= plant.x && x <= plant.x + plant.w && y >= plant.y && y <= plant.y + plant.h
+}
+
+/** One line for the dev console: what the thumb was actually left. See App.tsx. */
+export function describeThumbZone(zone: Rect, plant: Rect, ringRadiusPx: number): string {
+  const r = (n: number) => Math.round(n)
+  if (plant.w <= 0 || plant.h <= 0) {
+    return `thumb zone ${r(zone.w)}×${r(zone.h)} at (${r(zone.x)}, ${r(zone.y)}) — NO ROOM for a ${
+      2 * ringRadiusPx
+    } px ring, no stick`
+  }
+  return (
+    `thumb zone ${r(zone.w)}×${r(zone.h)} at (${r(zone.x)}, ${r(zone.y)}) — ` +
+    `a ${2 * ringRadiusPx} px ring may be planted anywhere in ${r(plant.w)}×${r(plant.h)} ` +
+    `at (${r(plant.x)}, ${r(plant.y)})`
+  )
 }
