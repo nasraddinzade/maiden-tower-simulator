@@ -4,6 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "description": "First-person historical reconstruction of the Maiden Tower (Qız Qalası), Baku",
+  "author": "Ramin Nəsrəddinzadə",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nasraddinzade/maiden-tower-simulator.git"
+  },
+  "homepage": "https://maiden-tower-simulator.vercel.app",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

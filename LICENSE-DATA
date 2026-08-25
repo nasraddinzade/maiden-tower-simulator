@@ -1,0 +1,45 @@
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Copyright 2026 Ramin Nəsrəddinzadə
+
+THIS FILE COVERS THE RESEARCH, NOT THE PROGRAM. The source code of this
+repository is licensed separately, under the Apache License 2.0 — see LICENSE.
+
+WHAT IS COVERED
+
+  · the dimensional data and its provenance: src/config/*, src/data/*, and the
+    reasoning written beside every number in those files;
+  · the documentation in docs/ and README.md;
+  · the survey schedule, the conflict records, and the notes on what the model
+    cannot vouch for.
+
+This is the part of the project that took the work: not that the tower is 16.5 m
+across, which is published, but the record of which figures are measured, which
+are estimated, which are placeholders, and what would settle each one.
+
+WHAT IS NOT COVERED
+
+  · the photographs in public/photos/ — they belong to their photographers and
+    carry their own licences. Every one is credited in src/data/attribution.json
+    with author, licence and source page, and those terms are not this project's
+    to alter. See NOTICE.
+  · third-party dependencies, each under its own licence.
+  · reference-photos/, which is not distributed with this repository at all.
+
+THE LICENCE
+
+You may share and adapt this material for any purpose, including commercially,
+provided you give appropriate credit, link to the licence, and indicate whether
+changes were made.
+
+Full legal code:  https://creativecommons.org/licenses/by/4.0/legalcode
+Summary:          https://creativecommons.org/licenses/by/4.0/
+
+HOW TO ATTRIBUTE
+
+  Dimensional data from the Qız Qalası reconstruction by Ramin Nəsrəddinzadə,
+  CC BY 4.0, https://github.com/nasraddinzade/maiden-tower-simulator
+
+If you use a figure from this project, please carry its provenance tag with it.
+A number separated from the record of how it was obtained is exactly what this
+project exists to prevent.

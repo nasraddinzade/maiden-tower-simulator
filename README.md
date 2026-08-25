@@ -76,7 +76,8 @@ off it let the walker pass through walls.
 
 The images in `public/photos/` are CC BY-SA or CC0 and every one is credited in
 [`src/data/attribution.json`](src/data/attribution.json) with author, licence and
-source page. Attribution is a licence condition, not a courtesy.
+source page, and the application shows them to the visitor. Attribution is a
+licence condition, not a courtesy — see [`NOTICE`](NOTICE).
 
 `reference-photos/` is git-ignored: it holds working material fetched by the
 scripts, including a `_research-only/` folder whose contents are **not** free and
@@ -95,3 +96,29 @@ Azerbaijani is the default, with English and Russian. All strings go through
 i18next; Azerbaijani is written with full diacritics (ə, ğ, ı, ö, ş, ü, ç).
 Historical terms are never machine-translated — untranslated entries are marked
 `TODO_AZ` and wait for a native speaker.
+
+## Licence
+
+Two licences, because the code and the research are different things.
+
+| | licence | what it covers |
+|---|---|---|
+| **Code** | [Apache-2.0](LICENSE) | `src/` — the procedural geometry, the physics, the interface |
+| **Data and documentation** | [CC BY 4.0](LICENSE-DATA) | `src/config/`, `src/data/`, `docs/`, this README — the dimensions, their provenance, and the record of what is unresolved |
+
+Copyright 2026 Ramin Nəsrəddinzadə.
+
+The split is deliberate. The valuable part of this project is not the renderer —
+it is the record of which figures are measured, which are estimated, which are
+placeholders, and what single observation would settle each one. That record is
+meant to be reused by anyone documenting a monument whose sources are
+incomplete, so it carries the licence that scholarship uses rather than the one
+software uses.
+
+**If you use a figure from here, carry its provenance tag with it.** A number
+separated from the record of how it was obtained is the thing this project
+exists to prevent.
+
+The photographs are neither: they belong to their photographers, under their own
+CC BY-SA and CC0 terms, and nothing here relicenses them. See
+[`NOTICE`](NOTICE).
